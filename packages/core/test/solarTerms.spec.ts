@@ -3,6 +3,8 @@ import {
   JIE, QI, SOLAR_TERMS, solveSolarTerm, termsInGregorianYear,
 } from "../src/astro/solarTerms.js";
 import { apparentSolarLongitude, meeusLowPrecision } from "../src/astro/sun.js";
+import { vsop87 } from "../src/astro/vsop87.js";
+import { DEFAULT_SOLAR_PROVIDER } from "../src/astro/defaults.js";
 import { asTT, fromJulianDay, toJulianDay } from "../src/astro/julian.js";
 import { normSigned } from "../src/astro/angles.js";
 
@@ -43,7 +45,7 @@ describe("求根的自洽性", () => {
   it("解出的时刻代回，视黄经确等于目标值", () => {
     for (const year of [1900, 1950, 1990, 2026, 2100]) {
       for (const t of termsInGregorianYear(year)) {
-        const lambda = apparentSolarLongitude(t.jdTT);
+        const lambda = apparentSolarLongitude(t.jdTT, DEFAULT_SOLAR_PROVIDER);
         expect(Math.abs(normSigned(t.def.longitude - lambda)), `${year} ${t.def.name}`)
           .toBeLessThan(1e-7);
       }
@@ -59,8 +61,17 @@ describe("求根的自洽性", () => {
     }
   });
 
-  it("如实上报所用级数的精度，绝不冒充达标", () => {
+  it("默认走 VSOP87，且如实上报精度", () => {
     const r = solveSolarTerm(315, asTT(jdOf(2026, 2, 4)));
+    expect(r.providerId).toBe("vsop87d-truncated");
+    expect(r.meetsTolerance).toBe(true);
+    // 0.6″ / 3600 / 0.9856°·日⁻¹ × 86400 秒 ≈ 14.6 秒
+    expect(r.estimatedUncertaintySeconds).toBeLessThan(20);
+    expect(DEFAULT_SOLAR_PROVIDER).toBe(vsop87);
+  });
+
+  it("低精度 provider 自陈不达标，且不冒充", () => {
+    const r = solveSolarTerm(315, asTT(jdOf(2026, 2, 4)), { provider: meeusLowPrecision });
     expect(r.providerId).toBe("meeus-low-precision");
     expect(r.meetsTolerance).toBe(false);
     // 0.01° / 0.9856°·日⁻¹ × 86400 秒 ≈ 876 秒 ≈ 14.6 分钟

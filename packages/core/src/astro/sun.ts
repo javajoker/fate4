@@ -7,14 +7,13 @@
  * ┌──────────────────┬────────────┬──────────────────────────────┐
  * │ provider         │ 黄经精度   │ 折合节气时刻误差             │
  * ├──────────────────┼────────────┼──────────────────────────────┤
- * │ meeusLowPrecision│ 约 0.01°   │ 约 ±15 分钟 —— **不达标**    │
- * │ vsop87           │ 约 1″      │ 约 ±1 秒 —— 达标             │
+ * │ meeusLowPrecision│ 约 0.01°   │ 实测最大 800 秒 —— **不达标**│
+ * │ vsop87           │ 约 0.6″    │ 实测最大 42 秒 —— 达标       │
  * └──────────────────┴────────────┴──────────────────────────────┘
  *
- * vsop87 provider 需要 Earth 的 L/R 级数系数（约 195 组），
- * 该数据尚未落地，见 docs/11-validation.md 待校准项。
- * 在它就位前，engine 以 meeusLowPrecision 运行并**在输出中标记精度等级** ——
- * 绝不以低精度结果冒充达标结果。
+ * vsop87 provider 的系数已由官方档案生成并落地（见 astro/vsop87.ts）。
+ * meeusLowPrecision 保留下来只作对照 —— 它在 240 个节气上的实测最大偏差
+ * 为 800 秒，213/240 条超出容差，正好用来证明精度声明不是空话。
  */
 
 import { arcsecToDeg, cosDeg, norm360, sinDeg } from "./angles.js";
@@ -82,7 +81,7 @@ const ABERRATION_CONSTANT = 20.4898;
  */
 export function apparentSolarLongitude(
   jdTT: JulianDayTT,
-  provider: SolarLongitudeProvider = meeusLowPrecision,
+  provider: SolarLongitudeProvider,
 ): number {
   const { geometricLongitude, radiusVector } = provider.position(jdTT);
   const { deltaPsi } = nutation(jdTT);

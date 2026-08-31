@@ -11,7 +11,8 @@
 import { cosDeg, degToMinutes, norm360, normSigned, sinDeg } from "./angles.js";
 import { julianCentury, type JulianDayTT } from "./julian.js";
 import { nutation, trueObliquity } from "./nutation.js";
-import { apparentSolarLongitude, meeusLowPrecision, type SolarLongitudeProvider } from "./sun.js";
+import { apparentSolarLongitude, type SolarLongitudeProvider } from "./sun.js";
+import { DEFAULT_SOLAR_PROVIDER } from "./defaults.js";
 
 /**
  * 返回均时差，单位分钟。
@@ -19,7 +20,7 @@ import { apparentSolarLongitude, meeusLowPrecision, type SolarLongitudeProvider 
  */
 export function equationOfTimeMinutes(
   jdTT: JulianDayTT,
-  provider: SolarLongitudeProvider | undefined = meeusLowPrecision,
+  provider: SolarLongitudeProvider | undefined = DEFAULT_SOLAR_PROVIDER,
 ): number {
   const T = julianCentury(jdTT);
   const tau = T / 10;
@@ -34,7 +35,7 @@ export function equationOfTimeMinutes(
     - (tau ** 5) / 2000000,
   );
 
-  const lambda = apparentSolarLongitude(jdTT, provider ?? meeusLowPrecision);
+  const lambda = apparentSolarLongitude(jdTT, provider ?? DEFAULT_SOLAR_PROVIDER);
   const epsilon = trueObliquity(jdTT);
   const { deltaPsi } = nutation(jdTT);
 

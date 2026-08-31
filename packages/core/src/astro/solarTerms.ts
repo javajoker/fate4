@@ -8,8 +8,9 @@
  * 月柱一律以**节**为界 —— 这是四柱与农历最常被混淆的一处。
  */
 
-import { MEAN_SOLAR_MOTION_DEG_PER_DAY, apparentSolarLongitude, meeusLowPrecision,
+import { MEAN_SOLAR_MOTION_DEG_PER_DAY, apparentSolarLongitude,
   type SolarLongitudeProvider } from "./sun.js";
+import { DEFAULT_SOLAR_PROVIDER } from "./defaults.js";
 import { normSigned } from "./angles.js";
 import { asTT, asUT, fromJulianDay, toJulianDay, type JulianDay, type JulianDayTT } from "./julian.js";
 import { deltaTSeconds } from "./deltaT.js";
@@ -92,7 +93,7 @@ export function solveSolarTerm(
   approxJdTT: JulianDayTT,
   options: SolveOptions = {},
 ): SolveResult {
-  const provider = options.provider ?? meeusLowPrecision;
+  const provider = options.provider ?? DEFAULT_SOLAR_PROVIDER;
   const tol = options.toleranceDeg ?? DEFAULT_TOLERANCE_DEG;
   const maxIter = options.maxIterations ?? DEFAULT_MAX_ITERATIONS;
 
