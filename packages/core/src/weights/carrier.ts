@@ -49,7 +49,8 @@ export interface Carrier {
   /** 稳定标识，如 "month.branch.0"。同一盘内唯一。 */
   readonly id: string;
   readonly stem: Stem;
-  readonly element: Element;
+  /** 五行。**只有 L2 的合化可以改写它** —— 其余任何层不得触碰。 */
+  element: Element;
   readonly polarity: Polarity;
   readonly origin: "revealed" | "hidden";
   readonly position: Position;

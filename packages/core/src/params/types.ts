@@ -54,9 +54,71 @@ export interface WeightParams {
   readonly taiyuanTotal: number;
 }
 
+export type HeKind = "sanhui" | "sanhe" | "banhe" | "gong" | "liuhe" | "ganhe";
+
+export interface GainDecay { readonly gain: number; readonly decay: number }
+
+export interface StructureParams {
+  readonly precedence: readonly string[];
+  readonly sanhui: GainDecay;
+  readonly sanhe: GainDecay;
+  readonly banhe: {
+    readonly shengWang: GainDecay;
+    readonly wangMu: GainDecay;
+    readonly gong: GainDecay;
+  };
+  readonly heDistance: { readonly adjacent: number; readonly gap1: number; readonly gap2: number };
+  readonly externalHeFactor: number;
+  readonly transform: {
+    readonly requireMonthSupport: boolean;
+    readonly requireCatalyst: boolean;
+    readonly catalystThreshold: number;
+    readonly blockOnContention: boolean;
+    readonly blockOnChong: boolean;
+    readonly gainOnSuccess: number;
+    readonly bindFactorOnFailure: number;
+    readonly contentionFactor: number;
+    readonly ganheRequireAdjacent: boolean;
+  };
+  readonly chong: {
+    readonly uprootThreshold: number;
+    readonly strongLoss: number;
+    readonly weakLoss: number;
+    readonly weakLossUproot: number;
+    readonly equalLoss: number;
+    readonly equalBandRatio: number;
+    readonly distance: {
+      readonly adjacent: number; readonly gap1: number; readonly gap2: number;
+      readonly luckToNatal: number; readonly annualToNatal: number; readonly luckToAnnual: number;
+    };
+  };
+  readonly ganchong: { readonly factor: number; readonly requireAdjacent: boolean };
+  readonly arbitration: {
+    readonly heTypeCoef: Readonly<Record<"sanhui" | "sanhe" | "banhe" | "liuhe", number>>;
+    readonly chongCoef: number;
+    readonly decisiveMargin: number;
+    readonly mutualDamageFactor: number;
+  };
+  readonly tomb: {
+    readonly sealedFactor: number;
+    readonly openOnChong: boolean;
+    readonly openOnXing: boolean;
+    readonly releaseGain: number;
+  };
+  readonly xing: {
+    readonly fullFactor: number;
+    readonly ziMaoFactor: number;
+    readonly selfFactor: number;
+    readonly partialFactor: number;
+  };
+  readonly hai: { readonly factor: number };
+  readonly po: { readonly enabled: boolean; readonly factor: number };
+}
+
 export interface Params {
   readonly version: number;
   readonly weights: WeightParams;
+  readonly structure: StructureParams;
 }
 
 /** 递归可选，供覆盖用。 */

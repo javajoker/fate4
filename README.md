@@ -67,10 +67,11 @@ L6 报告   汇总为分层报告
 | **P1** | `astro` 节气 + `time` 真太阳时 | ✅ 完成 —— 对港天文台 240 个节气**最大偏差 42 秒** |
 | **P2** | `chart` L0 排盘 | ✅ 完成 —— 73000 日日柱穷举无错位 |
 | **P3** | `weights` L1 配重 + 参数系统 | ✅ 完成 —— 七条不变量全绿 |
-| P4–P6 | 结构 / 传导 / 断论 | 未开始 |
+| **P4** | `structure` L2 会合冲刑害破 | ✅ 完成 —— 六条不变量全绿 |
+| P5–P6 | 传导 / 断论 | 未开始 |
 | P7–P10 | 神煞应期 / 时间层 / 报告 UI / Skill | 未开始 |
 
-全部 239 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
+全部 277 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
 
 ```bash
 pnpm install && pnpm test && pnpm typecheck
