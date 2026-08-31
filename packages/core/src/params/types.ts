@@ -213,12 +213,31 @@ export interface ConclusionParams {
   readonly femaleChildStarVariant: "standard" | "reversed";
 }
 
+export interface ShenshaParams {
+  /** 起例基准。现代通行以日干/日支为主，年为辅。 */
+  readonly primaryBase: "day" | "year";
+  readonly alsoComputeYearBase: boolean;
+  readonly scanTargets: readonly string[];
+  /** ⚠️ 福星/天厨/词馆 起例文献差异大，默认不启用。 */
+  readonly includeDisputed: boolean;
+  /** ⚠️ 阴干羊刃有分歧，默认不取。 */
+  readonly yinYangRen: boolean;
+  /** ⚠️ 元辰起例记载不一，默认关闭。 */
+  readonly yuanchen: boolean;
+  readonly tianluodiwang: { readonly enabled: boolean; readonly applyNayinFilter: boolean };
+  readonly modifiers: {
+    readonly zuowangThreshold: number;
+    readonly zuoshuaiThreshold: number;
+  };
+}
+
 export interface Params {
   readonly version: number;
   readonly weights: WeightParams;
   readonly structure: StructureParams;
   readonly propagation: PropagationParams;
   readonly conclusion: ConclusionParams;
+  readonly shensha: ShenshaParams;
 }
 
 /** 递归可选，供覆盖用。 */

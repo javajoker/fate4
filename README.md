@@ -70,9 +70,10 @@ L6 报告   汇总为分层报告
 | **P4** | `structure` L2 会合冲刑害破 | ✅ 完成 —— 六条不变量全绿 |
 | **P5** | `propagate` L3 生克传导 | ✅ 完成 —— 顺序无关性 200 次打乱通过 |
 | **P6** | `conclude` L4 旺衰/从格/用神/格局/六亲 | ✅ 完成 —— 七条不变量全绿 |
-| P7–P10 | 神煞应期 / 时间层 / 报告 UI / Skill | 未开始 |
+| **P7a** | `shensha` 神煞与状态修饰 | ✅ 完成 |
+| P7b–P10 | 应期 / 时间层 / 报告 UI / Skill | 未开始 |
 
-全部 361 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
+全部 390 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
 
 ```bash
 pnpm install && pnpm test && pnpm typecheck

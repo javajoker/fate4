@@ -166,4 +166,14 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
     }),
     femaleChildStarVariant: "standard",          // [流派] ⚠️ 待校准 #7
   }),
+  shensha: Object.freeze({
+    primaryBase: "day",
+    alsoComputeYearBase: true,
+    scanTargets: Object.freeze(["year", "month", "day", "hour", "luck", "annual", "taiyuan", "mingGong"]),
+    includeDisputed: false,   // ⚠️ #9 福星/天厨/词馆
+    yinYangRen: false,        // ⚠️ #10 阴干羊刃
+    yuanchen: false,          // ⚠️ #8 元辰起例待定
+    tianluodiwang: Object.freeze({ enabled: true, applyNayinFilter: true }),
+    modifiers: Object.freeze({ zuowangThreshold: 1.30, zuoshuaiThreshold: 0.50 }),
+  }),
 }) as Params;
