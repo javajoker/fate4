@@ -48,6 +48,16 @@ const RANGES: readonly RangeRule[] = [
   { path: "propagation.shengEfficiency", min: 0, max: 1 },
   { path: "propagation.keCost", min: 0, max: 2 },
   { path: "propagation.tongdang.beta", min: 0, max: 10 },
+
+  { path: "conclusion.strengthBands.veryStrong", min: 0, max: 1 },
+  { path: "conclusion.strengthBands.strong", min: 0, max: 1 },
+  { path: "conclusion.strengthBands.balancedLow", min: 0, max: 1 },
+  { path: "conclusion.strengthBands.weak", min: 0, max: 1 },
+  { path: "conclusion.confidence.bandMargin", min: 0.001, max: 0.5 },
+  { path: "conclusion.confidence.floor", min: 0, max: 1 },
+  { path: "conclusion.congge.ratioThreshold", min: 0, max: 1 },
+  { path: "conclusion.specialGe.zhuanwangThreshold", min: 0, max: 1 },
+  { path: "conclusion.specialGe.huaqiConfidenceCap", min: 0, max: 1 },
 ];
 
 const ENUMS: readonly EnumRule[] = [
@@ -55,6 +65,10 @@ const ENUMS: readonly EnumRule[] = [
   { path: "weights.luck.mode", values: ["linear", "step"] },
   { path: "propagation.mode", values: ["syncIterative"] },
   { path: "propagation.tongdang.mode", values: ["resistance", "additive"] },
+  { path: "conclusion.changshengSchool", values: ["yangForwardYinReverse", "sameBirthDeath"] },
+  { path: "conclusion.earthChangsheng", values: ["fireEarthSame", "waterEarthSame"] },
+  { path: "conclusion.yongshen.tiaohou.source", values: ["heuristic", "table"] },
+  { path: "conclusion.femaleChildStarVariant", values: ["standard", "reversed"] },
 ];
 
 function at(obj: unknown, path: string): unknown {
@@ -132,6 +146,14 @@ function validateInvariants(p: Params): string[] {
   // 生的传输效率若 > 1 即凭空造质量，破坏「质量非增」不变量
   if (p.propagation.shengEfficiency > 1) {
     errors.push(`propagation.shengEfficiency 须 ≤ 1，否则「生」会凭空制造质量，实为 ${p.propagation.shengEfficiency}`);
+  }
+
+  // 旺衰五档的阈值必须严格递减，否则分档逻辑会静默失序
+  const b = p.conclusion.strengthBands;
+  if (!(b.veryStrong > b.strong && b.strong > b.balancedLow && b.balancedLow > b.weak)) {
+    errors.push(
+      `conclusion.strengthBands 须严格递减，实为 ${b.veryStrong} > ${b.strong} > ${b.balancedLow} > ${b.weak}`,
+    );
   }
 
   const yearSum = w.year.stem + w.year.branch;

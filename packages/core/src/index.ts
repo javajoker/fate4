@@ -16,3 +16,4 @@ export * from "./params/index.js";
 export * from "./weights/index.js";
 export * from "./structure/index.js";
 export * from "./propagate/index.js";
+export * from "./conclude/index.js";

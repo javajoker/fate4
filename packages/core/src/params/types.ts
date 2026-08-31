@@ -171,11 +171,54 @@ export interface PropagationParams {
   };
 }
 
+export type ChangshengSchoolName = "yangForwardYinReverse" | "sameBirthDeath";
+export type EarthChangshengName = "fireEarthSame" | "waterEarthSame";
+
+export interface ConclusionParams {
+  /** ⚠️ 流派开关：直接改变通根评分，进而改变旺衰判定。 */
+  readonly changshengSchool: ChangshengSchoolName;
+  readonly earthChangsheng: EarthChangshengName;
+  readonly strengthBands: {
+    readonly veryStrong: number; readonly strong: number;
+    readonly balancedLow: number; readonly weak: number;
+  };
+  readonly confidence: { readonly bandMargin: number; readonly floor: number };
+  readonly rootCoef: {
+    readonly luRen: number; readonly changsheng: number;
+    readonly ku: number; readonly yuqi: number;
+  };
+  readonly congge: {
+    readonly ratioThreshold: number;
+    readonly requireRootless: boolean;
+    readonly yinThreshold: number;
+  };
+  readonly specialGe: {
+    readonly zhuanwangThreshold: number;
+    readonly suppressThreshold: number;
+    readonly enableHuaqi: boolean;
+    readonly huaqiConfidenceCap: number;
+  };
+  readonly yongshen: {
+    readonly priority: readonly string[];
+    readonly tiaohou: {
+      /** heuristic = 可计算的极端气候降级；table = 《穷通宝鉴》120 格（待转录）。 */
+      readonly source: "heuristic" | "table";
+      readonly fireFloor: number;
+      readonly waterFloor: number;
+    };
+    readonly weakYongshenThreshold: number;
+    readonly tongguan: { readonly balanceBand: number; readonly dominanceFloor: number };
+    readonly bingyao: { readonly damageThreshold: number };
+  };
+  readonly femaleChildStarVariant: "standard" | "reversed";
+}
+
 export interface Params {
   readonly version: number;
   readonly weights: WeightParams;
   readonly structure: StructureParams;
   readonly propagation: PropagationParams;
+  readonly conclusion: ConclusionParams;
 }
 
 /** 递归可选，供覆盖用。 */

@@ -141,4 +141,29 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
       annualToDayMasterBonus: 1.15,
     }),
   }),
+  conclusion: Object.freeze({
+    changshengSchool: "yangForwardYinReverse",   // [流派] ⚠️ 待校准 #3
+    earthChangsheng: "fireEarthSame",            // [流派] ⚠️ 待校准 #4
+    strengthBands: Object.freeze({
+      veryStrong: 0.70, strong: 0.55, balancedLow: 0.45, weak: 0.30,
+    }),
+    confidence: Object.freeze({ bandMargin: 0.05, floor: 0.30 }),
+    rootCoef: Object.freeze({ luRen: 1.00, changsheng: 0.70, ku: 0.50, yuqi: 0.30 }),
+    congge: Object.freeze({ ratioThreshold: 0.30, requireRootless: true, yinThreshold: 25 }),
+    specialGe: Object.freeze({
+      zhuanwangThreshold: 0.78, suppressThreshold: 40,
+      enableHuaqi: true, huaqiConfidenceCap: 0.60,   // ⚠️ #11 化气格实务争议大
+    }),
+    yongshen: Object.freeze({
+      priority: Object.freeze(["tiaohou", "fuyi", "tongguan", "bingyao"]),
+      tiaohou: Object.freeze({
+        source: "heuristic",   // ⚠️ #2 《穷通宝鉴》120 格待转录
+        fireFloor: 0.08, waterFloor: 0.08,
+      }),
+      weakYongshenThreshold: 15,
+      tongguan: Object.freeze({ balanceBand: 0.20, dominanceFloor: 0.45 }),
+      bingyao: Object.freeze({ damageThreshold: 12 }),
+    }),
+    femaleChildStarVariant: "standard",          // [流派] ⚠️ 待校准 #7
+  }),
 }) as Params;

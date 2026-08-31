@@ -11,10 +11,11 @@ import type { HeCandidate, ClashCandidate } from "./detect.js";
 import type { BranchSlot } from "./types.js";
 import { chongDistanceCoef, heDistanceCoef } from "./distance.js";
 
-export type Verdict = "heWins" | "chongWins" | "mutual";
+/** 互解裁决的结局。与断论层的 Verdict<T>（带推导链的判定）是两回事，故不共用名字。 */
+export type ArbitrationVerdict = "heWins" | "chongWins" | "mutual";
 
 export interface Arbitration {
-  readonly verdict: Verdict;
+  readonly verdict: ArbitrationVerdict;
   readonly he: number;
   readonly chong: number;
 }
