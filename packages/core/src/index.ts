@@ -10,3 +10,4 @@ export * from "./types/ganzhi.js";
 export * from "./ganzhi/index.js";
 export * from "./astro/index.js";
 export * from "./time/index.js";
+export * from "./chart/index.js";
