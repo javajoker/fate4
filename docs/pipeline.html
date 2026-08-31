@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  四柱推演管线 —— L1 配重与大运摆动系数的交互式校准页。
+  已发布为 Artifact: https://claude.ai/code/artifact/f1eeac0e-1aa2-4242-b12f-4e31338e5bd7
+
+  本文件是可独立打开的完整文档。重新发布到 Artifact 时，须先剥掉本文件的文档外壳
+  （doctype、html、head、body 四类标签及本注释），只提交 title 元素起、script 元素止
+  的那段内容 —— Artifact 宿主会自行套上骨架，重复套壳会产生嵌套文档。
+-->
+<title>四柱推演管线</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;700&display=swap">
+
+<style>
+:root{
+  --ground:#F4F6F8; --panel:#FFFFFF; --panel-2:#FAFBFC; --panel-3:#EEF1F4;
+  --ink:#11151B; --ink-2:#495363; --ink-3:#7B8697;
+  --rule:#DCE1E7; --rule-2:#BFC7D1;
+  --wood:#3D7A67; --fire:#BE4E39; --earth:#8A6828; --metal:#667589; --water:#3B5788;
+  --wash:0.13;
+  --serif:"Noto Serif SC","Songti SC","Source Han Serif SC","SimSun",serif;
+  --sans:"IBM Plex Sans","Noto Sans SC","PingFang SC","Hiragino Sans GB",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --maxw:1080px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0C1013; --panel:#141920; --panel-2:#1A2028; --panel-3:#202832;
+    --ink:#E7EBF1; --ink-2:#A2ACBA; --ink-3:#6B7684;
+    --rule:#252D36; --rule-2:#39424E;
+    --wood:#5CA88F; --fire:#E07A61; --earth:#C9A055; --metal:#9FB0C4; --water:#6E90C8;
+    --wash:0.20;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0C1013; --panel:#141920; --panel-2:#1A2028; --panel-3:#202832;
+  --ink:#E7EBF1; --ink-2:#A2ACBA; --ink-3:#6B7684;
+  --rule:#252D36; --rule-2:#39424E;
+  --wood:#5CA88F; --fire:#E07A61; --earth:#C9A055; --metal:#9FB0C4; --water:#6E90C8;
+  --wash:0.20;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:var(--sans); font-size:15px; line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:var(--maxw); margin:0 auto; padding:0 24px 88px}
+
+/* ── type ─────────────────────────────── */
+h1,h2,h3{font-family:var(--serif); font-weight:700; text-wrap:balance; margin:0}
+h1{font-size:clamp(34px,5.4vw,52px); line-height:1.14; letter-spacing:-.01em}
+h2{font-size:clamp(21px,2.8vw,27px); line-height:1.28}
+h3{font-size:16px; font-weight:500}
+p{margin:0}
+.eyebrow{
+  font-family:var(--mono); font-size:11px; font-weight:500;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3);
+}
+.lede{font-size:17px; color:var(--ink-2); max-width:62ch}
+.note{font-size:13.5px; color:var(--ink-2); max-width:66ch}
+.fine{font-size:12.5px; color:var(--ink-3); line-height:1.55}
+.mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
+.gz{font-family:var(--serif)}
+
+/* ── header ───────────────────────────── */
+header{padding:64px 0 40px}
+.hstack{display:flex; flex-direction:column; gap:16px}
+.themebtn{
+  position:absolute; top:20px; right:24px; z-index:5;
+  font-family:var(--mono); font-size:11px; letter-spacing:.1em;
+  background:var(--panel); color:var(--ink-2);
+  border:1px solid var(--rule); border-radius:2px;
+  padding:6px 11px; cursor:pointer;
+}
+.themebtn:hover{border-color:var(--rule-2); color:var(--ink)}
+.themebtn:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
+
+/* ── section shell ────────────────────── */
+section{border-top:1px solid var(--rule); padding:44px 0 8px}
+.shead{display:flex; flex-direction:column; gap:9px; margin-bottom:26px}
+.shead .row{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap}
+.tag{
+  font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.1em;
+  color:var(--ink-3); border:1px solid var(--rule-2); border-radius:2px;
+  padding:2px 7px; white-space:nowrap;
+}
+
+/* ── chart cards ──────────────────────── */
+.chart{display:grid; grid-template-columns:repeat(4,1fr); gap:10px}
+.pil{
+  background:var(--panel); border:1px solid var(--rule); border-radius:3px;
+  padding:14px 12px 12px; display:flex; flex-direction:column; gap:9px; text-align:center;
+}
+.pil.dm{border-color:var(--rule-2); background:var(--panel-2)}
+.pil .cap{font-family:var(--mono); font-size:10.5px; letter-spacing:.12em; color:var(--ink-3)}
+.glyph{font-family:var(--serif); font-size:clamp(30px,5.6vw,42px); line-height:1; font-weight:500}
+.god{font-size:11.5px; color:var(--ink-2); font-family:var(--sans)}
+.hid{
+  display:flex; flex-direction:column; gap:3px; padding-top:8px;
+  border-top:1px solid var(--rule); font-size:11.5px;
+}
+.hid span{display:flex; justify-content:space-between; gap:6px; color:var(--ink-2)}
+.hid b{font-family:var(--serif); font-weight:500; font-size:14px}
+.dmflag{
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.1em;
+  color:var(--ink-3); border-top:1px solid var(--rule); padding-top:6px;
+}
+
+/* 五行 color carriers */
+.e-木{color:var(--wood)} .e-火{color:var(--fire)} .e-土{color:var(--earth)}
+.e-金{color:var(--metal)} .e-水{color:var(--water)}
+.b-木{background:var(--wood)} .b-火{background:var(--fire)} .b-土{background:var(--earth)}
+.b-金{background:var(--metal)} .b-水{background:var(--water)}
+
+/* ── pipeline rail ────────────────────── */
+.rail{display:grid; grid-template-columns:repeat(7,1fr); gap:1px; background:var(--rule); border:1px solid var(--rule); border-radius:3px; overflow:hidden}
+.step{background:var(--panel); padding:13px 12px 15px; display:flex; flex-direction:column; gap:7px; min-width:0}
+.step .lv{font-family:var(--mono); font-size:11px; font-weight:600; color:var(--ink-3); letter-spacing:.08em}
+.step .nm{font-family:var(--serif); font-size:15px; font-weight:500}
+.step .ds{font-size:11.5px; color:var(--ink-2); line-height:1.5}
+.step.soft{background:var(--panel-3)}
+.step.soft .nm,.step.soft .lv{color:var(--ink-2)}
+
+/* ── panel / control layout ───────────── */
+.panel{display:grid; grid-template-columns:minmax(0,268px) minmax(0,1fr); gap:28px; align-items:start}
+.ctrls{display:flex; flex-direction:column; gap:17px; background:var(--panel); border:1px solid var(--rule); border-radius:3px; padding:18px 17px}
+.ctrl{display:flex; flex-direction:column; gap:6px}
+.ctrl .lab{display:flex; justify-content:space-between; align-items:baseline; gap:10px; min-width:0}
+.ctrl .pname{font-family:var(--mono); font-size:11.5px; color:var(--ink-2); min-width:0; flex:1 1 auto; overflow-wrap:anywhere}
+.ctrl .pval{font-family:var(--mono); font-size:12.5px; font-weight:600; font-variant-numeric:tabular-nums; flex:0 0 auto}
+.ctrl .hint{font-size:11px; color:var(--ink-3); line-height:1.45}
+input[type=range]{
+  -webkit-appearance:none; appearance:none; width:100%; height:18px;
+  background:transparent; cursor:pointer; margin:0;
+}
+input[type=range]::-webkit-slider-runnable-track{height:2px; background:var(--rule-2); border-radius:2px}
+input[type=range]::-moz-range-track{height:2px; background:var(--rule-2); border-radius:2px}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; appearance:none; width:13px; height:13px; border-radius:50%;
+  background:var(--ink); margin-top:-5.5px; border:none;
+}
+input[type=range]::-moz-range-thumb{width:13px; height:13px; border-radius:50%; background:var(--ink); border:none}
+input[type=range]:focus-visible{outline:2px solid var(--ink); outline-offset:3px; border-radius:2px}
+.seg{display:flex; gap:0; border:1px solid var(--rule-2); border-radius:2px; overflow:hidden}
+.seg button{
+  flex:1; font-family:var(--serif); font-size:13px; padding:6px 4px;
+  background:var(--panel); color:var(--ink-2); border:none; cursor:pointer;
+  border-right:1px solid var(--rule-2);
+}
+.seg button:last-child{border-right:none}
+.seg button[aria-pressed="true"]{background:var(--ink); color:var(--ground); font-weight:500}
+.seg button:focus-visible{outline:2px solid var(--ink); outline-offset:-2px}
+.reset{
+  font-family:var(--mono); font-size:11px; letter-spacing:.05em;
+  background:none; border:1px solid var(--rule-2); border-radius:2px;
+  color:var(--ink-2); padding:5px 9px; cursor:pointer; align-self:flex-start;
+}
+.reset:hover{color:var(--ink); border-color:var(--ink-3)}
+.reset:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
+
+/* ── readout ──────────────────────────── */
+.readout{display:flex; flex-direction:column; gap:20px; min-width:0}
+.board{background:var(--panel); border:1px solid var(--rule); border-radius:3px; padding:16px 17px; display:flex; flex-direction:column; gap:13px}
+.board h3{font-size:12px; font-family:var(--mono); font-weight:500; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3)}
+
+.wrow{display:grid; grid-template-columns:74px minmax(0,1fr) 58px; gap:11px; align-items:center; margin-bottom:7px}
+.wrow .wl{font-family:var(--serif); font-size:13px; color:var(--ink-2); white-space:nowrap}
+.wrow .wv{font-family:var(--mono); font-size:12px; text-align:right; font-variant-numeric:tabular-nums; color:var(--ink-2)}
+.bar{display:flex; height:19px; border-radius:2px; overflow:hidden; background:var(--panel-3)}
+.seg-b{position:relative; display:flex; align-items:center; justify-content:center; min-width:0; transition:width .18s ease}
+.seg-b span{
+  font-family:var(--serif); font-size:11.5px; font-weight:500; color:var(--panel);
+  white-space:nowrap; overflow:hidden;
+}
+
+.elem{display:grid; grid-template-columns:34px minmax(0,1fr) 74px; gap:11px; align-items:center}
+.elem .en{font-family:var(--serif); font-size:15px; font-weight:500}
+.elem .etrack{height:8px; background:var(--panel-3); border-radius:2px; overflow:hidden}
+.elem .efill{height:100%; transition:width .2s ease}
+.elem .ev{font-family:var(--mono); font-size:11.5px; text-align:right; color:var(--ink-2); font-variant-numeric:tabular-nums}
+
+.verdict{display:grid; grid-template-columns:repeat(auto-fit,minmax(126px,1fr)); gap:1px; background:var(--rule); border:1px solid var(--rule); border-radius:3px; overflow:hidden}
+.vc{background:var(--panel); padding:12px 13px; display:flex; flex-direction:column; gap:4px}
+.vc .vk{font-family:var(--mono); font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--ink-3)}
+.vc .vv{font-family:var(--serif); font-size:21px; font-weight:500; font-variant-numeric:tabular-nums; line-height:1.2}
+.vc .vs{font-size:11.5px; color:var(--ink-2); line-height:1.4}
+.vc.alert{background:var(--panel-2)}
+.vc.alert .vv{color:var(--fire)}
+
+.scale{position:relative; height:46px; margin-top:2px}
+.scale .track{position:absolute; top:19px; left:0; right:0; height:3px; background:var(--panel-3); border-radius:2px; display:flex}
+.scale .zone{height:100%; border-right:1px solid var(--panel)}
+.scale .zone:last-child{border-right:none}
+.scale .mk{position:absolute; top:9px; width:2px; height:23px; background:var(--ink); border-radius:1px; transition:left .18s ease}
+.scale .tick{position:absolute; top:26px; font-family:var(--mono); font-size:10px; color:var(--ink-3); transform:translateX(-50%)}
+.scale .zlab{position:absolute; top:0; font-family:var(--mono); font-size:9.5px; letter-spacing:.06em; color:var(--ink-3); transform:translateX(-50%)}
+
+/* ── 大运 ─────────────────────────────── */
+.luckwrap{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,300px); gap:26px; align-items:center}
+.curve{width:100%; height:auto; display:block; overflow:visible}
+.lreads{display:flex; flex-direction:column; gap:12px}
+.lread{display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding-bottom:9px; border-bottom:1px solid var(--rule)}
+.lread .lk{font-family:var(--serif); font-size:14px; color:var(--ink-2)}
+.lread .lv{font-family:var(--mono); font-size:19px; font-weight:600; font-variant-numeric:tabular-nums}
+
+/* ── generic tables / cards ───────────── */
+.scroller{overflow-x:auto; -webkit-overflow-scrolling:touch}
+table{border-collapse:collapse; width:100%; min-width:440px; font-size:13.5px}
+th,td{text-align:left; padding:9px 13px 9px 0; border-bottom:1px solid var(--rule); vertical-align:top}
+th{font-family:var(--mono); font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--ink-3); font-weight:500; white-space:nowrap}
+td.num{font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap}
+td .gz{font-size:15px}
+
+.cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(258px,1fr)); gap:13px}
+.card{background:var(--panel); border:1px solid var(--rule); border-radius:3px; padding:17px 17px 18px; display:flex; flex-direction:column; gap:10px}
+.card .ck{font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3)}
+.card h3{font-family:var(--serif); font-size:17px; font-weight:500}
+.card p{font-size:13.5px; color:var(--ink-2); line-height:1.62}
+.formula{
+  font-family:var(--mono); font-size:12px; line-height:1.7; color:var(--ink);
+  background:var(--panel-2); border:1px solid var(--rule); border-radius:2px;
+  padding:10px 12px; overflow-x:auto; white-space:pre;
+}
+
+.klist{display:flex; flex-direction:column; gap:0; border:1px solid var(--rule); border-radius:3px; overflow:hidden}
+.kitem{display:grid; grid-template-columns:26px minmax(0,1fr) auto; gap:13px; align-items:baseline; padding:12px 15px; background:var(--panel); border-bottom:1px solid var(--rule)}
+.kitem:last-child{border-bottom:none}
+.kitem .kn{font-family:var(--mono); font-size:11.5px; color:var(--ink-3); font-variant-numeric:tabular-nums}
+.kitem .kt{font-size:13.5px}
+.kitem .kt b{font-weight:600}
+.kitem .kt em{font-style:normal; color:var(--ink-2)}
+.kitem .kd{font-family:var(--mono); font-size:11px; letter-spacing:.05em; color:var(--ink-3); white-space:nowrap}
+.kitem.human{background:var(--panel-2)}
+
+footer{border-top:1px solid var(--rule); margin-top:52px; padding-top:24px; display:flex; flex-direction:column; gap:11px}
+
+@media (max-width:900px){
+  .panel{grid-template-columns:1fr}
+  .luckwrap{grid-template-columns:1fr}
+  .rail{grid-template-columns:repeat(4,1fr)}
+}
+@media (max-width:620px){
+  .wrap{padding:0 16px 64px}
+  .chart{grid-template-columns:repeat(2,1fr)}
+  .rail{grid-template-columns:repeat(2,1fr)}
+  .themebtn{top:14px; right:16px}
+  header{padding:56px 0 34px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none !important}
+}
+</style>
+</head>
+<body>
+<button class="themebtn" id="themeBtn" aria-label="切换主题">明 / 暗</button>
+
+<div class="wrap">
+
+<header>
+  <div class="hstack">
+    <p class="eyebrow">Fate Engine · 规格 v0.1 · 参数快照 default.yaml</p>
+    <h1>四柱推演管线</h1>
+    <p class="lede">六层确定性管线，从干支排盘到应期规则。这一页把 L1 配重与 L3 传导的自由系数暴露成可拖动的控件——参数怎么动、盘面怎么变，一眼看到。全页只有一种饱和色，且只用来表示五行。</p>
+  </div>
+</header>
+
+<section id="sec-chart">
+  <div class="shead">
+    <div class="row"><span class="tag">工作例</span><h2>庚午 · 辛巳 · 丁丑 · 丁未</h2></div>
+    <p class="note">1990-05-12 14:30 生于上海（东经 121.47°），男。真太阳时校正 +9.6 分钟，仍在未时内。年柱以立春为界、月柱以节为界、日柱锚定 2000-01-01 戊午。此盘选作工作例，是因为它的日主党势恰好落在 <span class="mono">r = 0.454</span>，距「中和／身弱」阈值 0.45 仅 0.004——正是置信度机制该发声的地方。</p>
+  </div>
+  <div class="chart" id="chartCards"></div>
+</section>
+
+<section id="sec-rail">
+  <div class="shead">
+    <div class="row"><span class="tag">L0 → L6</span><h2>管线</h2></div>
+    <p class="note">层间单向，下游不得回写上游。前五层是纯函数，同一输入永远同一输出；后两层组织语言，不产生新的命理判断。灰底的两层<strong>不进权重引擎</strong>——月与日是引动的扳机，不是力量的来源。</p>
+  </div>
+  <div class="rail">
+    <div class="step"><span class="lv">L0</span><span class="nm">排盘</span><span class="ds">节气 VSOP87、真太阳时、四柱、胎元、命宫、精确起运</span></div>
+    <div class="step"><span class="lv">L1</span><span class="nm">配重</span><span class="ds">柱基准 100 → 干支 40:60 → 藏干下发 → 月提放大 → 司令分野</span></div>
+    <div class="step"><span class="lv">L2</span><span class="nm">结构</span><span class="ds">会 &gt; 合 &gt; 冲 &gt; 刑 &gt; 害 &gt; 破；合化转五行、冲损、刑冲开库</span></div>
+    <div class="step"><span class="lv">L3</span><span class="nm">传导</span><span class="ds">生克核 × 阴阳 × 距离 × 活性，同步迭代至收敛</span></div>
+    <div class="step"><span class="lv">L4</span><span class="nm">断论</span><span class="ds">十神 → 旺衰 → 从格 → 用神 → 格局 → 宫位六亲</span></div>
+    <div class="step soft"><span class="lv">L5</span><span class="nm">时间</span><span class="ds">大运流年全量重算；<strong>流月流日仅事件匹配</strong></span></div>
+    <div class="step soft"><span class="lv">L6</span><span class="nm">报告</span><span class="ds">分层组装 + 措辞约束扫描，不做新判断</span></div>
+  </div>
+</section>
+
+<section id="sec-weights">
+  <div class="shead">
+    <div class="row"><span class="tag">L1</span><h2>配重：拖动看结论怎么翻</h2></div>
+    <p class="note">每柱基准 100 分，天干与地支按比例拆，地支再按藏干个数下发 <span class="mono">[1.0] / [0.7, 0.3] / [0.65, 0.25, 0.1]</span>。月提单独放大，司令藏干额外加成后在月支内重新归一——所以月支总量恒定，变的只是内部结构。</p>
+  </div>
+  <div class="panel">
+    <div class="ctrls">
+      <div class="ctrl">
+        <div class="lab"><span class="pname">stemShare</span><span class="pval" id="v-stem">0.40</span></div>
+        <input type="range" id="r-stem" min="0.20" max="0.60" step="0.01" value="0.40">
+        <span class="hint">天干占一柱的比例。地支拿走其余。</span>
+      </div>
+      <div class="ctrl">
+        <div class="lab"><span class="pname">monthCommand.branchMultiplier</span><span class="pval" id="v-bm">2.00</span></div>
+        <input type="range" id="r-bm" min="1.0" max="3.0" step="0.05" value="2.00">
+        <span class="hint">月支放大。默认下月柱占本命总量 35.9%，落在传统「月令定五分」的区间内。</span>
+      </div>
+      <div class="ctrl">
+        <div class="lab"><span class="pname">monthCommand.stemMultiplier</span><span class="pval" id="v-sm">1.20</span></div>
+        <input type="range" id="r-sm" min="1.0" max="2.0" step="0.05" value="1.20">
+        <span class="hint">月干放大。天干终究是虚，幅度刻意小于地支。</span>
+      </div>
+      <div class="ctrl">
+        <div class="lab"><span class="pname">monthCommand.silingBoost</span><span class="pval" id="v-sb">1.50</span></div>
+        <input type="range" id="r-sb" min="1.0" max="2.5" step="0.05" value="1.50">
+        <span class="hint">司令藏干加成，加完在月支内重归一。</span>
+      </div>
+      <div class="ctrl">
+        <div class="lab"><span class="pname">司令分野 · 巳月</span></div>
+        <div class="seg" id="silingSeg" role="group" aria-label="司令段选择">
+          <button type="button" data-i="0">戊 5日</button>
+          <button type="button" data-i="1" aria-pressed="true">庚 9日</button>
+          <button type="button" data-i="2">丙 16日</button>
+        </div>
+        <span class="hint">本例生于立夏后约 7 日，落在庚金司令段。同一个月支，月初与月末的力量结构因此不同。</span>
+      </div>
+      <button class="reset" id="resetBtn" type="button">恢复默认值</button>
+    </div>
+
+    <div class="readout">
+      <div class="board">
+        <h3>逐柱权重</h3>
+        <div id="bars"></div>
+      </div>
+      <div class="board">
+        <h3>五行合计</h3>
+        <div id="elems"></div>
+      </div>
+      <div class="verdict" id="verdict"></div>
+      <div class="board">
+        <h3>日主党势标尺</h3>
+        <div class="scale" id="scale">
+          <div class="track" id="scaleTrack"></div>
+          <div class="mk" id="scaleMk" style="left:45.4%"></div>
+        </div>
+        <p class="fine" id="scaleNote"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="sec-luck">
+  <div class="shead">
+    <div class="row"><span class="tag">L1 · 大运</span><h2>经年摆动</h2></div>
+    <p class="note">大运总量恒为 130，但干支内部分配随交运后经过的时间连续变化：天干占比自 0.70 线性衰减至 0.30，<strong>恰在第 5 年末交叉于 65 : 65</strong>。同一步大运的前后半段因此呈现不同气象，而不是在第五年突然跳变。<span class="mono">elapsed</span> 以交运时刻起算，与立春无关。</p>
+  </div>
+  <div class="luckwrap">
+    <div>
+      <svg class="curve" viewBox="0 0 520 210" role="img" aria-labelledby="curveTitle">
+        <title id="curveTitle">大运天干与地支权重随经过年数的交叉曲线</title>
+        <line x1="46" y1="24" x2="46" y2="168" stroke="var(--rule-2)" stroke-width="1"></line>
+        <line x1="46" y1="168" x2="500" y2="168" stroke="var(--rule-2)" stroke-width="1"></line>
+        <line x1="273" y1="24" x2="273" y2="168" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 4"></line>
+        <line x1="46" y1="96" x2="500" y2="96" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 4"></line>
+        <line x1="46" y1="40" x2="500" y2="152" stroke="var(--ink-2)" stroke-width="2"></line>
+        <line x1="46" y1="152" x2="500" y2="40" stroke="var(--ink-3)" stroke-width="2" stroke-dasharray="6 4"></line>
+        <circle cx="273" cy="96" r="4" fill="var(--ground)" stroke="var(--ink)" stroke-width="2"></circle>
+        <line id="mkLine" x1="46" y1="18" x2="46" y2="174" stroke="var(--fire)" stroke-width="1.5"></line>
+        <circle id="mkStem" cx="46" cy="40" r="5" fill="var(--fire)"></circle>
+        <circle id="mkBranch" cx="46" cy="152" r="5" fill="var(--fire)" fill-opacity="0.45"></circle>
+        <text x="500" y="36" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-3)">地支</text>
+        <text x="500" y="164" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-3)">天干</text>
+        <text x="38" y="44" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-3)">91</text>
+        <text x="38" y="100" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-3)">65</text>
+        <text x="38" y="156" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-3)">39</text>
+        <text x="46" y="188" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-3)">0</text>
+        <text x="273" y="188" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-3)">5</text>
+        <text x="500" y="188" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-3)">10</text>
+        <text x="273" y="205" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-3)">交运后经过年数</text>
+      </svg>
+    </div>
+    <div class="lreads">
+      <div class="ctrl">
+        <div class="lab"><span class="pname">elapsed</span><span class="pval" id="v-el">0.0 年</span></div>
+        <input type="range" id="r-el" min="0" max="10" step="0.1" value="0">
+      </div>
+      <div class="lread"><span class="lk">第三步大运 <b class="gz">甲申</b></span></div>
+      <div class="lread"><span class="lk">天干 <b class="gz e-木">甲</b></span><span class="lv mono" id="l-stem">91.0</span></div>
+      <div class="lread"><span class="lk">地支 <b class="gz e-金">申</b></span><span class="lv mono" id="l-branch">39.0</span></div>
+      <p class="fine" id="l-note">阳男顺行，月柱辛巳起。交运初期天干当权，甲木正印透出主事。</p>
+    </div>
+  </div>
+</section>
+
+<section id="sec-l3">
+  <div class="shead">
+    <div class="row"><span class="tag">L3</span><h2>三条建模决策</h2></div>
+    <p class="note">传导层是整个系统的中心，也是我偏离「朴素量化八字」最远的地方。三条决策各有其数学理由与命理理由，两者必须同时成立才被采纳。</p>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <span class="ck">决策一</span>
+      <h3>生是「流」，不是「加」</h3>
+      <p>木生火不是凭空给火加分，而是木的一部分流向火。母生子，母泄气——这是传统的明确表述。</p>
+      <div class="formula">W木 −= F
+W火 += η · F      η = 0.85</div>
+      <p><span class="mono">(1−η)</span> 是传输损耗，不进入任何载体。于是「生」准守恒，不会引发数值爆炸。</p>
+    </div>
+    <div class="card">
+      <span class="ck">决策二</span>
+      <h3>克是「毁」，不是「转移」</h3>
+      <p>金克木不是金拿走木的分，是金削掉木的分，且金自己也耗力。</p>
+      <div class="formula">W木 −= D
+W金 −= D · 0.30</div>
+      <p>双方都减 → 严格收缩，天然收敛。总量只减不增，是可以写成断言的不变量。</p>
+    </div>
+    <div class="card">
+      <span class="ck">决策三 · 最大分歧</span>
+      <h3>同类不加权，改为抗性</h3>
+      <p>若把比劫实现为同五行互相加分，两个载体每轮互增约 16%，带阻尼后仍是复利——二十轮放大四倍以上，数值必然发散。</p>
+      <div class="formula">resistance = 1 / (1 + β · S)
+β = 0.60      仅作用于「克」</div>
+      <p>比劫在传统中的真实职能是分担官杀之克、帮身任财官——那是抗压，不是凭空生力。附带收益：通根被自动覆盖，天干的根就是同柱距离 1.00 的同五行载体。</p>
+    </div>
+  </div>
+</section>
+
+<section id="sec-asym">
+  <div class="shead">
+    <div class="row"><span class="tag">L3 · 系数</span><h2>阴阳的不对称</h2></div>
+    <p class="note">生与克的阴阳规律<strong>方向相反</strong>：生取异性为强，克取同性为强。这是四柱阴阳理论的核心不对称，也是本引擎写进单元测试的一条硬约束。</p>
+  </div>
+  <div class="scroller">
+    <table>
+      <thead><tr><th>关系</th><th>阴阳</th><th>系数</th><th>十神</th><th>命理依据</th></tr></thead>
+      <tbody>
+        <tr><td>生</td><td><b>异</b>性</td><td class="num">1.00</td><td>正印 · 伤官</td><td>有情之生，力大</td></tr>
+        <tr><td>生</td><td><b>同</b>性</td><td class="num">0.70</td><td>偏印 · 食神</td><td>同性相斥，生而不亲</td></tr>
+        <tr><td>克</td><td><b>同</b>性</td><td class="num">1.00</td><td>七杀</td><td>无情之克，力猛</td></tr>
+        <tr><td>克</td><td><b>异</b>性</td><td class="num">0.70</td><td>正官 · 正财</td><td>有情之克，制约而不摧折</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div style="height:26px"></div>
+  <div class="shead"><div class="row"><span class="tag">L3 · 距离</span><h3 style="font-size:19px;font-family:var(--serif);font-weight:700">距离衰减与外部层</h3></div></div>
+  <div class="scroller">
+    <table>
+      <thead><tr><th>关系</th><th>系数</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>同柱（天干 ↔ 本柱藏干）</td><td class="num">1.00</td><td>通根与坐下之支的特殊重要性由此表达，L1 不再另加系数</td></tr>
+        <tr><td>同一地支内的藏干之间</td><td class="num">0.60</td><td>巳中丙火克庚金是真实的——庚在巳虽长生却受制</td></tr>
+        <tr><td>相邻柱</td><td class="num">0.80</td><td></td></tr>
+        <tr><td>隔一柱</td><td class="num">0.40</td><td></td></tr>
+        <tr><td>隔两柱（年 ↔ 时）</td><td class="num">0.20</td><td></td></tr>
+        <tr><td>跨层附加（天干 ↔ 异柱地支）</td><td class="num">×0.70</td><td></td></tr>
+        <tr><td>大运 → 本命</td><td class="num">0.80</td><td rowspan="4" style="border-bottom:1px solid var(--rule)">刻意不对称。环境作用于人强，人作用于环境弱——身强者在坏流年里受损较小，但不会把坏流年变成好流年。</td></tr>
+        <tr><td>流年 → 本命</td><td class="num">0.70</td></tr>
+        <tr><td>本命 → 大运</td><td class="num">0.60</td></tr>
+        <tr><td>本命 → 流年</td><td class="num">0.50</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="sec-open">
+  <div class="shead">
+    <div class="row"><span class="tag">待定</span><h2>需要拍板的十一项</h2></div>
+    <p class="note">这些是<strong>人工决策项</strong>，不进自动校准。把流派选择交给拟合，会得到一个在古籍命例上分数很高、但内部理论不自洽的模型。浅底行是我认为最要紧的四项。</p>
+  </div>
+  <div class="klist">
+    <div class="kitem human"><span class="kn">01</span><span class="kt"><b>命宫月界</b> <em>— 节（主流软件）还是中气（命宫源自月将，月将换于中气，理论更自洽）</em></span><span class="kd">默认 jie</span></div>
+    <div class="kitem human"><span class="kn">02</span><span class="kt"><b>十二长生流派</b> <em>— 阳顺阴逆 还是 阴阳同生同死。直接改变通根与旺衰</em></span><span class="kd">默认 阳顺阴逆</span></div>
+    <div class="kitem human"><span class="kn">03</span><span class="kt"><b>土的长生</b> <em>— 火土同宫 还是 水土同宫</em></span><span class="kd">默认 火土</span></div>
+    <div class="kitem human"><span class="kn">04</span><span class="kt"><b>子时规则</b> <em>— 晚子换日 / 早子不换 / 折衷。须在报告显式标注</em></span><span class="kd">默认 晚子换日</span></div>
+    <div class="kitem"><span class="kn">05</span><span class="kt"><b>《穷通宝鉴》调候表</b> <em>— 120 格待逐格转录、双源校对。当前用可计算的极端气候规则降级</em></span><span class="kd">heuristic</span></div>
+    <div class="kitem"><span class="kn">06</span><span class="kt"><b>藏干变体</b> <em>— 申三藏／二藏，亥二藏／三藏</em></span><span class="kd">默认 standard</span></div>
+    <div class="kitem"><span class="kn">07</span><span class="kt"><b>女命子女星分配</b> <em>— 食神为儿／伤官为女，或反向</em></span><span class="kd">默认 standard</span></div>
+    <div class="kitem"><span class="kn">08</span><span class="kt"><b>元辰起例</b> <em>— 记载不一，待择底本</em></span><span class="kd">关闭</span></div>
+    <div class="kitem"><span class="kn">09</span><span class="kt"><b>福星／天厨／词馆起例</b> <em>— 文献差异较大</em></span><span class="kd">关闭</span></div>
+    <div class="kitem"><span class="kn">10</span><span class="kt"><b>阴干羊刃</b> <em>— 取乙辰丁未己未辛戌癸丑，或不取</em></span><span class="kd">关闭</span></div>
+    <div class="kitem"><span class="kn">11</span><span class="kt"><b>化气格</b> <em>— 实务误判率高，当前 confidence 上限锁 0.60</em></span><span class="kd">开启 · 受限</span></div>
+  </div>
+</section>
+
+<footer>
+  <p class="fine">L4 判定的目标一致率定在 75%，不是 95%。古籍注家对同一命例的旺衰都会打架，追到 95% 就是过拟合到某一家之言。剩下的 25% 中有相当一部分是真实的流派分歧，应由 confidence 与 alternatives 如实呈现，而不是靠调参硬掰过去。</p>
+  <p class="fine">本页为四柱命理的计算实现之设计文档，属传统文化研究与自我省思的工具。其中的判定基于传统命理典籍的规则与本系统的量化模型，不具备预测未来事件的能力，不构成医疗、法律、财务或任何专业建议。</p>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STEM = {
+    "甲":["木","阳"],"乙":["木","阴"],"丙":["火","阳"],"丁":["火","阴"],
+    "戊":["土","阳"],"己":["土","阴"],"庚":["金","阳"],"辛":["金","阴"],
+    "壬":["水","阳"],"癸":["水","阴"]
+  };
+  var GEN = {"木":"火","火":"土","土":"金","金":"水","水":"木"};
+  var KE  = {"木":"土","火":"金","土":"水","金":"木","水":"火"};
+  var ELS = ["木","火","土","金","水"];
+
+  var PILLARS = [
+    {key:"year",  cap:"年柱", stem:"庚", branch:"午", hidden:["丁","己"]},
+    {key:"month", cap:"月柱", stem:"辛", branch:"巳", hidden:["丙","庚","戊"]},
+    {key:"day",   cap:"日柱", stem:"丁", branch:"丑", hidden:["己","癸","辛"]},
+    {key:"hour",  cap:"时柱", stem:"丁", branch:"未", hidden:["己","丁","乙"]}
+  ];
+  var SPLIT = {1:[1.0], 2:[0.70,0.30], 3:[0.65,0.25,0.10]};
+  var SILING = ["戊","庚","丙"];
+  var DM = "丁", DM_EL = "火", DM_POL = "阴";
+
+  var P = {stemShare:0.40, bm:2.00, sm:1.20, sb:1.50, seg:1};
+  var DEFAULTS = {stemShare:0.40, bm:2.00, sm:1.20, sb:1.50, seg:1};
+
+  function tenGod(el, pol){
+    var same = (pol === DM_POL);
+    if (el === DM_EL)      return same ? "比肩" : "劫财";
+    if (GEN[DM_EL] === el) return same ? "食神" : "伤官";
+    if (KE[DM_EL] === el)  return same ? "偏财" : "正财";
+    if (KE[el] === DM_EL)  return same ? "七杀" : "正官";
+    if (GEN[el] === DM_EL) return same ? "偏印" : "正印";
+    return "";
+  }
+
+  function compute(){
+    var out = [];
+    for (var i=0;i<PILLARS.length;i++){
+      var p = PILLARS[i];
+      var isMonth = (p.key === "month");
+      var stemW   = 100 * P.stemShare * (isMonth ? P.sm : 1);
+      var branchW = 100 * (1 - P.stemShare) * (isMonth ? P.bm : 1);
+
+      var ratios = SPLIT[p.hidden.length];
+      var raw = [];
+      for (var k=0;k<p.hidden.length;k++) raw.push(branchW * ratios[k]);
+
+      if (isMonth){
+        var cmd = SILING[P.seg], sum = 0, j;
+        var boosted = raw.slice();
+        for (j=0;j<p.hidden.length;j++){
+          var h = p.hidden[j];
+          var match = (h === cmd) || (STEM[h][0] === STEM[cmd][0]);
+          if (match) boosted[j] = raw[j] * P.sb;
+        }
+        for (j=0;j<boosted.length;j++) sum += boosted[j];
+        var norm = sum > 0 ? branchW / sum : 1;
+        for (j=0;j<boosted.length;j++) raw[j] = boosted[j] * norm;
+      }
+
+      var hid = [];
+      for (var m=0;m<p.hidden.length;m++){
+        var hs = p.hidden[m];
+        hid.push({stem:hs, el:STEM[hs][0], pol:STEM[hs][1], w:raw[m], god:tenGod(STEM[hs][0], STEM[hs][1])});
+      }
+      out.push({
+        key:p.key, cap:p.cap, branch:p.branch, isMonth:isMonth,
+        stem:{stem:p.stem, el:STEM[p.stem][0], pol:STEM[p.stem][1], w:stemW, god:tenGod(STEM[p.stem][0], STEM[p.stem][1])},
+        hidden:hid,
+        total:stemW + branchW
+      });
+    }
+    return out;
+  }
+
+  function totals(rows){
+    var by = {"木":0,"火":0,"土":0,"金":0,"水":0}, grand = 0, dmW = 0;
+    for (var i=0;i<rows.length;i++){
+      var r = rows[i];
+      by[r.stem.el] += r.stem.w; grand += r.stem.w;
+      if (r.key === "day") dmW = r.stem.w;
+      for (var j=0;j<r.hidden.length;j++){ by[r.hidden[j].el] += r.hidden[j].w; grand += r.hidden[j].w; }
+    }
+    var yinW = 0;
+    for (var e in GEN){ if (GEN[e] === DM_EL) yinW = by[e]; }
+    var support = by[DM_EL] + yinW;
+    var oppose  = grand - support;
+    return {by:by, grand:grand, dmW:dmW, support:support, oppose:oppose,
+            ratio: grand > 0 ? support/grand : 0, yin:yinW};
+  }
+
+  function band(r){
+    if (r >= 0.70) return {k:"VERY_STRONG", zh:"极旺", note:"专旺格候选"};
+    if (r >= 0.55) return {k:"STRONG",      zh:"身旺", note:"取食伤 · 财 · 官杀"};
+    if (r >= 0.45) return {k:"BALANCED",    zh:"中和", note:"补最弱一环或取通关"};
+    if (r >= 0.30) return {k:"WEAK",        zh:"身弱", note:"取印 · 比劫"};
+    return {k:"VERY_WEAK", zh:"极弱", note:"从格候选，须再验通根"};
+  }
+  var EDGES = [0.30, 0.45, 0.55, 0.70];
+  function confidence(r){
+    var d = Infinity;
+    for (var i=0;i<EDGES.length;i++) d = Math.min(d, Math.abs(r - EDGES[i]));
+    return Math.max(0.30, Math.min(1.0, d / 0.05));
+  }
+
+  function fmt(n, d){ return n.toFixed(d === undefined ? 1 : d); }
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  var elCards = document.getElementById("chartCards");
+  var elBars  = document.getElementById("bars");
+  var elElems = document.getElementById("elems");
+  var elVerd  = document.getElementById("verdict");
+  var elTrack = document.getElementById("scaleTrack");
+  var elMk    = document.getElementById("scaleMk");
+  var elScale = document.getElementById("scale");
+  var elSNote = document.getElementById("scaleNote");
+
+  function renderCards(rows){
+    var html = "";
+    for (var i=0;i<rows.length;i++){
+      var r = rows[i], isDay = (r.key === "day");
+      html += '<div class="pil' + (isDay ? " dm" : "") + '">';
+      html += '<span class="cap">' + r.cap + '</span>';
+      html += '<span class="glyph e-' + r.stem.el + '">' + r.stem.stem + '</span>';
+      html += '<span class="god">' + (isDay ? "日主" : r.stem.god) + '</span>';
+      html += '<span class="glyph e-' + STEM[r.hidden[0].stem][0] + '">' + r.branch + '</span>';
+      html += '<div class="hid">';
+      for (var j=0;j<r.hidden.length;j++){
+        var h = r.hidden[j];
+        html += '<span><b class="e-' + h.el + '">' + h.stem + '</b>' + h.god + '</span>';
+      }
+      html += '</div>';
+      if (isDay) html += '<span class="dmflag">丁火 · 阴</span>';
+      html += '</div>';
+    }
+    elCards.innerHTML = html;
+  }
+
+  function renderBars(rows){
+    var max = 0;
+    for (var i=0;i<rows.length;i++) max = Math.max(max, rows[i].total);
+    var html = "";
+    for (var k=0;k<rows.length;k++){
+      var r = rows[k];
+      var segs = [{s:r.stem.stem, el:r.stem.el, w:r.stem.w}];
+      for (var j=0;j<r.hidden.length;j++) segs.push({s:r.hidden[j].stem, el:r.hidden[j].el, w:r.hidden[j].w});
+      html += '<div class="wrow">';
+      html += '<span class="wl">' + r.cap + (r.isMonth ? " ·月提" : "") + '</span>';
+      html += '<div class="bar" style="width:' + (100 * r.total / max) + '%">';
+      for (var m=0;m<segs.length;m++){
+        var pct = 100 * segs[m].w / r.total;
+        html += '<div class="seg-b b-' + segs[m].el + '" style="width:' + pct + '%" title="' +
+                esc(segs[m].s) + " " + fmt(segs[m].w) + '"><span>' +
+                (pct > 9 ? esc(segs[m].s) : "") + '</span></div>';
+      }
+      html += '</div><span class="wv">' + fmt(r.total) + '</span></div>';
+    }
+    elBars.innerHTML = html;
+  }
+
+  function renderElems(t){
+    var max = 0, i;
+    for (i=0;i<ELS.length;i++) max = Math.max(max, t.by[ELS[i]]);
+    var html = "";
+    for (i=0;i<ELS.length;i++){
+      var e = ELS[i], w = t.by[e];
+      html += '<div class="elem">';
+      html += '<span class="en e-' + e + '">' + e + (e === DM_EL ? "" : "") + '</span>';
+      html += '<div class="etrack"><div class="efill b-' + e + '" style="width:' + (max > 0 ? 100*w/max : 0) + '%"></div></div>';
+      html += '<span class="ev">' + fmt(w) + '　' + fmt(100*w/t.grand,1) + '%</span>';
+      html += '</div>';
+    }
+    elElems.innerHTML = html;
+  }
+
+  function renderVerdict(t){
+    var r = t.ratio, b = band(r), c = confidence(r);
+    var low = c <= 0.45;
+    var html = "";
+    html += '<div class="vc"><span class="vk">同党 / 异党</span><span class="vv">' +
+            fmt(t.support) + ' : ' + fmt(t.oppose) + '</span><span class="vs">日主 ' + fmt(t.dmW) +
+            ' ＋ 比劫 ' + fmt(t.by[DM_EL] - t.dmW) + ' ＋ 印 ' + fmt(t.yin) + '</span></div>';
+    html += '<div class="vc"><span class="vk">r 值</span><span class="vv">' + r.toFixed(3) +
+            '</span><span class="vs">同党占全盘比例</span></div>';
+    html += '<div class="vc"><span class="vk">旺衰</span><span class="vv">' + b.zh +
+            '</span><span class="vs">' + b.k + ' · ' + b.note + '</span></div>';
+    html += '<div class="vc' + (low ? " alert" : "") + '"><span class="vk">置信度</span><span class="vv">' +
+            c.toFixed(2) + '</span><span class="vs">' +
+            (low ? "临界，报告须并列 alternatives" : "距阈值充分，可径直取用") + '</span></div>';
+    elVerd.innerHTML = html;
+  }
+
+  function renderScale(t){
+    var r = t.ratio;
+    var zones = [
+      {to:0.30, cls:"b-水"}, {to:0.45, cls:"b-金"},
+      {to:0.55, cls:"b-土"}, {to:0.70, cls:"b-火"}, {to:1.00, cls:"b-木"}
+    ];
+    var prev = 0, html = "";
+    for (var i=0;i<zones.length;i++){
+      html += '<div class="zone ' + zones[i].cls + '" style="width:' + (100*(zones[i].to - prev)) + '%;opacity:.55"></div>';
+      prev = zones[i].to;
+    }
+    elTrack.innerHTML = html;
+
+    var old = elScale.querySelectorAll(".tick,.zlab");
+    for (var q=0;q<old.length;q++) old[q].parentNode.removeChild(old[q]);
+    var labs = [[0.30,"0.30"],[0.45,"0.45"],[0.55,"0.55"],[0.70,"0.70"]];
+    for (var j=0;j<labs.length;j++){
+      var d = document.createElement("div");
+      d.className = "tick"; d.style.left = (100*labs[j][0]) + "%";
+      d.textContent = labs[j][1]; elScale.appendChild(d);
+    }
+    var zl = [[0.15,"极弱"],[0.375,"身弱"],[0.50,"中和"],[0.625,"身旺"],[0.85,"极旺"]];
+    for (var z=0;z<zl.length;z++){
+      var s = document.createElement("div");
+      s.className = "zlab"; s.style.left = (100*zl[z][0]) + "%";
+      s.textContent = zl[z][1]; elScale.appendChild(s);
+    }
+    elMk.style.left = (100*r) + "%";
+
+    var c = confidence(r), b = band(r);
+    var nearest = EDGES[0], dmin = Infinity;
+    for (var k=0;k<EDGES.length;k++){
+      var dd = Math.abs(r - EDGES[k]);
+      if (dd < dmin){ dmin = dd; nearest = EDGES[k]; }
+    }
+    elSNote.textContent = "r = " + r.toFixed(3) + "，距最近阈值 " + nearest.toFixed(2) +
+      " 有 " + dmin.toFixed(3) + "，置信度 " + c.toFixed(2) + "。" +
+      (c <= 0.45
+        ? "落在临界带内——报告必须写明「接近临界，两种取用皆需参考」，并在 alternatives 中给出另一判定下的用神。这正是本引擎与市面工具的分野：临界盘就是临界盘，不该被强行归类。"
+        : "判定" + b.zh + "，距阈值充分，可径直进入取用流程。");
+  }
+
+  function renderAll(){
+    var rows = compute(), t = totals(rows);
+    renderCards(rows); renderBars(rows); renderElems(t);
+    renderVerdict(t); renderScale(t);
+  }
+
+  function bind(id, key, dec, suffix){
+    var el = document.getElementById("r-" + id);
+    var lab = document.getElementById("v-" + id);
+    el.addEventListener("input", function(){
+      P[key] = parseFloat(el.value);
+      lab.textContent = P[key].toFixed(dec) + (suffix || "");
+      renderAll();
+    });
+  }
+  bind("stem","stemShare",2);
+  bind("bm","bm",2);
+  bind("sm","sm",2);
+  bind("sb","sb",2);
+
+  var segBtns = document.getElementById("silingSeg").querySelectorAll("button");
+  for (var i=0;i<segBtns.length;i++){
+    (function(btn){
+      btn.addEventListener("click", function(){
+        P.seg = parseInt(btn.getAttribute("data-i"), 10);
+        for (var j=0;j<segBtns.length;j++)
+          segBtns[j].setAttribute("aria-pressed", segBtns[j] === btn ? "true" : "false");
+        renderAll();
+      });
+    })(segBtns[i]);
+  }
+
+  document.getElementById("resetBtn").addEventListener("click", function(){
+    for (var k in DEFAULTS) P[k] = DEFAULTS[k];
+    document.getElementById("r-stem").value = P.stemShare;
+    document.getElementById("r-bm").value   = P.bm;
+    document.getElementById("r-sm").value   = P.sm;
+    document.getElementById("r-sb").value   = P.sb;
+    document.getElementById("v-stem").textContent = P.stemShare.toFixed(2);
+    document.getElementById("v-bm").textContent   = P.bm.toFixed(2);
+    document.getElementById("v-sm").textContent   = P.sm.toFixed(2);
+    document.getElementById("v-sb").textContent   = P.sb.toFixed(2);
+    for (var j=0;j<segBtns.length;j++)
+      segBtns[j].setAttribute("aria-pressed", j === P.seg ? "true" : "false");
+    renderAll();
+  });
+
+  /* ── 大运摆动 ── */
+  var rEl = document.getElementById("r-el");
+  var X0 = 46, X1 = 500, Y_HI = 40, Y_LO = 152;
+  function renderLuck(){
+    var e = parseFloat(rEl.value);
+    var share = 0.70 - 0.40 * (e / 10);
+    var sw = 130 * share, bw = 130 - sw;
+    var x  = X0 + (X1 - X0) * (e / 10);
+    document.getElementById("v-el").textContent = e.toFixed(1) + " 年";
+    document.getElementById("l-stem").textContent   = sw.toFixed(1);
+    document.getElementById("l-branch").textContent = bw.toFixed(1);
+    var ml = document.getElementById("mkLine");
+    ml.setAttribute("x1", x); ml.setAttribute("x2", x);
+    var ms = document.getElementById("mkStem");
+    ms.setAttribute("cx", x); ms.setAttribute("cy", Y_HI + (Y_LO - Y_HI) * (e/10));
+    var mb = document.getElementById("mkBranch");
+    mb.setAttribute("cx", x); mb.setAttribute("cy", Y_LO - (Y_LO - Y_HI) * (e/10));
+    var note;
+    if (e < 4.6)       note = "天干当权，甲木正印透出主事。生扶日主，前段偏印绶文书之象。";
+    else if (e < 5.4)  note = "交叉点。干支平权 65 : 65，恰在第 5 年末——气象由虚转实的转折。";
+    else               note = "地支当权，申金主事。庚壬戊三藏得势，财杀渐显，后段与前段判若两运。";
+    document.getElementById("l-note").textContent = note;
+  }
+  rEl.addEventListener("input", renderLuck);
+
+  /* ── theme ── */
+  var btn = document.getElementById("themeBtn");
+  btn.addEventListener("click", function(){
+    var cur = document.documentElement.getAttribute("data-theme");
+    var next;
+    if (cur === "dark") next = "light";
+    else if (cur === "light") next = "dark";
+    else next = window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem("fate-theme", next); } catch (err) {}
+  });
+  try {
+    var saved = localStorage.getItem("fate-theme");
+    if (saved === "dark" || saved === "light") document.documentElement.setAttribute("data-theme", saved);
+  } catch (err) {}
+
+  renderAll();
+  renderLuck();
+})();
+</script>
+</body>
+</html>

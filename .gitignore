@@ -18,3 +18,4 @@ coverage/
 # 校准产物（本地实验，不入库；baseline.json 例外，需版本化）
 calibration/log.jsonl
 !calibration/baseline.json
+*.tsbuildinfo

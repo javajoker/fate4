@@ -55,14 +55,27 @@ L6 报告   汇总为分层报告
 | [09-report](docs/09-report.md) | 报告系统结构与叙述生成 |
 | [10-architecture](docs/10-architecture.md) | 应用方案：模块划分、API、UI、Agent Skill |
 | [11-validation](docs/11-validation.md) | 验证方案、测试向量、待校准清单 |
+| [pipeline.html](docs/pipeline.html) | **交互页** —— 管线总览 + L1 配重与大运摆动系数的实时校准（[在线版](https://claude.ai/code/artifact/f1eeac0e-1aa2-4242-b12f-4e31338e5bd7)） |
 
 ---
 
 ## 状态
 
-当前阶段：**规格已定，实现未开始。**
+| 阶段 | 内容 | 状态 |
+| --- | --- | --- |
+| **P0** | `ganzhi` 静态表与代数 | ✅ **107 测试全绿**，`tsc --strict` 干净 |
+| P1 | `astro` 节气 + 真太阳时 | 未开始 |
+| P2 | `chart` L0 排盘 | 未开始 |
+| P3–P6 | 配重 / 结构 / 传导 / 断论 | 未开始 |
+| P7–P10 | 神煞应期 / 时间层 / 报告 UI / Skill | 未开始 |
 
-文档中标记 `⚠️ 待校准` 的条目表示该处存在流派分歧或公式需外部验证，默认值已给出但需以参考万年历/命例回归确认。清单见 [11-validation](docs/11-validation.md)。
+完整实施顺序与完成判据见 [10-architecture §7](docs/10-architecture.md)。**P2 不零误差不进 P3** —— 排盘的对错是可以 100% 客观验证的。
+
+```bash
+pnpm install && pnpm test && pnpm typecheck
+```
+
+文档中标记 `⚠️ 待校准` 的条目表示该处存在流派分歧或公式需外部验证，默认值已给出但需以参考万年历/命例回归确认。清单见 [11-validation §5](docs/11-validation.md)。
 
 ---
 

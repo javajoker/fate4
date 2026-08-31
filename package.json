@@ -1,0 +1,17 @@
+{
+  "name": "fate",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "四柱预测引擎 —— 可复现、可审计、可校准",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b --pretty"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.0"
+  }
+}

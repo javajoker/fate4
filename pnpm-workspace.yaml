@@ -1,0 +1,18 @@
+packages:
+  - "packages/*"
+allowBuilds:
+  esbuild: set this to true or false
+
+# esbuild 的 postinstall 刻意不执行 —— 其二进制由平台可选依赖
+# （@esbuild/darwin-arm64 等）提供，该脚本仅作回退校验，跳过不影响 vitest。
+# 在此显式声明，是要让「跳过」成为一个记录在案的决定，而不是每次安装都弹的告警。
+#
+# 本仓库的默认立场：不批准任何依赖的构建脚本。需要时逐个声明并说明理由。
+# 设置名是 pnpm 11 的 ignoredDependencyBuilds；pnpm 10 下对应 ignoredBuiltDependencies。
+ignoredDependencyBuilds:
+  - esbuild
+
+# pnpm run 之前的依赖状态检查会另起 install 子进程，该子进程不继承上面的
+# ignoredDependencyBuilds，于是 pnpm test 被 ERR_PNPM_IGNORED_BUILDS 挡下。
+# 关掉这个便利性检查 —— 安装由 CI 与开发者显式执行，不靠 run 时的隐式补装。
+verifyDepsBeforeRun: false
