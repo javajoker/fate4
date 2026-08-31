@@ -37,11 +37,24 @@ const RANGES: readonly RangeRule[] = [
   { path: "weights.kongwang.factor", min: 0, max: 1 },
   { path: "weights.revealedResonance", min: 0, max: 5 },
   { path: "weights.taiyuanTotal", min: 0, max: 1000 },
+
+  { path: "propagation.damping", min: 0, max: 1 },
+  { path: "propagation.maxRounds", min: 1, max: 100 },
+  { path: "propagation.epsilon", min: 0, max: 1 },
+  { path: "propagation.outflowCap", min: 0, max: 1 },
+  { path: "propagation.inflowDamageCap", min: 0, max: 1 },
+  { path: "propagation.kernel.sheng", min: 0, max: 2 },
+  { path: "propagation.kernel.ke", min: 0, max: 2 },
+  { path: "propagation.shengEfficiency", min: 0, max: 1 },
+  { path: "propagation.keCost", min: 0, max: 2 },
+  { path: "propagation.tongdang.beta", min: 0, max: 10 },
 ];
 
 const ENUMS: readonly EnumRule[] = [
   { path: "weights.monthCommand.silingResolution", values: ["exact", "sameElement", "none"] },
   { path: "weights.luck.mode", values: ["linear", "step"] },
+  { path: "propagation.mode", values: ["syncIterative"] },
+  { path: "propagation.tongdang.mode", values: ["resistance", "additive"] },
 ];
 
 function at(obj: unknown, path: string): unknown {
@@ -114,6 +127,11 @@ function validateInvariants(p: Params): string[] {
         errors.push(`weights.hiddenSplit.${n} 须递减（本气 > 中气 > 余气），第 ${i + 1} 项反而更大`);
       }
     }
+  }
+
+  // 生的传输效率若 > 1 即凭空造质量，破坏「质量非增」不变量
+  if (p.propagation.shengEfficiency > 1) {
+    errors.push(`propagation.shengEfficiency 须 ≤ 1，否则「生」会凭空制造质量，实为 ${p.propagation.shengEfficiency}`);
   }
 
   const yearSum = w.year.stem + w.year.branch;

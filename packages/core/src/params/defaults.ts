@@ -105,4 +105,40 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
     hai: Object.freeze({ factor: 0.93 }),
     po: Object.freeze({ enabled: true, factor: 0.97 }),
   }),
+  propagation: Object.freeze({
+    mode: "syncIterative",
+    damping: 0.50,      // [校准] 与 maxRounds 共同决定交互深度
+    maxRounds: 3,       // [校准] 交互深度，非收敛控制 —— 见 types.ts 说明
+    epsilon: 0.002,     // 安全阀，非主控制
+    outflowCap: 0.35,
+    inflowDamageCap: 0.40,
+    floor: 0.0,
+    kernel: Object.freeze({ sheng: 0.30, ke: 0.40 }),   // 克重于生，是有意的
+    shengEfficiency: 0.85,
+    keCost: 0.30,
+    polarity: Object.freeze({
+      shengCross: 1.00,   // 正印 / 伤官 —— 有情之生，力大
+      shengSame: 0.70,    // 偏印 / 食神 —— 同性相斥，生而不亲
+      keSame: 1.00,       // 七杀 —— 无情之克，力猛
+      keCross: 0.70,      // 正官 / 正财 —— 有情之克，制约而不摧折
+    }),
+    tongdang: Object.freeze({ mode: "resistance", beta: 0.60, additiveKernel: 0.20 }),
+    distance: Object.freeze({
+      samePillar: 1.00,
+      sameBranchHidden: 0.60,
+      adjacent: 0.80,
+      gap1: 0.40,
+      gap2: 0.20,
+      crossLayerFactor: 0.70,
+    }),
+    external: Object.freeze({
+      // 刻意不对称：环境作用于人强，人作用于环境弱
+      luckToNatal: 0.80,
+      annualToNatal: 0.70,
+      luckToAnnual: 1.00,
+      natalToLuck: 0.60,
+      natalToAnnual: 0.50,
+      annualToDayMasterBonus: 1.15,
+    }),
+  }),
 }) as Params;

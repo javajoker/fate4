@@ -115,10 +115,67 @@ export interface StructureParams {
   readonly po: { readonly enabled: boolean; readonly factor: number };
 }
 
+export interface PropagationParams {
+  readonly mode: "syncIterative";
+  readonly damping: number;
+  /**
+   * 迭代轮数 —— **这是「交互深度」参数，不是收敛控制**。
+   *
+   * 本系统是齐次线性映射 W ← (I+λA)W，展开为 I + kλA + C(k,2)(λA)² + …：
+   * 一阶项随 k **线性增长**，故轮数直接决定「让生克作用发生多少」，
+   * 没有自然的截断点。迭代到「收敛」等于幂迭代，结果趋于主特征向量 ——
+   * 那只由结构决定，会**完全遗忘 L1 的月提与司令分野**。故必须取小的定值。
+   */
+  readonly maxRounds: number;
+  /** 提前停止的安全阀（归一分布几乎不动时）。**不是**主控制。 */
+  readonly epsilon: number;
+  /** 单轮任一载体的总流出上限，占其当前权重的比例。 */
+  readonly outflowCap: number;
+  /**
+   * 单轮任一载体因受克而损失的上限，占其当前权重的比例。
+   *
+   * 与流出上限对称。缺了它，一个大载体的全部克力可能砸在唯一的小目标上，
+   * 一轮之内把它蒸发 —— 克应当削弱，不应当汽化。
+   */
+  readonly inflowDamageCap: number;
+  readonly floor: number;
+  readonly kernel: { readonly sheng: number; readonly ke: number };
+  /** 生的传输效率 η；(1−η) 为损耗，不进入任何载体。 */
+  readonly shengEfficiency: number;
+  /** 克者自耗，占其造成伤害的比例。 */
+  readonly keCost: number;
+  readonly polarity: {
+    readonly shengCross: number; readonly shengSame: number;
+    readonly keSame: number; readonly keCross: number;
+  };
+  readonly tongdang: {
+    readonly mode: "resistance" | "additive";
+    readonly beta: number;
+    readonly additiveKernel: number;
+  };
+  readonly distance: {
+    readonly samePillar: number;
+    readonly sameBranchHidden: number;
+    readonly adjacent: number;
+    readonly gap1: number;
+    readonly gap2: number;
+    readonly crossLayerFactor: number;
+  };
+  readonly external: {
+    readonly luckToNatal: number;
+    readonly annualToNatal: number;
+    readonly luckToAnnual: number;
+    readonly natalToLuck: number;
+    readonly natalToAnnual: number;
+    readonly annualToDayMasterBonus: number;
+  };
+}
+
 export interface Params {
   readonly version: number;
   readonly weights: WeightParams;
   readonly structure: StructureParams;
+  readonly propagation: PropagationParams;
 }
 
 /** 递归可选，供覆盖用。 */

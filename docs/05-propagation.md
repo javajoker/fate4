@@ -2,7 +2,11 @@
 
 这是整个系统的中心。L1 给出「谁在场、各占多少」，L2 给出「结构如何改写场面」，L3 回答**「这些力量互相作用之后，最终各自剩多少」**。
 
-执行模式：**多轮同步迭代至收敛**。每轮基于上一轮的完整状态计算全部增量，一次性施加。结果与载体的遍历顺序无关，可复现、可单测。
+执行模式：**多轮同步迭代**，轮数为固定的小值。每轮基于上一轮的完整状态计算全部增量，一次性施加。结果与载体的遍历顺序无关，可复现、可单测。
+
+> ⚠️ 本文档早先写的是「迭代至**收敛**」—— 那是错的，且错得要紧。
+> 本系统是齐次线性映射，迭代到收敛等于幂迭代，会把 L1 的月提与司令分野**完全冲刷掉**。
+> 详见 §5.1。
 
 ---
 
@@ -26,7 +30,8 @@ W_木 −= F           W_火 += η · F           η = shengEfficiency = 0.85
 W_木 −= D           W_金 −= D · keCost      keCost = 0.30
 ```
 
-双方都减 → 严格收缩，天然收敛。
+双方都减 → 总质量严格单调不增。注意这保证的是**有界**，不是「收敛到定态」——
+齐次线性系统没有非零不动点，见 §5.1。
 
 ### 1.3 同类不加权，改为「抗性」
 
@@ -142,26 +147,36 @@ function computeRound(carriers, params) -> Delta[]
       S_j = Σ_{a ≠ j, elem(a) == elem(j)} carriers[a].weight · Dist(a, j)
       resistance[j] = 1 / (1 + β · S_j / M)
 
-  # ---- 收集原始作用 ----
+  # ---- 收集原始作用：按关系分组，**对目标集归一** ----
   outgoing = map<i, Effect[]>
-  for (i, j) in orderedPairs:
-      rel = relation(elem(i), elem(j))
-      if rel == PASSIVE or rel == TONG: continue
+  for i in carriers:
+      buckets = groupBy(j ≠ i, rel(i,j))        # 生 / 克 / 同 / 无
+      for rel in [生, 克]:
+          ts = buckets[rel];  if empty: continue
+          w_j   = Y(pol_i, pol_j, rel) · Dist(pos_i, pos_j)
+          rate  = K(rel) · max_j(w_j)            # 速率由最强耦合定，非目标个数
+          out   = W_i · A_i · rate
+          for j in ts:
+              B = out · (w_j / Σ w_j)            # 按耦合强度分摊
+              if rel == 生:
+                  outgoing[i].push({ j, cost: B,            gainToJ: +η · B })
+              if rel == 克:
+                  damage = B · resistance[j]
+                  outgoing[i].push({ j, cost: damage · keCost, gainToJ: −damage })
 
-      B = W_i · A_i · K(rel) · Y(pol_i, pol_j, rel) · Dist(pos_i, pos_j)
-
-      if rel == SHENG:
-          outgoing[i].push({ j, cost: B,           gainToJ: +η · B })
-      if rel == KE:
-          damage = B · resistance[j]
-          outgoing[i].push({ j, cost: damage · keCost, gainToJ: −damage })
-
-  # ---- 流出上限（防塌陷 & 防负权重）----
+  # ---- 流出上限（防一轮泄尽）----
   for i in carriers:
       O_i = Σ outgoing[i].cost
       if O_i > outflowCap · W_i:                       # outflowCap = 0.35
           scale = outflowCap · W_i / O_i
           for e in outgoing[i]: e.cost *= scale; e.gainToJ *= scale
+
+  # ---- 受克上限（防一轮蒸发）----
+  for j in carriers:
+      D_j = Σ_{所有指向 j 的克} (−gainToJ)
+      if D_j > inflowDamageCap · W_j:                  # inflowDamageCap = 0.40
+          scale = inflowDamageCap · W_j / D_j
+          for 每条指向 j 的克 e: e.cost *= scale; e.gainToJ *= scale
 
   # ---- 汇总 ----
   for i, effects in outgoing:
@@ -176,59 +191,106 @@ function computeRound(carriers, params) -> Delta[]
 
 ---
 
-## 5. 迭代与收敛
+## 5. 迭代：轮数是「交互深度」，不是收敛控制
+
+### 5.1 为何不能迭代到收敛
+
+本系统的更新式是
 
 ```
-W^(0) ← L2 输出
-M₀    ← Σ W^(0)
-
-for t in 0 .. maxRounds−1:
-    Δ ← computeRound(W^(t))
-    W^(t+1) ← max(0, W^(t) + λ · Δ)              # λ = damping = 0.50
-
-    p^(t)   ← W^(t)   / Σ W^(t)                   # 归一分布
-    p^(t+1) ← W^(t+1) / Σ W^(t+1)
-    if max_i |p_i^(t+1) − p_i^(t)| < ε: break     # ε = 0.002
-
-M_final ← Σ W^(final)
-vitality ← M_final / M₀
-W_normalized ← W^(final) · (M₀ / M_final)         # 形状归一回 L2 总量
+W ← W + λ · Δ(W)
 ```
+
+而 `Δ` 的每一项都正比于 `W_i`，即对 `W` **一次齐次**。于是整体是线性映射
+`W ← (I + λA) W`。这类映射只有两种归宿：谱半径小于 1 则全部趋零，大于 1 则发散，
+**恰等于 1 是零测度事件**。「收敛到非零定态」在这个形式下根本不存在。
+
+更要命的是：迭代到「收敛」等于**幂迭代**，结果趋于矩阵的主特征向量 ——
+那只由结构（哪些五行在场、如何耦合）决定，**完全遗忘初始权重**。
+L1 辛苦算出的月提放大与司令分野会被彻底冲刷掉。
+
+实测（工作例，火占 L2 出口 52.7%）：
+
+| 轮数 | 木 | 火 | 土 | 金 | 水 |
+| --- | --- | --- | --- | --- | --- |
+| L2 出口 | 0.9% | **52.7%** | 15.0% | 28.3% | 3.0% |
+| 3 | 1.1% | **43.9%** | 28.2% | 22.0% | 4.8% |
+| 10 | 0.0% | 34.3% | 47.4% | 18.3% | 0.0% |
+| 30 | 0.0% | **8.8%** | 28.2% | **63.0%** | 0.0% |
+
+30 轮后火只剩 8.8%、金升到 63% —— 初始信息尽失，这不是「传导的结果」，
+是「矩阵的特征向量」。
+
+### 5.2 正确的语义
+
+展开 `(I+λA)^k = I + kλA + C(k,2)(λA)² + …`：**一阶项随 k 线性增长**。
+所以轮数直接决定「让生克作用发生多少」，没有自然截断点 ——
+它是一个**校准参数**，与核系数同性质，须标 `[校准]`。
 
 ```
 propagation:
-  mode: syncIterative
-  damping: 0.50
-  maxRounds: 30
-  epsilon: 0.002
-  outflowCap: 0.35
-  floor: 0.0
+  maxRounds: 3        # [校准] 交互深度
+  damping: 0.50       # [校准] 与 maxRounds 共同决定总交互量
+  epsilon: 0.002      # 提前停止的安全阀，**不是**主控制
 ```
 
-**收敛判据用归一分布而非绝对权重。**我们关心的是力量的**结构**，不是标度；绝对量的整体缩放由 `vitality` 单独承载。
+取 3 的理由：2 轮才能捕捉二阶链（金生水、水再生木），3–4 轮覆盖三四阶，
+再多则开始向特征向量退化。`damping × maxRounds` 是有效交互深度，二者部分冗余。
 
-**不收敛不静默。**若 `t == maxRounds` 仍未达标，`converged: false` 与残差一并进入输出，报告顶部出现警示。此类盘（通常是三组以上强克并存）本身就是「战克交加」的实证，不应被掩盖。
-
----
-
-## 6. `vitality`：一个副产品指标
+### 5.3 两道上限
 
 ```
-vitality = Σ W_final / Σ W_L2
+outflowCap: 0.35        # 单轮任一载体的**流出**上限
+inflowDamageCap: 0.40   # 单轮任一载体的**受克**上限
 ```
 
-传导过程中损失的质量，来自两处：生的传输损耗 `(1−η)`，与克的双向销毁。
+二者对称，缺一不可：
+
+- 无流出上限 → 强载体一轮泄尽
+- 无受克上限 → **一个大载体的全部克力可能砸在唯一的小目标上，一轮之内蒸发它**
+
+后者是实测发现的：工作例中金 123 单位，其克的唯一目标是 4 单位的乙木，
+无上限时乙木一轮归零。克应当削弱，不应当汽化。
+
+### 5.4 对目标集归一（关键）
+
+**流出速率是施方的属性，多个受方是分摊而非倍增。**
+
+```
+对施方 i 与关系 r ∈ {生, 克}:
+    targets = { j : rel(i,j) = r }
+    w_j     = Y_ij · D_ij
+    rate    = K_r · max_j(w_j)          ← 速率由最强耦合决定
+    totalOut = W_i · A_i · rate
+    effect_j = totalOut · (w_j / Σw_j)  ← 按耦合强度分摊
+```
+
+若改为对每个目标独立求和，一个载体的流出率就正比于**目标个数** ——
+而目标个数取决于藏干记账（火有 4 个土载体可生，木只有 1 个），纯属artifact。
+
+实测该写法下流出率中位数达 **63%**、最大 **102%**，人人撞上限，
+全盘等比塌缩（总量 434 → 18），且稳态形状由载体个数而非命理结构决定。
+
+## 6. `vitality`：单轮留存率
+
+```
+vitality = (Σ W_final / Σ W_L2) ^ (1 / rounds)
+```
+
+**取几何平均的单轮留存，而非累计留存。**累计留存 ≈ ρ^rounds 会随轮数任意变化，
+不是命局的属性；单轮留存 ρ 才是。
+
+传导中损失的质量来自两处：生的传输损耗 `(1−η)`，与克的双向销毁。
 
 | `vitality` | 含义 |
 | --- | --- |
 | **高**（→ 1.0） | 五行流通，相生为主，内耗少。气顺。 |
-| **低**（→ 0.5 以下） | 战克交加，多组相冲相克，力量在内部消耗殆尽。 |
+| **低**（→ 0.8 以下） | 战克交加，多组相冲相克，力量在内部消耗殆尽。 |
 
-这不是「命好命坏」的指标——`vitality` 高的偏枯之局未必胜过 `vitality` 低但制化有情之局。它衡量的是**内耗程度**，作为报告的一个独立维度呈现，不参与旺衰判定。
+这不是「命好命坏」的指标 —— `vitality` 高的偏枯之局未必胜过 `vitality` 低但制化有情之局。
+它衡量的是**内耗程度**，作为报告的一个独立维度呈现，不参与旺衰判定。
 
-`vitality` 逐年的变化曲线，是流年运程图的一条辅助线：内耗骤升的年份，往往对应传统所说的「多事之秋」。
-
----
+`cumulativeRetention` 亦一并输出，但仅供诊断，不进报告。
 
 ## 7. 归一化后的输出
 
@@ -329,8 +391,8 @@ propagation:
 1. **顺序无关**：随机打乱 `carriers` 数组，结果差异 < 1e-9。这是同步迭代模式的核心保证，必须有对应测试。
 2. **非负**：任意轮次任意载体 `W ≥ 0`。
 3. **质量非增**：`Σ W^(t+1) ≤ Σ W^(t) + 1e-9`。生有损耗、克有销毁，总量只减不增。
-4. **流出上限**：任一载体单轮流出 `≤ outflowCap × W_i`。
+4. **两道上限**：任一载体单轮流出 `≤ outflowCap × W_i`，单轮受克 `≤ inflowDamageCap × W_i`。
 5. **审计闭合**：`Σ Δ[i]` 必须等于 `−Σ(传输损耗) − Σ(克的销毁)`，误差 < 1e-9。
 6. **收敛或声明**：`converged == false` 时 `finalResidual` 必须非空。
 7. **归一保总量**：`Σ W_normalized == M₀`（误差 < 1e-9）。
-8. **`vitality ∈ (0, 1]`**。
+8. **`vitality ∈ (0, 1]`**，且为单轮留存 —— 改变轮数不应显著改变它。

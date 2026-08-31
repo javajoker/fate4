@@ -23,19 +23,24 @@ describe("YAML 与 TS 默认值一致", () => {
     expect(yamlWeights).toBeTypeOf("object");
   });
 
-  it("weights 段逐项相同（含嵌套）", () => {
-    // stableStringify 递归排序键，使比较与书写顺序无关
-    expect(stableStringify(yamlWeights)).toBe(stableStringify(DEFAULT_PARAMS.weights));
-  });
+  const flat = (o: unknown, p = "", out: string[] = []): string[] => {
+    if (o === null || typeof o !== "object" || Array.isArray(o)) { out.push(p); return out; }
+    for (const [k, v] of Object.entries(o)) flat(v, p ? `${p}.${k}` : k, out);
+    return out;
+  };
 
-  it("键集合完全一致 —— YAML 不多不少", () => {
-    const flat = (o: unknown, p = "", out: string[] = []): string[] => {
-      if (o === null || typeof o !== "object" || Array.isArray(o)) { out.push(p); return out; }
-      for (const [k, v] of Object.entries(o)) flat(v, p ? `${p}.${k}` : k, out);
-      return out;
-    };
-    expect(flat(yamlWeights).sort()).toEqual(flat(DEFAULT_PARAMS.weights).sort());
-  });
+  // 三段全覆盖。只查 weights 会让后加的 structure / propagation 悄悄漂移 ——
+  // 实测 propagation 就曾漂出两处（新增 inflowDamageCap、maxRounds 30→3）。
+  for (const section of ["weights", "structure", "propagation"] as const) {
+    it(`${section} 段逐项相同（含嵌套）`, () => {
+      // stableStringify 递归排序键，使比较与书写顺序无关
+      expect(stableStringify(doc[section])).toBe(stableStringify(DEFAULT_PARAMS[section]));
+    });
+
+    it(`${section} 键集合完全一致 —— YAML 不多不少`, () => {
+      expect(flat(doc[section]).sort()).toEqual(flat(DEFAULT_PARAMS[section]).sort());
+    });
+  }
 });
 
 describe("参数校验", () => {

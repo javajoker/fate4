@@ -1,7 +1,11 @@
 # fate — 默认参数集
 #
-# 这是引擎的唯一参数源。core 中不得出现任何硬编码的命理系数。
-# 载入时由 packages/core/src/params/schema.ts (zod) 校验，缺项报错而非静默取默认。
+# 本文件是**文档表述**，默认值的真源是 packages/core/src/params/defaults.ts。
+# 二者由 test/params.spec.ts 断言逐键一致（weights / structure / propagation 三段全覆盖），
+# 任一处漂移即构建失败。理由见 docs/03-weights.md §8.5。
+#
+# core 中不得出现任何硬编码的命理系数。
+# 运行时校验见 params/load.ts：区间与枚举、结构不变量两类，一次报出全部错误。
 #
 # 标记说明：
 #   [流派]  人工决策项，不进入自动校准（见 docs/11-validation.md §4.3）
@@ -154,10 +158,11 @@ structure:
 # ═══════════════════════════════════════════════════════════
 propagation:
   mode: syncIterative              # [硬约束] 同步迭代，保证顺序无关
-  damping: 0.50                    # [校准] λ
-  maxRounds: 30
-  epsilon: 0.002                   # 归一分布的收敛阈值
+  damping: 0.50                    # [校准] λ，与 maxRounds 共同决定交互深度
+  maxRounds: 3                     # [校准] **交互深度**，不是收敛控制 —— 见下
+  epsilon: 0.002                   # 提前停止的安全阀，非主控制
   outflowCap: 0.35                 # 单轮任一载体的流出上限（占其权重）
+  inflowDamageCap: 0.40            # 单轮任一载体的受克上限（占其权重）
   floor: 0.0
 
   kernel:
