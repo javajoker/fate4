@@ -1,0 +1,20 @@
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+.claude/settings.local.json
+.claude/worktrees/
+
+# 校准产物（本地实验，不入库；baseline.json 例外，需版本化）
+calibration/log.jsonl
+!calibration/baseline.json

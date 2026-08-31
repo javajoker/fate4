@@ -1,0 +1,304 @@
+# fate — 默认参数集
+#
+# 这是引擎的唯一参数源。core 中不得出现任何硬编码的命理系数。
+# 载入时由 packages/core/src/params/schema.ts (zod) 校验，缺项报错而非静默取默认。
+#
+# 标记说明：
+#   [流派]  人工决策项，不进入自动校准（见 docs/11-validation.md §4.3）
+#   [校准]  数据驱动项，由金标准集拟合
+#   [硬约束] 不得修改，改则构建失败
+
+version: 1
+schema: fate-params/v1
+
+# ═══════════════════════════════════════════════════════════
+# L0 · 排盘
+# ═══════════════════════════════════════════════════════════
+chart:
+  ziHourRule: lateZiNextDay        # [流派] lateZiNextDay | earlyZiSameDay | split
+  mingGongBoundary: jie            # [流派] jie | zhongqi        ⚠️ 待校准 #1
+  hiddenStemVariant: standard      # [流派] standard | alt        ⚠️ 待校准 #5
+
+  trueSolarTime: true
+  equationOfTime: true
+  handleDst: true
+  southernHemisphereFlip: false    # [硬约束] 传统不反转季节
+
+  includeShenGong: false
+  includeTaiXi: false
+
+# ═══════════════════════════════════════════════════════════
+# L1 · 配重
+# ═══════════════════════════════════════════════════════════
+weights:
+  pillarBase: 100
+  stemShare: 0.40                  # 天干占比
+  branchShare: 0.60                # 地支占比   (stemShare + branchShare == 1)
+
+  # 地支分数 → 藏干，按藏干个数取用
+  hiddenSplit:
+    1: [1.00]
+    2: [0.70, 0.30]
+    3: [0.65, 0.25, 0.10]
+
+  monthCommand:
+    branchMultiplier: 2.00         # [校准] 月支放大 → 60 × 2.00 = 120
+    stemMultiplier: 1.20           # [校准] 月干放大 → 40 × 1.20 = 48
+    silingBoost: 1.50              # [校准] 司令藏干加成，组内重归一
+    useSilingTable: true
+    silingResolution: sameElement  # exact | sameElement | none
+    silingPolarityOverride: false  # 司令期内是否用司令干的阴阳
+
+  luck:                            # 大运
+    total: 130                     # [校准]
+    mode: linear                   # linear | step
+    stemShareStart: 0.70           # 交运时（elapsed=0）天干占比
+    stemShareEnd: 0.30             # 换运前（elapsed=10）天干占比
+    stepFirstHalf: 0.65            # 仅 mode=step
+    stepSecondHalf: 0.35           # 仅 mode=step
+    # 交叉点：stemShare(elapsed=5) == 0.50，恰在第 5 年末
+
+  year:                            # 流年
+    total: 110                     # [校准]
+    stem: 40
+    branch: 70                     # 注意：40:70，非本命的 40:60
+    stemBranchSwing: false         # 上下半年干支主次切换（实验）
+
+  kongwang:
+    enabled: true
+    factor: 0.80                   # [校准]
+    releasedByChong: true
+    releasedByHe: true
+    applyToLuckAnnual: false
+
+  revealedResonance: 1.00          # 刻意置 1.00 —— 透干效应由 L3 距离模型承担
+  includeTaiyuan: false
+  taiyuanTotal: 40
+
+# ═══════════════════════════════════════════════════════════
+# L2 · 结构（会合冲刑害破）
+# ═══════════════════════════════════════════════════════════
+structure:
+  precedence: [sanhui, sanhe, banhe, liuhe, ganhe, chong, ganchong, xing, hai, po]
+
+  sanhui:
+    gain: 1.40                     # [校准] 化神五行的藏干
+    decay: 0.50                    # [校准] 非化神五行的藏干
+  sanhe:
+    gain: 1.30
+    decay: 0.60
+  banhe:
+    shengWang: { gain: 1.20, decay: 0.75 }
+    wangMu:    { gain: 1.15, decay: 0.80 }
+    gong:      { gain: 1.05, decay: 0.95 }   # 缺旺神，仅作标记
+
+  heDistance:                      # 合局的距离系数
+    adjacent: 1.00
+    gap1: 0.80
+    gap2: 0.60
+  externalHeFactor: 0.90           # 含大运/流年的合
+
+  transform:                       # 合化判定（六合与天干五合共用）
+    requireMonthSupport: true      # C1
+    requireCatalyst: true          # C2
+    catalystThreshold: 30
+    blockOnContention: true        # C3 争合妒合
+    blockOnChong: true             # C4
+    gainOnSuccess: 1.20
+    bindFactorOnFailure: 0.70      # 合绊：activity ×= 此值
+    contentionFactor: 0.85         # 争合：activity ×= 此值
+    ganheRequireAdjacent: true     # 天干五合须相邻才可能化
+
+  chong:
+    uprootThreshold: 2.50          # [校准] 强弱比 ≥ 此值判为拔根
+    strongLoss: 0.20
+    weakLoss: 0.50
+    weakLossUproot: 0.75
+    equalLoss: 0.35
+    equalBandRatio: 1.20           # r < 此值视为势均
+    distance:
+      adjacent: 1.00
+      gap1: 0.60
+      gap2: 0.30
+      luckToNatal: 0.90
+      annualToNatal: 0.85
+      luckToAnnual: 1.00
+
+  ganchong:
+    factor: 0.50                   # 天干为虚，整体折半
+    requireAdjacent: true
+
+  arbitration:                     # 冲合互解裁决
+    heTypeCoef: { sanhui: 1.00, sanhe: 0.85, banhe: 0.65, liuhe: 0.55 }
+    chongCoef: 2.00
+    decisiveMargin: 1.20           # 胜者需超出 20% 才判定，否则两败
+    mutualDamageFactor: 0.60       # 两败时冲的损耗折扣
+
+  tomb:
+    sealedFactor: 0.60             # 闭库时中气/余气的折扣
+    openOnChong: true
+    openOnXing: true
+    releaseGain: 1.30
+
+  xing:
+    fullFactor: 0.80               # 三支全见
+    ziMaoFactor: 0.85              # 子卯二支即成
+    selfFactor: 0.90               # 自刑
+    partialFactor: 0.93            # 三刑只见两支
+
+  hai: { factor: 0.93 }
+  po:  { enabled: true, factor: 0.97 }
+
+# ═══════════════════════════════════════════════════════════
+# L3 · 生克传导
+# ═══════════════════════════════════════════════════════════
+propagation:
+  mode: syncIterative              # [硬约束] 同步迭代，保证顺序无关
+  damping: 0.50                    # [校准] λ
+  maxRounds: 30
+  epsilon: 0.002                   # 归一分布的收敛阈值
+  outflowCap: 0.35                 # 单轮任一载体的流出上限（占其权重）
+  floor: 0.0
+
+  kernel:
+    sheng: 0.30                    # [校准]
+    ke:    0.40                    # [校准] 克重于生
+
+  shengEfficiency: 0.85            # η，生的传输效率；(1−η) 为损耗
+  keCost: 0.30                     # 克者自耗，占其造成伤害的比例
+
+  polarity:
+    shengCross: 1.00               # 异性相生（正印/伤官）力大
+    shengSame:  0.70               # 同性相生（偏印/食神）力小
+    keSame:     1.00               # 同性相克（七杀）无情力猛
+    keCross:    0.70               # 异性相克（正官/正财）有情力缓
+
+  tongdang:
+    mode: resistance               # [硬约束建议] resistance | additive
+    beta: 0.60                     # [校准] 抗性强度
+    additiveKernel: 0.20           # 仅 mode=additive；已知会引入正反馈
+
+  distance:
+    samePillar:       1.00         # 天干 ↔ 本柱地支藏干
+    sameBranchHidden: 0.60         # 同一地支内的藏干之间
+    adjacent:         0.80
+    gap1:             0.40
+    gap2:             0.20         # 年 ↔ 时
+    crossLayerFactor: 0.70         # 附加：天干 ↔ 异柱地支
+
+  external:                        # 刻意不对称：环境作用于命强，命作用于环境弱
+    luckToNatal:   0.80
+    annualToNatal: 0.70
+    luckToAnnual:  1.00
+    natalToLuck:   0.60
+    natalToAnnual: 0.50
+    annualToDayMasterBonus: 1.15
+
+# ═══════════════════════════════════════════════════════════
+# L4 · 断论
+# ═══════════════════════════════════════════════════════════
+conclusion:
+  changshengSchool: yangForwardYinReverse   # [流派] | sameBirthDeath   ⚠️ #3
+  earthChangsheng: fireEarthSame            # [流派] | waterEarthSame   ⚠️ #4
+
+  strengthBands:
+    veryStrong:  0.70
+    strong:      0.55
+    balancedLow: 0.45
+    weak:        0.30
+
+  confidence:
+    bandMargin: 0.05               # 距阈值多远算高置信
+    floor: 0.30
+
+  rootCoef:
+    luRen:      1.00               # 禄 / 羊刃
+    changsheng: 0.70
+    ku:         0.50               # 库根
+    yuqi:       0.30               # 中气 / 余气
+
+  congge:
+    ratioThreshold: 0.30
+    requireRootless: true
+    yinThreshold: 25               # 印星权重超此值则不从
+
+  specialGe:
+    zhuanwangThreshold: 0.78
+    suppressThreshold: 40
+    enableHuaqi: true
+    huaqiConfidenceCap: 0.60       # ⚠️ #11 化气格实务争议大
+
+  yongshen:
+    priority: [tiaohou, fuyi, tongguan, bingyao]
+    tiaohou:
+      source: heuristic            # heuristic | table   ⚠️ #2 待转录《穷通宝鉴》
+      fireFloor:  0.08             # 冬月火占比低于此值 → 极寒
+      waterFloor: 0.08             # 夏月水占比低于此值 → 极燥
+    weakYongshenThreshold: 15      # 用神权重低于此值 → needsLuckSupport
+    tongguan:
+      balanceBand: 0.20            # 两方权重差异比例
+      dominanceFloor: 0.45         # 两方合计占总权重的下限
+    bingyao:
+      damageThreshold: 12
+
+  femaleChildStarVariant: standard # [流派] | reversed   ⚠️ #7
+
+# ═══════════════════════════════════════════════════════════
+# 神煞
+# ═══════════════════════════════════════════════════════════
+shensha:
+  primaryBase: day                 # day | year
+  alsoComputeYearBase: true
+  scanTargets: [year, month, day, hour, luck, annual, taiyuan, mingGong]
+
+  includeDisputed: false           # ⚠️ #9 福星/天厨/词馆
+  yinYangRen: false                # ⚠️ #10 阴干羊刃
+  yuanchen: false                  # ⚠️ #8 元辰起例待定
+  tianluodiwang:
+    enabled: true
+    applyNayinFilter: true
+
+  modifiers:
+    zuowangThreshold: 1.30         # 宿主支权重 ≥ 场均 × 此值 → 坐旺
+    zuoshuaiThreshold: 0.50        # ≤ 场均 × 此值 → 坐衰
+
+# ═══════════════════════════════════════════════════════════
+# L5 · 时间层
+# ═══════════════════════════════════════════════════════════
+temporal:
+  qiyun:
+    mode: continuous               # continuous | traditionalDiscrete
+    daysPerYear: 3
+    reportBothModes: true
+
+  luckPillarCount: 12
+  includeXiaoyun: false
+  yearRangeYears: 120
+  sampleLuckAt: [start, mid, end]
+
+  monthLayer:
+    recomputeWeights: false        # [硬约束]
+    maxInteractionsShown: 3
+
+  dayLayer:
+    recomputeWeights: false        # [硬约束]
+    severityLevels: 2
+
+  index:
+    a: 4.00                        # [校准] 权重结构变化的贡献
+    b: 0.35                        # [校准] 应期事件的贡献
+
+# ═══════════════════════════════════════════════════════════
+# L6 · 报告
+# ═══════════════════════════════════════════════════════════
+report:
+  locale: zh-Hans                  # zh-Hans | zh-Hant | en
+  hedgeBelowConfidence: 0.60
+  showConvergenceHistory: false
+  showParamsSnapshot: true
+  showGoldSetScore: true
+
+  guard:
+    enforceBannedTerms: true       # [硬约束] 构建期扫描，命中即失败
+    scanExportBeforeWrite: true
+    neutralPalette: true           # [硬约束] 禁止红绿吉凶配色
