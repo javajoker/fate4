@@ -32,7 +32,7 @@ describe("YAML 与 TS 默认值一致", () => {
   // 三段全覆盖。只查 weights 会让后加的 structure / propagation 悄悄漂移 ——
   // 实测 propagation 就曾漂出两处（新增 inflowDamageCap、maxRounds 30→3）。
   // conclusion 段同样纳入 —— 它含四个流派开关，漂移会让报告声明错误的流派。
-  for (const section of ["weights", "structure", "propagation", "conclusion", "shensha"] as const) {
+  for (const section of ["weights", "structure", "propagation", "conclusion", "shensha", "temporal"] as const) {
     it(`${section} 段逐项相同（含嵌套）`, () => {
       // stableStringify 递归排序键，使比较与书写顺序无关
       expect(stableStringify(doc[section])).toBe(stableStringify(DEFAULT_PARAMS[section]));

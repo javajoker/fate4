@@ -231,6 +231,19 @@ export interface ShenshaParams {
   };
 }
 
+export interface TemporalParams {
+  readonly qiyun: { readonly mode: "continuous" | "traditionalDiscrete"; readonly daysPerYear: number; readonly reportBothModes: boolean };
+  readonly luckPillarCount: number;
+  readonly includeXiaoyun: boolean;
+  readonly yearRangeYears: number;
+  readonly sampleLuckAt: readonly string[];
+  /** [硬约束] 流月不重算权重。改为 true 则构建期报错。 */
+  readonly monthLayer: { readonly recomputeWeights: false; readonly maxInteractionsShown: number };
+  /** [硬约束] 流日不重算权重。 */
+  readonly dayLayer: { readonly recomputeWeights: false; readonly severityLevels: number };
+  readonly index: { readonly a: number; readonly b: number };
+}
+
 export interface Params {
   readonly version: number;
   readonly weights: WeightParams;
@@ -238,6 +251,7 @@ export interface Params {
   readonly propagation: PropagationParams;
   readonly conclusion: ConclusionParams;
   readonly shensha: ShenshaParams;
+  readonly temporal: TemporalParams;
 }
 
 /** 递归可选，供覆盖用。 */

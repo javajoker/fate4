@@ -275,14 +275,13 @@ temporal:
     mode: continuous               # continuous | traditionalDiscrete
     daysPerYear: 3
     reportBothModes: true
-
   luckPillarCount: 12
   includeXiaoyun: false
   yearRangeYears: 120
   sampleLuckAt: [start, mid, end]
 
   monthLayer:
-    recomputeWeights: false        # [硬约束]
+    recomputeWeights: false        # [硬约束] 月是引动的扳机，不是力量的来源
     maxInteractionsShown: 3
 
   dayLayer:

@@ -176,4 +176,15 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
     tianluodiwang: Object.freeze({ enabled: true, applyNayinFilter: true }),
     modifiers: Object.freeze({ zuowangThreshold: 1.30, zuoshuaiThreshold: 0.50 }),
   }),
+  temporal: Object.freeze({
+    qiyun: Object.freeze({ mode: "continuous", daysPerYear: 3, reportBothModes: true }),
+    luckPillarCount: 12,
+    includeXiaoyun: false,
+    yearRangeYears: 120,
+    sampleLuckAt: Object.freeze(["start", "mid", "end"]),
+    // [硬约束] 月与日是引动的扳机，不是力量的来源
+    monthLayer: Object.freeze({ recomputeWeights: false as const, maxInteractionsShown: 3 }),
+    dayLayer: Object.freeze({ recomputeWeights: false as const, severityLevels: 2 }),
+    index: Object.freeze({ a: 4.00, b: 0.35 }),   // [校准]
+  }),
 }) as Params;

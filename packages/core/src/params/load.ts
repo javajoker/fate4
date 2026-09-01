@@ -58,6 +58,11 @@ const RANGES: readonly RangeRule[] = [
   { path: "conclusion.congge.ratioThreshold", min: 0, max: 1 },
   { path: "conclusion.specialGe.zhuanwangThreshold", min: 0, max: 1 },
   { path: "conclusion.specialGe.huaqiConfidenceCap", min: 0, max: 1 },
+
+  { path: "temporal.luckPillarCount", min: 1, max: 30 },
+  { path: "temporal.yearRangeYears", min: 1, max: 200 },
+  { path: "temporal.index.a", min: 0, max: 50 },
+  { path: "temporal.index.b", min: 0, max: 50 },
 ];
 
 const ENUMS: readonly EnumRule[] = [
@@ -154,6 +159,16 @@ function validateInvariants(p: Params): string[] {
     errors.push(
       `conclusion.strengthBands 须严格递减，实为 ${b.veryStrong} > ${b.strong} > ${b.balancedLow} > ${b.weak}`,
     );
+  }
+
+  // [硬约束] 流月流日不得重算权重 —— 月与日是引动的扳机，不是力量的来源。
+  // 放开它会让一个 30 天的短期因素与终生不变的月令同台竞争数值，
+  // 既无理论依据，也会让年度曲线被高频噪声淹没。
+  if (p.temporal.monthLayer.recomputeWeights !== false) {
+    errors.push("temporal.monthLayer.recomputeWeights 必须为 false（硬约束）");
+  }
+  if (p.temporal.dayLayer.recomputeWeights !== false) {
+    errors.push("temporal.dayLayer.recomputeWeights 必须为 false（硬约束）");
   }
 
   const yearSum = w.year.stem + w.year.branch;
