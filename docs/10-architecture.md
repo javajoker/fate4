@@ -10,14 +10,16 @@ fate/
 ├── pnpm-workspace.yaml
 ├── tsconfig.base.json
 ├── params/
-│   └── default.yaml              # 唯一参数源
+│   └── default.yaml              # 默认值的**平行文档**，真源在 core/params/defaults.ts
 ├── docs/                         # 本文档集
+├── scripts/
+│   └── generate-vsop87.mjs       # 由官方数据生成截断级数，校验 SHA256
 └── packages/
     ├── core/                     # 推演内核 —— 零运行时依赖
-    ├── data/                     # 静态数据（节气表、调候表、模板库）
-    ├── web/                      # Next.js 应用
-    ├── skill/                    # Claude Agent Skill
-    └── cli/                      # 命令行，供 skill 与调试调用
+    ├── data/                     # 静态数据（VSOP87 截断级数）
+    ├── web/                      # Next.js 应用（静态导出）
+    ├── cli/                      # 命令行，Skill 的执行后端
+    └── skill/                    # Claude Agent Skill 载荷
 ```
 
 **依赖方向严格单向**：`web → core → data`，`skill → cli → core → data`。
@@ -30,86 +32,120 @@ fate/
 ```
 core/src/
 ├── index.ts                      # 公共 API 出口
-├── types/                        # 全部类型定义，无实现
-│   ├── carrier.ts  chart.ts  verdict.ts  params.ts  report.ts
+├── types/ganzhi.ts               # 干支、五行、十神的基础类型
 ├── astro/
-│   ├── julian.ts                 # 儒略日
+│   ├── julian.ts  deltaT.ts  angles.ts  nutation.ts
 │   ├── vsop87.ts                 # 太阳视黄经（截断级数）
-│   ├── solarTerms.ts             # 节气求解 + 静态表查询
-│   ├── deltaT.ts                 # TT ↔ UT
-│   └── equationOfTime.ts
+│   ├── sun.ts  equationOfTime.ts
+│   ├── solarTerms.ts             # 节气求根
+│   └── defaults.ts               # 默认黄经提供者（单列以断开循环依赖）
 ├── time/
-│   ├── timezone.ts               # 含历史规则
+│   ├── timezone.ts               # Intl + IANA tzdata，含历史夏令时
 │   └── trueSolarTime.ts
 ├── ganzhi/
 │   ├── tables.ts                 # 01-foundations 的全部静态表
-│   ├── algebra.ts                # 干支循环、五行关系、十神映射
-│   ├── hiddenStems.ts
-│   └── changsheng.ts
+│   ├── algebra.ts                # 干支循环、五行关系、十神映射、反向查表
+│   └── changsheng.ts             # 十二长生、禄刃、通根分级
 ├── chart/
-│   ├── buildChart.ts             # L0
-│   ├── pillars.ts  taiyuan.ts  mingGong.ts
-│   ├── siling.ts
-│   └── qiyun.ts                  # 起运精确计算
-├── weights/assign.ts             # L1
+│   ├── buildChart.ts             # L0，另导出 chartOptionsOf(params)
+│   ├── pillars.ts  taiyuan.ts  mingGong.ts  siling.ts  qiyun.ts
+│   └── types.ts
+├── weights/
+│   ├── carrier.ts                # 载体类型与 trace
+│   └── assign.ts                 # L1
 ├── structure/
-│   ├── detect.ts                 # 会合冲刑害破的检测
-│   ├── transform.ts              # 合化判定
-│   ├── arbitrate.ts              # 冲合互解裁决
+│   ├── detect.ts  transform.ts  arbitrate.ts  distance.ts
 │   └── apply.ts                  # L2 施加
 ├── propagate/
 │   ├── relations.ts  distance.ts  resistance.ts
 │   └── iterate.ts                # L3 主循环
 ├── conclude/
 │   ├── tenGods.ts  rootScore.ts  strength.ts
-│   ├── specialPattern.ts  yongshen.ts  geju.ts  kin.ts
-│   └── metrics.ts
+│   ├── specialPattern.ts  yongshen.ts  geju.ts  kin.ts  metrics.ts
+│   └── conclude.ts               # L4 总装
 ├── shensha/
-│   ├── rules.ts                  # 起例（可推导的用函数，不硬编码）
-│   ├── scan.ts
-│   └── modifiers.ts              # 逢冲/逢合/落空 等状态修饰
-├── temporal/
-│   ├── luck.ts  year.ts  month.ts  day.ts
-│   └── index.ts                  # 顺逆指数
+│   ├── tables.ts  rules.ts       # 起例（可推导者用函数，不硬编码）
+│   ├── modifiers.ts              # 逢冲/逢合/落空 等状态修饰
+│   └── scan.ts
 ├── yingqi/
-│   ├── rules.ts                  # 规则清单
-│   ├── engine.ts                 # 求值 + 裁决
-│   └── domains.ts
+│   ├── types.ts  helpers.ts  rules.ts  engine.ts  domains.ts
+├── temporal/
+│   ├── evaluate.ts               # 瞬时求解
+│   ├── views.ts                  # 大运/流年/流月/流日四视图
+│   └── types.ts
 ├── report/
-│   ├── assemble.ts  templates.ts  guard.ts   # guard = §9-6 措辞扫描
+│   ├── templates.ts  render.ts   # 模板库与求值
+│   ├── guard.ts                  # §9-6 措辞扫描
+│   ├── labels.ts                 # 枚举 → 中文
+│   ├── assemble.ts  markdown.ts  types.ts
 └── params/
-    ├── schema.ts                 # zod
-    └── load.ts
+    ├── types.ts  defaults.ts     # **默认值的真源**
+    └── load.ts                   # 手写校验，不引 zod
 ```
+
+> 原稿在此处列过 `types/carrier.ts` `chart.ts` `verdict.ts` `params.ts` `report.ts`、
+> `ganzhi/hiddenStems.ts`、`params/schema.ts`、`temporal/{luck,year,month,day}.ts` ——
+> 这些文件最终没有出现：类型与实现同文件更便于维护，
+> 时间层四视图合并在 `views.ts` 里共享大量辅助函数。上表为实际结构。
+
+**P11–P15 将新增**（见 [12](12-persona-curves-nodes.md)）：
+`chart/baseChart.ts`、`conclude/persona.ts`、`conclude/neijing.ts`、
+`temporal/series.ts`、`temporal/nodes.ts`、`report/finding.ts`。
 
 ### 2.1 公共 API
 
 ```ts
-// 排盘
-export function buildChart(input: BirthInput, params?: PartialParams): NatalChart;
+// ── L0 排盘 ──
+export function buildChart(input: BirthInput, options?: ChartOptions): NatalChart;
+/** 由完整参数集导出 L0 开关。界面与 CLI 一律用它，不手工对映。 */
+export function chartOptionsOf(p: Params): ChartOptions;
 
-// 在某一瞬时求解（本命 / 加大运 / 加流年）
-export function evaluate(
-  chart: NatalChart,
-  at: Instant,
-  params?: PartialParams
-): EvaluatedChart;
+// ── 瞬时求解 ──
+export function evaluate(input: {
+  chart: NatalChart;
+  luck?: { pillar: Pillar; elapsedYears: number } | null;
+  annual?: Pillar | null;
+  params?: Params;
+}): EvaluatedChart;
 
-// 时间层
-export function luckTimeline(chart: NatalChart, params?): LuckPillar[];
-export function yearView(chart: NatalChart, year: number, params?): YearView;
-export function monthView(chart: NatalChart, year: number, monthIndex: number): MonthView;
-export function dayView(chart: NatalChart, date: CalendarDate): DayView;
+// ── 时间层 ──
+export function luckTimeline(chart: NatalChart, params?: Params): LuckStep[];
+export function yearView(chart: NatalChart, year: number, params?: Params): YearView;
+export function monthView(chart: NatalChart, year: number, monthIndex: number,
+                          params?: Params): MonthView;
+export function dayView(chart: NatalChart, y: number, m: number, d: number,
+                        params?: Params): DayView;
 
-// 报告
-export function buildReport(chart: NatalChart, options: ReportOptions): Report;
+// ── L6 报告 ──
+export function buildReport(chart: NatalChart, options?: ReportOptions): Report;
+export function renderMarkdown(report: Report): string;
 
-// 参数
+// ── 措辞守卫 ──
+export function scanText(text: string, where: string, opts?): GuardViolation[];
+export function formatViolations(vs: readonly GuardViolation[]): string;
+
+// ── 参数 ──
 export function loadParams(overrides?: PartialParams): Params;
 export function paramsHash(params: Params): string;
 ```
 
-**全部为纯函数。**`core` 中无全局可变状态、无 `Date.now()`、无 I/O。所有时间从参数传入。这是可测试性的前提。
+> 原稿把 `evaluate` 写作 `(chart, at, params)` 三个位置参数。
+> 实际取单个具名入参对象 —— 大运需要同时给「哪一柱」与「已行几年」，
+> 位置参数放不下，且具名入参在调用点自解释。
+
+**P11 起 `evaluate` 的入口改为收 `BaseChart`**（[12](12-persona-curves-nodes.md) §2.0）：
+
+```ts
+export function buildBaseChart(chart: NatalChart, params: Params): BaseChart;
+export function evaluateAt(base: BaseChart, at: Instant): InstantChart;
+export function series(base: BaseChart, opts?): Series[];        // 月度曲线
+export function nodes(series: readonly Series[], opts?): NodeInterval[];  // 2σ 穿越区间
+```
+
+这样「基准算过一次」成为**类型层面的事实**，而不是调用方需要记得的纪律。
+
+**全部为纯函数。**`core` 中无全局可变状态、**无 `Date.now()`**、无 I/O。
+所有时间从参数传入 —— 取系统时间是外壳（Web / CLI）的职责，这是可测试性的前提。
 
 ### 2.2 性能
 
@@ -283,13 +319,28 @@ description: 四柱（八字）排盘与推演。当用户提供出生年月日�
 | 排盘 | 100+ 已知命例的四柱/胎元/命宫/起运 | 黄金测试 |
 | L1 | 不变量 1–7（[03-weights](03-weights.md) §10） | 属性测试 |
 | L2 | 不变量 1–6（[04-structure](04-structure.md) §13） | 属性测试 |
-| L3 | **顺序无关性**（打乱数组结果不变）、质量非增、审计闭合 | 属性测试（fast-check） |
+| L3 | **顺序无关性**（打乱数组结果不变）、质量非增、审计闭合 | vitest + 打乱重跑 |
 | L4 | 不变量、边界置信度 | vitest |
 | L5 | 换运年分段、流月流日无 weight 字段 | 类型 + 运行时 |
-| L6 | 禁用词表扫描 | 构建期检查 |
-| 端到端 | 若干命例的完整报告快照 | snapshot |
+| L6 | **措辞扫描**：模板库 + 全部叙述语料 + 报告全文 + CLI 输出 | `pnpm guard`，随 `pnpm test` 执行 |
+| L6 | 中文输出不得漏出英文枚举（三个及以上连续拉丁字母） | vitest |
+| L4p | 内外分布归一化；特质表四栏齐全且全中文 | vitest（P12） |
+| 内经 | 配属表逐格；病名无条件禁；框定语与免责语缺一即拦 | vitest（P13） |
+| L5c | 序列条数；运内结构翻转的实证样例；月度采样耗时 | vitest（P14） |
+| L5n | 三尺度；中节点用 MAD；**平直序列不产出节点**的反向对照 | vitest（P15） |
+| 端到端 | CLI 的 Markdown 与内核直调**逐字节相同** | vitest |
 
 **L3 的顺序无关性测试是最重要的一个。**它是「同步迭代」这个设计承诺的唯一证明。
+
+### 6.1 每一条「全绿」都要配一条反向对照
+
+只断言「扫描通过」「不变量成立」是**空转的** —— 扫描根本没跑到东西时，
+它同样全绿；条件断言在没有样本命中时，它同样全绿。本项目已两次栽在这上面
+（P4 的互解裁决从未被样本触发、P9 的措辞扫描）。故：
+
+- 扫描类断言必须同时断言 `scanned > 阈值`，且**植入一条违规必须被逮到**
+- 条件类断言必须有**实证覆盖**：确认样本集中确实有命中该分支的盘
+- 统计类断言必须有**空对照**：平直序列不得产出节点
 
 ---
 
@@ -297,20 +348,26 @@ description: 四柱（八字）排盘与推演。当用户提供出生年月日�
 
 严格自底向上，每层通过测试才进下一层。
 
-| 阶段 | 内容 | 完成判据 |
+| 阶段 | 内容 | 状态 · 完成判据 |
 | --- | --- | --- |
-| **P0** | `data` 静态表 + `ganzhi` 代数 | 表一致性与自洽性测试全绿 |
-| **P1** | `astro` + `time` | 1900–2100 节气误差 ≤ 1 min |
-| **P2** | `chart` L0 | 100 命例四柱零误差；命宫两种取法都实现并标注待定 |
-| **P3** | `weights` L1 | 不变量测试全绿；配重面板可视 |
-| **P4** | `structure` L2 | 不变量全绿；互解裁决有 trace |
-| **P5** | `propagate` L3 | **顺序无关性测试通过**；桑基图可渲染 |
-| **P6** | `conclude` L4 | 与人工判读的命例比对，旺衰一致率作为校准依据 |
-| **P7** | `shensha` + `yingqi` | 神煞起例的推导式与查表式一致 |
-| **P8** | `temporal` L5 | 三线曲线、月历、日视图 |
-| **P9a** | `report` L6 | 措辞扫描通过，且**植入违规必被逮到** |
-| **P9b** | Web UI | 十路由静态导出；参数改动实时重算且违反不变量当场拒绝 |
-| **P10** | `cli` + `skill` | Skill 与 Web 结论逐字一致 |
+| **P0** | `data` 静态表 + `ganzhi` 代数 | ✅ 表一致性与自洽性全绿 |
+| **P1** | `astro` + `time` | ✅ 对香港天文台 240 个节气，RMS 18.0 秒，0 项越界 |
+| **P2** | `chart` L0 | ✅ 日柱 73000 日连推无错位；命宫两种取法皆实现并标注待定 |
+| **P3** | `weights` L1 | ✅ 七条不变量全绿；YAML 与 TS 逐键对账 |
+| **P4** | `structure` L2 | ✅ 六条不变量全绿；互解裁决有 trace 且有实证覆盖 |
+| **P5** | `propagate` L3 | ✅ **顺序无关性**通过；并修正规格中四处会致命的错误 |
+| **P6** | `conclude` L4 | ✅ 旺衰/从格/用神/格局/六亲；后修正忌神方向与病药法 |
+| **P7** | `shensha` + `yingqi` | ✅ 起例的推导式与查表式一致；32 条应期规则 |
+| **P8** | `temporal` L5 | ✅ 四视图；流月流日无权重字段（类型 + 参数 + 输出三处强制） |
+| **P9** | `report` L6 + Web UI | ✅ 措辞扫描通过；十个路由静态导出；图表无红绿吉凶色 |
+| **P10** | `cli` + `skill` | ✅ **Skill 与 Web 报告逐字节相同**（构造保证，非人工约定） |
+| **P11** | `BaseChart` 一等对象 + `evaluateAt` | 📋 基础盘在一次报告生成中**恰好算一次**；现有断言全绿不变 |
+| **P12** | L4p 人格层 | 📋 内外分布归一化恒和为 1；前二并列时置信度下调 |
+| **P13** | 内经配属 + 三条轴 + 守卫的「整段」判定域 | 📋 配属表逐格断言；病名与易感式各有真实反例；框定语缺一即拦 |
+| **P14** | L5c 曲线层 | 📋 47 条序列 + 扰动序列；**运内结构翻转**有实证样例 |
+| **P15** | L5n 节点层 + Finding 两层 | 📋 穿越区间；中节点走 MAD；summary 的每个数字可在 detail 的 evidence 中找到 |
+
+P11–P15 的完整算法见 [12-persona-curves-nodes](12-persona-curves-nodes.md)。
 
 **P2 不通过不进 P3。**排盘错了，后面全部无意义——而排盘的对错是可以 100% 客观验证的，没有任何借口。
 
@@ -322,9 +379,9 @@ description: 四柱（八字）排盘与推演。当用户提供出生年月日�
 | --- | --- | --- |
 | 语言 | TypeScript `strict` | Skill 与 Web 共用一份内核 |
 | 包管理 | pnpm workspace | |
-| 时区 | `@js-temporal/polyfill` + 完整 tzdata | 需历史夏令时规则 |
-| 参数校验 | zod | 参数文件是外部输入，必须校验 |
-| 测试 | vitest + fast-check | 属性测试对不变量是刚需 |
+| 时区 | 平台内建 `Intl` + 系统 tzdata | 已含完整历史规则；`core` 要求零运行时依赖 |
+| 参数校验 | **手写两类校验**（区间枚举 / 结构不变量） | 同上。zod 会给 `core` 带来运行时依赖 |
+| 测试 | vitest | 不变量以**穷举**与**实测样本**验证，未引 fast-check |
 | 图表 | 自绘 SVG（无图表库） | 桑基图与命盘表都是定制的，通用库反而绑手 |
 | PDF | 服务端 Playwright 打印 | 唯一需要服务端的功能 |
 | 部署 | 静态导出优先，仅 PDF 走 serverless | 生辰数据默认不出浏览器 |

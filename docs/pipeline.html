@@ -267,7 +267,7 @@ footer{border-top:1px solid var(--rule); margin-top:52px; padding-top:24px; disp
   <div class="hstack">
     <p class="eyebrow">Fate Engine · 规格 v0.1 · 参数快照 default.yaml</p>
     <h1>四柱推演管线</h1>
-    <p class="lede">六层确定性管线，从干支排盘到应期规则。这一页把 L1 配重与 L3 传导的自由系数暴露成可拖动的控件——参数怎么动、盘面怎么变，一眼看到。全页只有一种饱和色，且只用来表示五行。</p>
+    <p class="lede">确定性管线，从干支排盘到应期规则与统计节点。这一页把 L1 配重与 L3 传导的自由系数暴露成可拖动的控件——参数怎么动、盘面怎么变，一眼看到。全页只有一种饱和色，且只用来表示五行。</p>
   </div>
 </header>
 
@@ -282,15 +282,17 @@ footer{border-top:1px solid var(--rule); margin-top:52px; padding-top:24px; disp
 <section id="sec-rail">
   <div class="shead">
     <div class="row"><span class="tag">L0 → L6</span><h2>管线</h2></div>
-    <p class="note">层间单向，下游不得回写上游。前五层是纯函数，同一输入永远同一输出；后两层组织语言，不产生新的命理判断。灰底的两层<strong>不进权重引擎</strong>——月与日是引动的扳机，不是力量的来源。</p>
+    <p class="note">层间单向，下游不得回写上游。力量层是纯函数，同一输入永远同一输出；报告层只组织语言，不产生新的命理判断。<strong>基础盘只取四柱，算一次即冻结</strong>，是一切时点偏离的分母。灰底的两层<strong>不进权重引擎</strong>——月与日是引动的扳机，不是力量的来源。</p>
   </div>
   <div class="rail">
     <div class="step"><span class="lv">L0</span><span class="nm">排盘</span><span class="ds">节气 VSOP87、真太阳时、四柱、胎元、命宫、精确起运</span></div>
     <div class="step"><span class="lv">L1</span><span class="nm">配重</span><span class="ds">柱基准 100 → 干支 40:60 → 藏干下发 → 月提放大 → 司令分野</span></div>
     <div class="step"><span class="lv">L2</span><span class="nm">结构</span><span class="ds">会 &gt; 合 &gt; 冲 &gt; 刑 &gt; 害 &gt; 破；合化转五行、冲损、刑冲开库</span></div>
-    <div class="step"><span class="lv">L3</span><span class="nm">传导</span><span class="ds">生克核 × 阴阳 × 距离 × 活性，同步迭代至收敛</span></div>
+    <div class="step"><span class="lv">L3</span><span class="nm">传导</span><span class="ds">生克核 × 阴阳 × 距离 × 活性，同步迭代；<strong>轮数是交互深度，不是收敛控制</strong></span></div>
     <div class="step"><span class="lv">L4</span><span class="nm">断论</span><span class="ds">十神 → 旺衰 → 从格 → 用神 → 格局 → 宫位六亲</span></div>
-    <div class="step soft"><span class="lv">L5</span><span class="nm">时间</span><span class="ds">大运流年全量重算；<strong>流月流日仅事件匹配</strong></span></div>
+    <div class="step"><span class="lv">L4p</span><span class="nm">人格</span><span class="ds">内外十神（透显藏隐）、五行偏枯、形体与《内经》配属　<em>规划中</em></span></div>
+    <div class="step soft"><span class="lv">L5</span><span class="nm">时间</span><span class="ds">基础盘冻结为基准；大运流年重跑结构与传导；<strong>流月流日仅事件匹配</strong></span></div>
+    <div class="step soft"><span class="lv">L5n</span><span class="nm">节点</span><span class="ds">月度曲线 → 2σ 穿越区间 → 神煞作为理由　<em>规划中</em></span></div>
     <div class="step soft"><span class="lv">L6</span><span class="nm">报告</span><span class="ds">分层组装 + 措辞约束扫描，不做新判断</span></div>
   </div>
 </section>
