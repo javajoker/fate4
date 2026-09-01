@@ -212,6 +212,17 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
     seasonAdjust: 0.15,       // [校准]
     axisBand: 0.12,           // [校准]
   }),
+  series: Object.freeze({
+    spanYears: 60,
+    drawYears: 60,
+    samplesPerYear: 12 as const,          // [硬约束] 月度
+    fleetingMonthInWeights: false as const, // [硬约束]
+    agitation: Object.freeze({            // [校准]
+      chong: 1.00, sanheSanhui: 0.85, liuhe: 0.70,
+      xing: 0.60, hai: 0.40, po: 0.25,
+      layerLuck: 1.00, layerAnnual: 0.85, layerMonth: 0.45,
+    }),
+  }),
   report: Object.freeze({
     locale: "zh-Hans",
     showConvergenceHistory: false,

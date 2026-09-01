@@ -217,6 +217,11 @@ const pairHit = (t: readonly (readonly [Branch, Branch])[], a: Branch, b: Branch
  * 正解是直接按黄经求根：开启寅月的节是立春（λ = 315°），此后每月 +30°。
  * 均值只用来给牛顿法一个初值，不参与结果。
  */
+export function lichunJdOf(year: number): number {
+  const guess = toJulianDay({ year, month: 2, day: 4, hour: 0, minute: 0, second: 0 });
+  return solveSolarTerm(315, asTT(utToTT(guess))).jdUT as number;
+}
+
 function jieMonthBounds(
   year: number, monthIndex: number,
 ): { openJd: number; closeJd: number; openName: string } {

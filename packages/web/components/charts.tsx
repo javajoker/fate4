@@ -380,3 +380,90 @@ export function InnerOuterBars({ rows, highlight = [] }: {
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────
+// 生命曲线 —— 月度采样的多序列叠加
+// ─────────────────────────────────────────────────────────
+
+export interface CurveSeries {
+  readonly id: string;
+  readonly label: string;
+  readonly values: readonly number[];
+}
+
+/**
+ * 多序列折线。
+ *
+ * 每条各自归一到 [0,1] 再画 —— 十神权重与域张力量纲差着两个数量级，
+ * 同轴直接画会让后者变成一条贴底的直线。归一之后比的是**形状**，
+ * 而形状正是这张图要说的：哪一段在动、哪几条一起动。
+ * 具体数值在下方的表里给，图上不标 —— 归一后的纵轴没有单位，标了是骗人。
+ *
+ * 换运处画竖线：那是曲线上唯一的真实断点，其余起伏都是连续的。
+ */
+export function LifeCurves({ series, years, luckBreaks, mark, onPick }: {
+  series: readonly CurveSeries[];
+  years: readonly number[];
+  luckBreaks: readonly number[];
+  mark?: number;
+  onPick?: (index: number) => void;
+}) {
+  const n = years.length;
+  if (n === 0 || series.length === 0) return null;
+  const W = 860; const H = 240; const padL = 8; const padB = 22; const padT = 8;
+  const X = (i: number) => padL + (i / Math.max(1, n - 1)) * (W - padL - 8);
+  const Y = (v: number) => padT + (1 - v) * (H - padT - padB);
+
+  const norm = (vs: readonly number[]) => {
+    const lo = Math.min(...vs); const hi = Math.max(...vs);
+    return hi - lo < 1e-9 ? vs.map(() => 0.5) : vs.map((v) => (v - lo) / (hi - lo));
+  };
+
+  // 每年有十二个采样点，故先取该年的首点再过滤 —— 否则一个年份会画十二次
+  const ticks = years
+    .map((y, i) => ({ y, i }))
+    .filter(({ y, i }) => y % 10 === 0 && (i === 0 || years[i - 1] !== y));
+
+  return (
+    <div className="scroll">
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="生命曲线"
+        style={{ cursor: onPick ? "crosshair" : "default" }}
+        onClick={(e) => {
+          if (onPick === undefined) return;
+          const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
+          onPick(Math.round(((e.clientX - r.left) / r.width) * (n - 1)));
+        }}>
+        {luckBreaks.map((i) => (
+          <line key={`b${i}`} x1={X(i)} y1={padT} x2={X(i)} y2={H - padB}
+            stroke="var(--line-strong)" strokeWidth={1} strokeDasharray="2 4" />
+        ))}
+        {ticks.map(({ y, i }) => (
+          <text key={y} x={X(i)} y={H - 6} textAnchor="middle" fontSize={10} fill="var(--ink-3)">
+            {y}
+          </text>
+        ))}
+        {mark !== undefined && (
+          <line x1={X(mark)} y1={padT} x2={X(mark)} y2={H - padB}
+            stroke="var(--accent)" strokeWidth={1.5} />
+        )}
+        {series.map((s, si) => {
+          const vs = norm(s.values);
+          const d = vs.map((v, i) => `${i === 0 ? "M" : "L"}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+          return (
+            <path key={s.id} d={d} fill="none" stroke="var(--accent)"
+              strokeOpacity={Math.max(0.28, 1 - si * 0.22)} strokeWidth={si === 0 ? 1.8 : 1.1} />
+          );
+        })}
+      </svg>
+      <div className="legend">
+        {series.map((s, i) => (
+          <span key={s.id}>
+            <i style={{ background: "var(--accent)", opacity: Math.max(0.28, 1 - i * 0.22) }} />
+            {s.label}
+          </span>
+        ))}
+        <span className="dim">虚线为换运处 —— 曲线上唯一的真实断点</span>
+      </div>
+    </div>
+  );
+}

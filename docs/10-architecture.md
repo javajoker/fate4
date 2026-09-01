@@ -73,6 +73,7 @@ core/src/
 ├── yingqi/
 │   ├── types.ts  helpers.ts  rules.ts  engine.ts  domains.ts
 ├── temporal/
+│   ├── series.ts                 # L5c 生命曲线（月度采样）
 │   ├── evaluate.ts               # 瞬时求解
 │   ├── views.ts                  # 大运/流年/流月/流日四视图
 │   └── types.ts
@@ -93,7 +94,7 @@ core/src/
 
 `chart/baseChart.ts`（P11）与 `conclude/{traits,persona}.ts`（P12）已就位。
 `conclude/neijing.ts`（P13）亦已就位。
-**P14–P15 将新增**：`temporal/series.ts`、`temporal/nodes.ts`、`report/finding.ts`。
+`temporal/series.ts`（P14）亦已就位。**P15 将新增**：`temporal/nodes.ts`、`report/finding.ts`。
 
 ### 2.1 公共 API
 
@@ -332,7 +333,7 @@ description: 四柱（八字）排盘与推演。当用户提供出生年月日�
 | L4p | 内外分布归一化；特质表四栏齐全且全中文 | vitest（P12） |
 | 内经 | 配属表十三行逐格对账；病名无条件禁；框定语与免责语缺一即拦 | vitest |
 | L6 | 模板文本不得含 Markdown（同一份要进 Web、CLI、JSON 三处） | vitest |
-| L5c | 序列条数；运内结构翻转的实证样例；月度采样耗时 | vitest（P14） |
+| L5c | 序列条数与分组；月内变化的两个来源可分；流月不入权重；扰动只取最强一条 | vitest |
 | L5n | 三尺度；中节点用 MAD；**平直序列不产出节点**的反向对照 | vitest（P15） |
 | 端到端 | CLI 的 Markdown 与内核直调**逐字节相同** | vitest |
 

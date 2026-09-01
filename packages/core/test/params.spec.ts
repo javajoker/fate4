@@ -36,7 +36,7 @@ describe("YAML 与 TS 默认值一致", () => {
   // 于是它们既不受这条断言保护，也进不了参数校准面板。补齐后一并纳入。
   for (const section of [
     "chart", "weights", "structure", "propagation",
-    "conclusion", "shensha", "temporal", "persona", "report",
+    "conclusion", "shensha", "temporal", "persona", "series", "report",
   ] as const) {
     it(`${section} 段逐项相同（含嵌套）`, () => {
       // stableStringify 递归排序键，使比较与书写顺序无关

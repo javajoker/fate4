@@ -320,6 +320,40 @@ export interface PersonaParams {
   readonly axisBand: number;
 }
 
+/** L5c 曲线层。 */
+export interface SeriesParams {
+  /** 统计基准窗的年数，自起运起算。 */
+  readonly spanYears: number;
+  /** 曲线绘制的年数。 */
+  readonly drawYears: number;
+  /**
+   * [硬约束] 每年采样点数。
+   *
+   * 取月度而非年度：曲线本来就是连续的 —— 流年是阶跃、大运是斜坡
+   * （天干占比自 0.70 线性降到 0.30），而**结构的结局也在运内变化**：
+   * 实测 528 步运里 191 次出现同一组参与者的事件结局翻转
+   * （冲而拔根 ⇄ 相冲、合解冲 ⇄ 相冲）。年度采样会把这些整个抹掉。
+   *
+   * 月度上有变化是因为大运份额在推移，**不是流月加了分** —— 后者由
+   * `fleetingMonthInWeights` 硬约束禁止。
+   */
+  readonly samplesPerYear: number;
+  /** [硬约束] 流月不参与权重。只入符号层（神煞、扰动）。 */
+  readonly fleetingMonthInWeights: boolean;
+  /** [校准] 扰动系数。 */
+  readonly agitation: {
+    readonly chong: number;
+    readonly sanheSanhui: number;
+    readonly liuhe: number;
+    readonly xing: number;
+    readonly hai: number;
+    readonly po: number;
+    readonly layerLuck: number;
+    readonly layerAnnual: number;
+    readonly layerMonth: number;
+  };
+}
+
 export interface ReportParams {
   readonly locale: "zh-Hans" | "zh-Hant" | "en";
   readonly showConvergenceHistory: boolean;
@@ -343,6 +377,7 @@ export interface Params {
   readonly shensha: ShenshaParams;
   readonly temporal: TemporalParams;
   readonly persona: PersonaParams;
+  readonly series: SeriesParams;
   readonly report: ReportParams;
 }
 

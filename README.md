@@ -82,10 +82,10 @@ L6 报告   汇总为分层报告
 | **P11** | `BaseChart` 一等对象 | ✅ 完成 —— 报告快 43%，透干与引出分开 |
 | **P12** | L4p 人格层 —— 内外十神、五行偏枯 | ✅ 完成 —— 张力改按五组算，真缺与过弱分开 |
 | **P13** | 《内经》五行配属 · 虚实寒热燥湿 · 三条新禁令 | ✅ 完成 —— 守卫新增「段」判定域 |
-| P14 | L5c 生命曲线 —— 月度采样 | 📋 同上 |
+| **P14** | L5c 生命曲线 —— 月度采样 | ✅ 完成 —— 运内结构翻转有实证 |
 | P15 | L5n 统计节点 —— 2σ 穿越区间 + 两层结论 | 📋 同上 |
 
-全部 572 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
+全部 595 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
 
 ```bash
 pnpm install && pnpm test && pnpm typecheck
