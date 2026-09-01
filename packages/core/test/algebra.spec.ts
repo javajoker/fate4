@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { BRANCHES, STEMS, TEN_GODS, type Branch, type Stem } from "../src/types/ganzhi.js";
 import {
-  actingRelation, branchAt, branchIndex, hiddenStemsOf,
+  BRANCHES, ELEMENTS, STEMS, TEN_GODS, type Branch, type Stem,
+} from "../src/types/ganzhi.js";
+import { CONTROLS, GENERATES } from "../src/ganzhi/tables.js";
+import {
+  actingRelation, branchAt, branchIndex, controlledBy, generatedBy, hiddenStemsOf,
   hourStemOf, isValidPair, mod, monthStemOf, nayinOf, polarityOf,
   sexagenaryAt, sexagenaryIndexOf, stemAt, stemIndex, stepBranch, stepStem,
   tenGod, xunKongOf, xunStartOf, yinMonthStemOf, ziHourStemOf,
@@ -245,6 +248,27 @@ describe("藏干下发", () => {
       expect(last.share, `${b} 余气`).toBeGreaterThan(0);
       expect(last.share).toBeLessThan(hs[0]!.share);
       expect(+(last.share * 60).toFixed(6), `${b} 余气 60 分制`).toBe(6);
+    }
+  });
+});
+
+describe("反向查表 —— 方向写反不会报错，只会静默给出反的结论", () => {
+  it("generatedBy / controlledBy 与正向表互逆", () => {
+    for (const e of ELEMENTS) {
+      expect(GENERATES[generatedBy(e)]).toBe(e);
+      expect(CONTROLS[controlledBy(e)]).toBe(e);
+    }
+  });
+  it("反向与正向在五元环上恒不相等 —— 写错一处必错到底", () => {
+    for (const e of ELEMENTS) {
+      expect(generatedBy(e)).not.toBe(GENERATES[e]);
+      expect(controlledBy(e)).not.toBe(CONTROLS[e]);
+    }
+  });
+  it("恒等式：x 所克者 === 生「克 x 者」者", () => {
+    // 五元环的一条结构性事实。喜忌五组的划分正靠它才不重不漏。
+    for (const e of ELEMENTS) {
+      expect(CONTROLS[e]).toBe(generatedBy(controlledBy(e)));
     }
   });
 });

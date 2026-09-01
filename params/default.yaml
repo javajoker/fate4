@@ -234,7 +234,9 @@ conclusion:
     huaqiConfidenceCap: 0.60       # ⚠️ #11 化气格实务争议大
 
   yongshen:
-    priority: [tiaohou, fuyi, tongguan, bingyao]
+    # 求值次序，非并列清单。前三者短路，病药是后置精修 ——
+    # 若按「调候→扶抑→通关→病药」实现，通关与病药都是死代码。见 conclude/yongshen.ts 模块头。
+    priority: [tiaohou, tongguan, fuyi, bingyao]
     tiaohou:
       source: heuristic            # heuristic | table   ⚠️ #2 待转录《穷通宝鉴》
       fireFloor:  0.08             # 冬月火占比低于此值 → 极寒
@@ -244,7 +246,8 @@ conclusion:
       balanceBand: 0.20            # 两方权重差异比例
       dominanceFloor: 0.45         # 两方合计占总权重的下限
     bingyao:
-      damageThreshold: 12
+      damageShare: 0.42            # [校准] 折损比 damage/(W用神+damage) 超此值方成病
+      damageFloor: 8               # 绝对下限，挡住用神本就不存在的盘
 
   femaleChildStarVariant: standard # [流派] | reversed   ⚠️ #7
 

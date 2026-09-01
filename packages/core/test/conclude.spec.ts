@@ -9,13 +9,24 @@ import { godGroupElement } from "../src/conclude/specialPattern.js";
 import { tenGodOf, GOD_GROUPS, sumGods } from "../src/conclude/tenGods.js";
 import { DEFAULT_PARAMS } from "../src/params/defaults.js";
 import { loadParams } from "../src/params/load.js";
-import { STEMS, TEN_GODS, ELEMENTS } from "../src/types/ganzhi.js";
-import { elementOf, polarityOf, tenGod as algebraTenGod } from "../src/ganzhi/algebra.js";
+import { STEMS, TEN_GODS, ELEMENTS, type Element } from "../src/types/ganzhi.js";
+import {
+  controls, elementOf, generates, polarityOf, tenGod as algebraTenGod,
+} from "../src/ganzhi/algebra.js";
 import { rootKindOf } from "../src/ganzhi/changsheng.js";
 import type { BirthInput } from "../src/chart/types.js";
 import type { Conclusions } from "../src/conclude/types.js";
 
 const CP = DEFAULT_PARAMS.conclusion;
+
+// 相克序在测试里独立写一遍，不复用 src 的表 —— 否则表若写反，测试会跟着一起反。
+const KE: Readonly<Record<Element, Element>> = {
+  木: "土", 土: "水", 水: "火", 火: "金", 金: "木",
+};
+/** x 克谁。 */
+const CONTROLS_OF = (x: Element): Element => KE[x];
+/** 谁克 x。 */
+const CONTROLLED_BY = (x: Element): Element => ELEMENTS.find((k) => KE[k] === x)!;
 
 const EXAMPLE: BirthInput = {
   year: 1990, month: 5, day: 12, hour: 14, minute: 30,
@@ -273,6 +284,54 @@ describe("用神", () => {
       const all = [y.primary, ...y.xishen, ...y.jishen, ...y.choushen, ...y.xianshen];
       expect(new Set(all).size, `${JSON.stringify(i)} 有重复或遗漏`).toBe(5);
       expect(new Set(all)).toEqual(new Set(ELEMENTS));
+    }
+  });
+
+  it("喜忌仇的方向 —— 「是一个划分」不等于「分对了」", () => {
+    // 上一条只验五组构成五行的一个划分。划分对置换不敏感：把忌神与闲神
+    // 整个对调，它照样全绿 —— 而这恰恰就是本仓库真实发生过的错。方向须单独断言。
+    for (const i of [EXAMPLE, WINTER, AUTUMN]) {
+      const y = run(i).yongshen.value;
+      const u = y.primary;
+      const xi = y.xishen[0]!; const ji = y.jishen[0]!; const chou = y.choushen[0]!;
+
+      expect(generates(xi, u), `喜神${xi}须生用神${u}`).toBe(true);
+      expect(controls(ji, u), `忌神${ji}须克用神${u}`).toBe(true);
+      expect(generates(chou, ji), `仇神${chou}须生忌神${ji}`).toBe(true);
+
+      // 反向的那个才是最容易误取的：用神所克者对用神无害，绝不是忌神。
+      expect(y.jishen, `用神${u}所克的${CONTROLS_OF(u)}不是忌神`).not.toContain(CONTROLS_OF(u));
+      // 五行是五元环，于是恒有「用神所克者 === 生忌神者」，二者本就是同一个。
+      expect(CONTROLS_OF(u)).toBe(chou);
+    }
+  });
+
+  it("病药：病克用神、药克病 —— 两处方向都不能反", () => {
+    // 该盘在默认参数下命中病药（折损比 0.426 > 0.42）。
+    const c = run({
+      year: 1962, month: 7, day: 23, hour: 14, minute: 20,
+      gender: "male", timeZone: "Asia/Shanghai", longitude: 116.4,
+    });
+    const y = c.yongshen.value;
+    expect(y.method).toBe("bingyao");
+
+    const yao = y.primary;          // 药
+    const protectedYong = y.secondary!;  // 原用神，药所护者
+    const bing = CONTROLLED_BY(protectedYong);
+    expect(controls(bing, protectedYong), "病须克原用神").toBe(true);
+    expect(controls(yao, bing), `药${yao}须克病${bing}`).toBe(true);
+
+    // 不静默替换：原判定必须留在 alternatives 里。
+    expect(c.yongshen.alternatives.some((a) => a.value.primary === protectedYong)).toBe(true);
+    expect(c.yongshen.derivation.some((d) => d.step === "病药")).toBe(true);
+  });
+
+  it("病药不夺调候与从格", () => {
+    for (const i of [WINTER, AUTUMN]) {
+      const y = run(i).yongshen.value;
+      if (y.method === "bingyao") {
+        expect.fail(`${JSON.stringify(i)} 的调候/从格取用被病药改写了`);
+      }
     }
   });
 

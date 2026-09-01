@@ -6,7 +6,7 @@
  */
 
 import {
-  BRANCHES, STEMS,
+  BRANCHES, ELEMENTS, STEMS,
   type ActingRelation, type Branch, type Element, type Polarity,
   type SexagenaryIndex, type Stem, type TenGod,
 } from "../types/ganzhi.js";
@@ -96,6 +96,22 @@ export function generates(a: Element, b: Element): boolean {
 /** a 克 b ？ */
 export function controls(a: Element, b: Element): boolean {
   return CONTROLS[a] === b;
+}
+
+/**
+ * 生 x 者 / 克 x 者 —— **反向**查表。
+ *
+ * `GENERATES[x]` 是「x 生谁」，`CONTROLS[x]` 是「x 克谁」；
+ * 命理里更常要问的却是反过来的那一半（喜神＝生用神者、忌神＝克用神者、药＝克病者）。
+ * 直接写 `CONTROLS[x]` 当作「克 x 者」，本仓库已犯过两次，
+ * 且两次都不会报错、只是静默给出反的结论。故把反向查表固化成具名函数。
+ */
+export function generatedBy(x: Element): Element {
+  return ELEMENTS.find((e) => GENERATES[e] === x)!;
+}
+
+export function controlledBy(x: Element): Element {
+  return ELEMENTS.find((e) => CONTROLS[e] === x)!;
 }
 
 /**

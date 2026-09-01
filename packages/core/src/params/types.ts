@@ -208,7 +208,17 @@ export interface ConclusionParams {
     };
     readonly weakYongshenThreshold: number;
     readonly tongguan: { readonly balanceBand: number; readonly dominanceFloor: number };
-    readonly bingyao: { readonly damageThreshold: number };
+    readonly bingyao: {
+      /**
+       * 病药的门槛是**尺度无关**的折损比，不是绝对流量：
+       * `damage / (W_用神 + damage) > damageShare`。
+       * 绝对门槛会让同一张盘因为算的是本命还是「本命+大运+流年」而改变取用法 ——
+       * 载体多了，流量自然大，与病之轻重无关。
+       */
+      readonly damageShare: number;
+      /** 绝对下限，挡住「用神本就不存在」的盘：折损比再高也只是两个小数在比。 */
+      readonly damageFloor: number;
+    };
   };
   readonly femaleChildStarVariant: "standard" | "reversed";
 }

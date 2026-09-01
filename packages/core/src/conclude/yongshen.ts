@@ -1,5 +1,22 @@
 /**
- * 用神选取。优先级：调候（极端时）→ 扶抑 → 通关 → 病药。
+ * 用神选取。
+ *
+ * ## 四法的求值次序，与文档原先的列举次序不同
+ *
+ * [06-conclusions](../../../../docs/06-conclusions.md) §5 原先把优先级写成
+ * 「调候 → 扶抑 → 通关 → 病药」。若按短路顺序照此实现，**通关与病药都是死代码** ——
+ * 扶抑是主路，任何盘面都会返回一个用神，轮不到后两者。
+ *
+ * 实际的求值次序按「特殊者先行、精修者后置」重排：
+ *
+ * | 次序 | 法 | 性质 |
+ * | 1 | 调候 | 极端气候短路。气候不解，谈扶抑无益 |
+ * | 2 | 通关 | 结构条件短路。两强相持且合占全盘 45% 以上，比扶抑更具体 |
+ * | 3 | 扶抑 | 主路。恒有产出 |
+ * | 4 | 病药 | **后置精修**，不是并列的第四条路 —— §5.4 的「直接损害用神」 |
+ * |   |      | 一句已预设了用神的存在，它只能在前三者之后跑 |
+ *
+ * 文档 §5 已随之改正。
  *
  * ⚠️ **调候表尚未就位。**《穷通宝鉴》的完整调候表是 10 日干 × 12 月支 = 120 格，
  * 须逐格转录并双源校对。凭记忆转录 120 格必然出错，而错误的调候表比没有更糟。
@@ -9,6 +26,7 @@
 
 import { ELEMENTS, type Element, type TenGod } from "../types/ganzhi.js";
 import { CONTROLS, GENERATES } from "../ganzhi/tables.js";
+import { controlledBy, generatedBy } from "../ganzhi/algebra.js";
 import type { Branch } from "../types/ganzhi.js";
 import type { ConclusionParams } from "../params/types.js";
 import { godGroupElement } from "./specialPattern.js";
@@ -26,6 +44,12 @@ export interface YongshenInput {
   readonly tenGods: Readonly<Record<TenGod, number>>;
   readonly strength: StrengthBand;
   readonly special: SpecialPattern | null;
+  /**
+   * L3 的克流量矩阵，`keDamage[受害五行][施克五行]`。
+   * 病药法要判的是「这个忌神**实际上**打到用神多少」，而不是「它权重多大」——
+   * 一个隔了两柱、被合绊、被通关引开的忌神，权重再高也不成病。
+   */
+  readonly keDamage: Readonly<Record<Element, Readonly<Record<Element, number>>>>;
 }
 
 function shareOf(el: Element, by: Readonly<Record<Element, number>>): number {
@@ -39,10 +63,11 @@ function assemble(
   by: Readonly<Record<Element, number>>, p: ConclusionParams,
   extra: Partial<YongshenVerdict> = {},
 ): YongshenVerdict {
-  const xishen = [ELEMENTS.find((e) => GENERATES[e] === primary)!];       // 生用神者
-  const jishen = [CONTROLS[primary], ...(secondary === null ? [] : [])]   // 克用神者
-    .filter((e, i, a) => a.indexOf(e) === i);
-  const choushen = [ELEMENTS.find((e) => GENERATES[e] === jishen[0]!)!];  // 生忌神者
+  // 一律走反向查表的具名函数。写成 CONTROLS[primary] 会得到「用神所克者」——
+  // 用神水会被标成忌神火（水克火，火对水毫无威胁），而真正的敌人土反倒落进闲神。
+  const xishen = [generatedBy(primary)];         // 生用神者
+  const jishen = [controlledBy(primary)];        // 克用神者
+  const choushen = [generatedBy(jishen[0]!)];    // 生忌神者
   const xianshen = ELEMENTS.filter(
     (e) => e !== primary && !xishen.includes(e) && !jishen.includes(e) && !choushen.includes(e));
   const strength = by[primary];
@@ -55,7 +80,8 @@ function assemble(
   };
 }
 
-export function yongshenVerdict(
+/** 前三法：调候短路 → 通关短路 → 扶抑主路。 */
+function baseVerdict(
   input: YongshenInput, p: ConclusionParams,
 ): Verdict<YongshenVerdict> {
   const { dayMasterElement: dm, monthBranch, byElement, tenGods, strength, special } = input;
@@ -185,4 +211,63 @@ export function yongshenVerdict(
   const weakest = [...ELEMENTS].sort((a, b) => byElement[a] - byElement[b])[0]!;
   derivation.push({ step: "扶抑", detail: `中和，补全局最弱的 ${weakest}（${byElement[weakest].toFixed(1)}）` });
   return { value: assemble(weakest, null, "fuyi", byElement, p), confidence: 0.6, derivation, alternatives };
+}
+
+/**
+ * 第四法 · 病药 —— 后置精修。
+ *
+ * §5.4：`病 = 忌神组中权重最大且对用神累计克流量 > damageThreshold 者；药 = 克病者`。
+ * 「忌神组」由 `assemble` 定为克用神的那一行，故 argmax 落在唯一元素上；
+ * 真正的门槛在**流量**，不在权重 —— 见 `keDamage` 的注释。
+ *
+ * 命中后用神改取药，原用神降为 secondary（药所护者），
+ * 原判定进 alternatives。**不静默替换** —— 病药与扶抑给出的是两个不同的用神，
+ * 只报一个而不说另一个存在过，正是本层最容易犯的那类错。
+ */
+function applyBingyao(
+  v: Verdict<YongshenVerdict>, input: YongshenInput, p: ConclusionParams,
+): Verdict<YongshenVerdict> {
+  const base = v.value;
+  // 调候短路与从格/专旺顺势，都不受病药改写：前者是气候刚性，后者已放弃扶抑逻辑。
+  if (base.method !== "fuyi" && base.method !== "tongguan") return v;
+  if (input.special !== null) return v;
+
+  const yong = base.primary;
+  const bing = base.jishen[0];
+  if (bing === undefined) return v;
+
+  const damage = input.keDamage[yong][bing];
+  const B = p.yongshen.bingyao;
+  if (damage < B.damageFloor) return v;
+  // 折损比 —— 用神被削掉的那一份占它「本可有」的多少。尺度无关。
+  const share = damage / (base.strength + damage);
+  if (share <= B.damageShare) return v;
+
+  const yao = controlledBy(bing);   // 克病者。不是 CONTROLS[bing] —— 那正是用神自己。
+  if (yao === yong) return v;
+
+  const derivation: DerivationStep[] = [...v.derivation, {
+    step: "病药",
+    detail: `${bing}对用神${yong}的累计克流量 ${damage.toFixed(1)}，折损比 ${share.toFixed(3)} > ${B.damageShare}，`
+      + `${bing}成病；取制病之${yao}为药`,
+    values: { damage, share, damageShare: B.damageShare, damageFloor: B.damageFloor },
+  }];
+
+  return {
+    value: assemble(yao, yong, "bingyao", input.byElement, p),
+    // 精修多加了一重条件，置信度不高于原判定，且封顶 0.65。
+    confidence: Math.min(v.confidence, 0.65),
+    derivation,
+    alternatives: [...v.alternatives, {
+      value: base,
+      reason: `不计病药时，${base.method === "tongguan" ? "通关" : "扶抑"}一路取 ${yong}；`
+        + `病药一路认为 ${yong} 正被 ${bing} 所伤，须先去病。两说并存。`,
+    }],
+  };
+}
+
+export function yongshenVerdict(
+  input: YongshenInput, p: ConclusionParams,
+): Verdict<YongshenVerdict> {
+  return applyBingyao(baseVerdict(input, p), input, p);
 }

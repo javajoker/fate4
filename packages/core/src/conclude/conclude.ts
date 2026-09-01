@@ -54,9 +54,23 @@ export function conclude(input: ConcludeInput): Conclusions {
     dayMaster, monthBranch, carriers,
   }, cp);
 
+  // 克流量矩阵 keDamage[受害][施克] —— 病药法的门槛判在流量上，不在权重上。
+  const elementById = new Map(carriers.map((c) => [c.id, c.element]));
+  const keDamage = Object.fromEntries(ELEMENTS.map((e) => [
+    e, Object.fromEntries(ELEMENTS.map((f) => [f, 0])) as Record<Element, number>,
+  ])) as Record<Element, Record<Element, number>>;
+  for (const f of input.flows) {
+    if (f.kind !== "ke") continue;
+    const from = elementById.get(f.from);
+    const to = elementById.get(f.to);
+    if (from === undefined || to === undefined) continue;
+    keDamage[to][from] += f.totalAmount;
+  }
+
   const yongshen = yongshenVerdict({
     dayMasterElement: dayMaster.element, monthBranch, byElement,
     tenGods: tg.vector, strength: strength.value, special: specialPattern.value,
+    keDamage,
   }, cp);
 
   // 定格只看年、月、时三处天干 —— 日干即日主本身，不算「透」

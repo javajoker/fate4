@@ -155,14 +155,14 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
       enableHuaqi: true, huaqiConfidenceCap: 0.60,   // ⚠️ #11 化气格实务争议大
     }),
     yongshen: Object.freeze({
-      priority: Object.freeze(["tiaohou", "fuyi", "tongguan", "bingyao"]),
+      priority: Object.freeze(["tiaohou", "tongguan", "fuyi", "bingyao"]),
       tiaohou: Object.freeze({
         source: "heuristic",   // ⚠️ #2 《穷通宝鉴》120 格待转录
         fireFloor: 0.08, waterFloor: 0.08,
       }),
       weakYongshenThreshold: 15,
       tongguan: Object.freeze({ balanceBand: 0.20, dominanceFloor: 0.45 }),
-      bingyao: Object.freeze({ damageThreshold: 12 }),
+      bingyao: Object.freeze({ damageShare: 0.42, damageFloor: 8 }),
     }),
     femaleChildStarVariant: "standard",          // [流派] ⚠️ 待校准 #7
   }),
