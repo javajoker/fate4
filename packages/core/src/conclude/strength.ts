@@ -49,8 +49,11 @@ export function strengthVerdict(
     { step: "党势", detail: `同党 ${supporting.toFixed(2)}，异党 ${opposing.toFixed(2)}`,
       values: { supporting, opposing } },
     { step: "比值", detail: `r = 同党 / 总量 = ${r.toFixed(4)}`, values: { r } },
-    { step: "分档", detail: `落入 ${BAND_LABEL[value]}（${value}）`,
-      values: { veryStrong: p.strengthBands.veryStrong, strong: p.strengthBands.strong,
+    // detail 是给人看的散文，values 是给机器看的。
+    // 枚举标识放 values，不放 detail —— 否则中文报告里会漏出一截英文。
+    { step: "分档", detail: `落入 ${BAND_LABEL[value]}`,
+      values: { band: value,
+        veryStrong: p.strengthBands.veryStrong, strong: p.strengthBands.strong,
         balancedLow: p.strengthBands.balancedLow, weak: p.strengthBands.weak } },
     { step: "置信", detail: `距最近阈值 ${nearest} 有 ${distance.toFixed(4)}，置信度 ${confidence.toFixed(2)}`,
       values: { nearest, distance, confidence } },

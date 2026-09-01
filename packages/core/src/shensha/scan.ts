@@ -35,7 +35,8 @@ export type PalaceName =
   | "祖上宫" | "根基宫" | "父母兄弟宫" | "门户宫"
   | "自身" | "配偶宫" | "志向宫" | "子女宫" | "外部";
 
-const PALACE: Readonly<Record<string, PalaceName>> = Object.freeze({
+/** 八宫 —— 报告层按宫位分组神煞时也用它。「有华盖」是废话，「华盖在时支子女宫」才是信息。 */
+export const PALACE: Readonly<Record<string, PalaceName>> = Object.freeze({
   "year.stem": "祖上宫", "year.branch": "根基宫",
   "month.stem": "父母兄弟宫", "month.branch": "门户宫",
   "day.stem": "自身", "day.branch": "配偶宫",
