@@ -11,14 +11,21 @@ import {
   createContext, useContext, useEffect, useMemo, useState, type ReactNode,
 } from "react";
 import {
-  buildChart, chartOptionsOf, loadParams, type BirthInput, type NatalChart,
-  type Params, type PartialParams,
+  buildBaseChart, buildChart, chartOptionsOf, loadParams,
+  type BaseChart, type BirthInput, type NatalChart, type Params, type PartialParams,
 } from "@fate/core";
 import { decodeShare, getChart, type ChartRecord } from "./storage";
 
 interface Ctx {
   readonly record: ChartRecord | null;
   readonly chart: NatalChart | null;
+  /**
+   * 基础盘 —— **整个命盘上下文里算一次**。
+   *
+   * 各页拿它去调 buildReport / yearView / monthView，基准不再逐页重解。
+   * 换年份、换页签都不会触发重算；只有换命盘或改参数才会。
+   */
+  readonly base: BaseChart | null;
   readonly params: Params;
   readonly overrides: PartialParams;
   readonly setOverrides: (o: PartialParams) => void;
@@ -84,9 +91,15 @@ export function ChartProvider({ children }: { children: ReactNode }) {
     }
   }, [record, params]);
 
+  // 基础盘随 (命盘, 参数) 记忆。参数面板改一个系数即失效重算，符合预期。
+  const base = useMemo(
+    () => (chart === null ? null : buildBaseChart(chart, params)),
+    [chart, params],
+  );
+
   return (
     <ChartCtx.Provider
-      value={{ record, chart, params, overrides, setOverrides, error, loading }}
+      value={{ record, chart, base, params, overrides, setOverrides, error, loading }}
     >
       {children}
     </ChartCtx.Provider>

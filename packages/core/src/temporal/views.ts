@@ -21,7 +21,8 @@ import { scanShensha } from "../shensha/scan.js";
 import { runYingqi } from "../yingqi/engine.js";
 import { aggregateDomains } from "../yingqi/domains.js";
 import type { YingqiContext } from "../yingqi/types.js";
-import { evaluate, type EvaluatedChart } from "./evaluate.js";
+import { evaluateAt, type EvaluatedChart } from "./evaluate.js";
+import { toBaseChart, type BaseChart, type SolvedChart } from "../chart/baseChart.js";
 import type {
   DayView, ElementConflict, Interaction, LuckStep, MonthView, YearView,
 } from "./types.js";
@@ -60,7 +61,7 @@ const PILLAR_LABEL: Readonly<Record<string, string>> = Object.freeze({
  *
  * 五行求和恒为 0，故不再有整体漂移。无大运流年时 delta 恒为 0。
  */
-function shareDeltaOf(natal: EvaluatedChart, now: EvaluatedChart): Record<Element, number> {
+function shareDeltaOf(natal: SolvedChart, now: SolvedChart): Record<Element, number> {
   const a = natal.propagation.byElement;
   const b = now.propagation.byElement;
   const massN = ELEMENTS.reduce((t, e) => t + a[e], 0);
@@ -81,15 +82,18 @@ export function annualPillarOf(year: number): Pillar {
 // 大运
 // ─────────────────────────────────────────────────────────
 
-export function luckTimeline(chart: NatalChart, params: Params = DEFAULT_PARAMS): LuckStep[] {
-  const natal = evaluate({ chart, params });
+export function luckTimeline(
+  from: BaseChart | NatalChart, params?: Params,
+): LuckStep[] {
+  const base = toBaseChart(from, params);
+  const { chart } = base;
   return chart.luck.pillars.map((lp) => {
     const samples = ([["start", 0], ["mid", 5], ["end", 9.99]] as const).map(([at, elapsed]) => {
-      const ev = evaluate({ chart, luck: { pillar: lp.pillar, elapsedYears: elapsed }, params });
-      const idx = favorIndexOf(natal, ev, [], params);
+      const ev = evaluateAt(base, { luck: { pillar: lp.pillar, elapsedYears: elapsed } });
+      const idx = favorIndexOf(base, ev, [], base.params);
       return {
         at, elapsedYears: elapsed,
-        stemShare: luckStemShareAt(elapsed, params),
+        stemShare: luckStemShareAt(elapsed, base.params),
         favorIndex: idx.index,
         strength: ev.conclusions.strength.value,
       };
@@ -118,7 +122,7 @@ export function luckTimeline(chart: NatalChart, params: Params = DEFAULT_PARAMS)
  * 更不是生活质量。低分意味着结构性张力大，在传统语境中同样对应变动与转折。
  */
 export function favorIndexOf(
-  natal: EvaluatedChart, now: EvaluatedChart,
+  natal: SolvedChart, now: EvaluatedChart,
   events: readonly { polarity: -1 | 0 | 1; weight: number }[],
   params: Params = DEFAULT_PARAMS,
 ): { index: number; base: number; eventDelta: number; raw: number } {
@@ -137,9 +141,12 @@ export function favorIndexOf(
 // ─────────────────────────────────────────────────────────
 
 export function yearView(
-  chart: NatalChart, year: number, params: Params = DEFAULT_PARAMS,
+  from: BaseChart | NatalChart, year: number, params?: Params,
 ): YearView {
-  const natal = evaluate({ chart, params });
+  // 传 BaseChart 时基准不再重算。原实现每调一次就重解一遍本命盘，
+  // 一条 120 年曲线就是 120 遍 —— 这是 buildReport 里最大的一块重复。
+  const base = toBaseChart(from, params);
+  const { chart } = base;
   const pillar = annualPillarOf(year);
 
   // 取样点：该年立春时刻
@@ -147,19 +154,18 @@ export function yearView(
   const step = chart.luck.pillars.find((p) => lichunJd >= p.startJd && lichunJd < p.endJd) ?? null;
   const elapsed = step === null ? 0 : (lichunJd - step.startJd) / TROPICAL_YEAR_DAYS;
 
-  const now = evaluate({
-    chart, params,
+  const now = evaluateAt(base, {
     luck: step === null ? null : { pillar: step.pillar, elapsedYears: elapsed },
     annual: pillar,
   });
 
   const ctx: YingqiContext = {
-    chart, natal, now,
+    chart, natal: base, now,
     luck: step?.pillar ?? null, annual: pillar,
-    scope: "year", shareDelta: shareDeltaOf(natal, now),
+    scope: "year", shareDelta: shareDeltaOf(base, now),
   };
   const events = runYingqi(ctx, "year");
-  const idx = favorIndexOf(natal, now, events, params);
+  const idx = favorIndexOf(base, now, events, base.params);
 
   // 换运年：分段返回，不做加权平均 —— 两步大运的气象不可线性混合
   const nextLichun = lichunJd + TROPICAL_YEAR_DAYS;
@@ -237,8 +243,11 @@ function jieMonthBounds(
 }
 
 export function monthView(
-  chart: NatalChart, year: number, monthIndex: number, params: Params = DEFAULT_PARAMS,
+  from: BaseChart | NatalChart, year: number, monthIndex: number, params?: Params,
 ): MonthView {
+  const base = toBaseChart(from, params);
+  const { chart } = base;
+  const p = base.params;
   const yearPillar = annualPillarOf(year);
   const monthBranch = MONTH_BRANCH_ORDER[mod(monthIndex, 12)]!;
   const pillar: Pillar = { stem: monthStemOf(yearPillar.stem, monthBranch), branch: monthBranch };
@@ -246,7 +255,7 @@ export function monthView(
   const { openJd, closeJd, openName } = jieMonthBounds(year, monthIndex);
   const mid = (openJd + closeJd) / 2;
 
-  const natal = evaluate({ chart, params });
+  const natal = base;
   const dm = natal.conclusions.dayMaster;
   const y = natal.conclusions.yongshen.value;
   const monthElement = elementOf(pillar.stem);
@@ -273,7 +282,7 @@ export function monthView(
 
   // 流月单列一个落点，不冒充本命月柱 —— 否则流月的神煞会被标成「门户宫」。
   const shensha = scanShensha({
-    chart, carriers: natal.carriers, events: natal.events, params: params.shensha,
+    chart, carriers: natal.carriers, events: natal.events, params: p.shensha,
     fleetingMonth: pillar,
   }).filter((h) => h.landsOn.pillar === "fleetingMonth");
 
@@ -287,7 +296,7 @@ export function monthView(
   narrative.push(relationToYongshen === "supports" ? "与本命喜用同气，本月的外部条件偏于顺应。"
     : relationToYongshen === "opposes" ? "与本命忌仇同气，本月的外部条件偏于牵制。"
     : "与本命用忌皆不直接相干，本月外部条件平缓。");
-  for (const i of interactions.slice(0, params.temporal.monthLayer.maxInteractionsShown)) {
+  for (const i of interactions.slice(0, p.temporal.monthLayer.maxInteractionsShown)) {
     narrative.push(`${i.detail}，牵动${i.targetPalace}。`);
   }
 
@@ -297,7 +306,7 @@ export function monthView(
     openedBy: openName,
     yearPillar, luckPillar: step?.pillar ?? null,
     shensha,
-    interactions: interactions.slice(0, params.temporal.monthLayer.maxInteractionsShown),
+    interactions: interactions.slice(0, p.temporal.monthLayer.maxInteractionsShown),
     tone: {
       monthElement, relationToYongshen,
       relationToDayMaster: tenGodOf(dm.element, dm.polarity, monthElement, polarityOf(pillar.stem)),
@@ -311,13 +320,16 @@ export function monthView(
 // ─────────────────────────────────────────────────────────
 
 export function dayView(
-  chart: NatalChart, y: number, m: number, d: number, params: Params = DEFAULT_PARAMS,
+  from: BaseChart | NatalChart, y: number, m: number, d: number, params?: Params,
 ): DayView {
+  const base = toBaseChart(from, params);
+  const { chart } = base;
+  const p = base.params;
   const jdn = julianDayNumber(y, m, d);
   const sx = mod(jdn + 49, 60);
   const pillar: Pillar = { stem: stepStem("甲", sx), branch: branchAt(sx) };
 
-  const natal = evaluate({ chart, params });
+  const natal = base;
   const dm = natal.conclusions.dayMaster;
   const yong = natal.conclusions.yongshen.value.primary;
   const dayElement = elementOf(pillar.stem);
@@ -353,7 +365,7 @@ export function dayView(
   }
 
   const shensha = scanShensha({
-    chart, carriers: natal.carriers, events: natal.events, params: params.shensha,
+    chart, carriers: natal.carriers, events: natal.events, params: p.shensha,
   }).filter((h) => h.branch === pillar.branch);
 
   const note = conflicts.length === 0

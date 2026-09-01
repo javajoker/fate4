@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { buildReport, evaluate, type Element } from "@fate/core";
+import { buildReport, type Element } from "@fate/core";
 import { useChart } from "../../lib/chartContext";
 import { Narrative } from "../../components/Narrative";
 import { PillarTable } from "../../components/PillarTable";
@@ -10,16 +10,17 @@ import { num, pct, pillarText, shenshaKey } from "../../lib/format";
 import { OUTCOME_LABEL, PILLAR_LABEL, TONE_LABEL, label } from "@fate/core";
 
 export default function ChartPage() {
-  const { chart, params } = useChart();
+  const { base } = useChart();
   const data = useMemo(() => {
-    if (chart === null) return null;
-    const r = buildReport(chart, { params, curveYears: 1 });
-    const ev = evaluate({ chart, params });
-    const elementById = Object.fromEntries(ev.carriers.map((c) => [c.id, c.element])) as Record<string, Element>;
-    return { r, ev, elementById };
-  }, [chart, params]);
+    if (base === null) return null;
+    // 基础盘来自上下文，此处不重解；本页展示的正是它本身
+    const r = buildReport(base, { curveYears: 1 });
+    const elementById = Object.fromEntries(
+      base.carriers.map((c) => [c.id, c.element])) as Record<string, Element>;
+    return { r, ev: base, elementById };
+  }, [base]);
 
-  if (chart === null || data === null) return null;
+  if (base === null || data === null) return null;
   const { r, ev, elementById } = data;
 
   return (

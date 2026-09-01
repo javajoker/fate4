@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { buildReport, DOMAIN_LABEL, evaluate, type Element } from "@fate/core";
+import { buildReport, DOMAIN_LABEL, type Element } from "@fate/core";
 import { useChart } from "../../../lib/chartContext";
 import { Narrative } from "../../../components/Narrative";
 import { aggregateFlows, ElementRadar, SankeyFlow, YearLines } from "../../../components/charts";
@@ -10,31 +10,32 @@ import { num, pillarText } from "../../../lib/format";
 import { useToday } from "../../../lib/today";
 
 export default function YearPage() {
-  const { chart, params } = useChart();
+  const { chart, base } = useChart();
   const today = useToday();
   const [picked, setPicked] = useState<number | null>(null);
   // 构建期预渲染时没有「今天」，故当前年份只能在客户端确定。
   const year = picked ?? today?.year ?? null;
   const setYear = setPicked;
 
+  // 曲线与卡片各自成环，故换年份只重算那一张卡片，整条曲线不动。
   const r = useMemo(() => {
-    if (chart === null || year === null) return null;
-    return buildReport(chart, {
-      params,
-      curveYears: params.temporal.yearRangeYears,
+    if (base === null || year === null) return null;
+    return buildReport(base, {
+      curveYears: base.params.temporal.yearRangeYears,
       cardYears: { from: year, to: year },
     });
-  }, [chart, params, year]);
+  }, [base, year]);
 
   const detail = useMemo(() => {
-    if (chart === null || r === null) return null;
+    if (base === null || r === null) return null;
     const card = r.years.cards[0];
     if (card === undefined) return null;
     const ev = card.view.evaluated;
-    const natal = evaluate({ chart, params });
-    const elementById = Object.fromEntries(ev.carriers.map((c) => [c.id, c.element])) as Record<string, Element>;
-    return { card, ev, natal, elementById };
-  }, [chart, params, r]);
+    const elementById = Object.fromEntries(
+      ev.carriers.map((c) => [c.id, c.element])) as Record<string, Element>;
+    // 本命参照直接取基础盘，不再重解
+    return { card, ev, natal: base, elementById };
+  }, [base, r]);
 
   if (r === null || chart === null || detail === null || year === null) {
     return <p className="sub">计算中…</p>;

@@ -79,13 +79,13 @@ L6 报告   汇总为分层报告
 | **P9a** | `report` L6 报告层 + 措辞守卫 | ✅ 完成 —— 措辞扫描全绿 |
 | **P9b** | `web` Next.js 应用 | ✅ 完成 —— 十个路由全部静态导出 |
 | **P10** | `cli` + `skill` | ✅ 完成 —— **Skill 与 Web 报告逐字节相同** |
-| P11 | `BaseChart` 一等对象 | 📋 [算法规格已定案](docs/12-persona-curves-nodes.md) |
+| **P11** | `BaseChart` 一等对象 | ✅ 完成 —— 报告快 43%，透干与引出分开 |
 | P12 | L4p 人格层 —— 内外十神、五行偏枯 | 📋 同上 |
 | P13 | 《内经》五行配属 · 虚实寒热燥湿 · 三条新禁令 | 📋 同上 |
 | P14 | L5c 生命曲线 —— 月度采样 | 📋 同上 |
 | P15 | L5n 统计节点 —— 2σ 穿越区间 + 两层结论 | 📋 同上 |
 
-全部 511 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
+全部 527 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
 
 ```bash
 pnpm install && pnpm test && pnpm typecheck

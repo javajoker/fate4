@@ -3,6 +3,7 @@
 import type { Element, Pillar } from "../types/ganzhi.js";
 import type { NatalChart } from "../chart/types.js";
 import type { EvaluatedChart } from "../temporal/evaluate.js";
+import type { SolvedChart } from "../chart/baseChart.js";
 
 export type Domain =
   | "career" | "wealth" | "marriage" | "health"
@@ -17,8 +18,13 @@ export type Scope = "luck" | "year" | "month" | "day";
 
 export interface YingqiContext {
   readonly chart: NatalChart;
-  /** 本命盘（不含大运流年）—— 用神、忌神、六亲星的基准。 */
-  readonly natal: EvaluatedChart;
+  /**
+   * 基准盘（不含大运流年）—— 用神、忌神、六亲星的参照。
+   *
+   * 类型取 `SolvedChart` 而非 `EvaluatedChart`：**基础盘本身就是这个基准**，
+   * 不必为了满足类型而再算一遍即时盘。
+   */
+  readonly natal: SolvedChart;
   /** 当前瞬时（含大运流年）。 */
   readonly now: EvaluatedChart;
   readonly luck: Pillar | null;

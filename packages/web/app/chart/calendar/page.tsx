@@ -16,21 +16,21 @@ const TONE_TEXT = {
 } as const;
 
 export default function CalendarPage() {
-  const { chart, params } = useChart();
+  const { chart, base } = useChart();
   const today = useToday();
   const [pick, setPick] = useState<number | null>(null);
 
   const months = useMemo<MonthView[] | null>(() => {
-    if (chart === null || today === null) return null;
-    return MONTH_BRANCH_ORDER.map((_, i) => monthView(chart, today.year, i, params));
-  }, [chart, params, today]);
+    if (base === null || today === null) return null;
+    return MONTH_BRANCH_ORDER.map((_, i) => monthView(base, today.year, i));
+  }, [base, today]);
 
   const day = useMemo(() => {
-    if (chart === null || today === null) return null;
-    return dayView(chart, today.year, today.month, today.day, params);
-  }, [chart, params, today]);
+    if (base === null || today === null) return null;
+    return dayView(base, today.year, today.month, today.day);
+  }, [base, today]);
 
-  if (chart === null || today === null || months === null || day === null) {
+  if (chart === null || base === null || today === null || months === null || day === null) {
     return <p className="sub">读取本机日期中…</p>;
   }
 

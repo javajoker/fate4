@@ -23,7 +23,8 @@ export interface Position {
 export type CarrierFlag =
   | "DAY_MASTER"    // 日主本身
   | "SILING"        // 当权的月令藏干
-  | "REVEALED"      // 该藏干在盘中有同字天干透出
+  | "REVEALED"      // 该藏干在**本命**天干中有同字透出
+  | "EVOKED"        // 该藏干被**大运/流年**带来的同字天干引出（透与引出不是一回事）
   | "KONGWANG"      // 落旬空，待 L2 结算是否填实
   | "BOUND"         // 合绊（L2）
   | "TRANSFORMED"   // 合化成功（L2）
@@ -68,6 +69,16 @@ export function carrierId(pos: Position): string {
   return pos.hiddenIndex === null
     ? `${pos.pillar}.${pos.layer}`
     : `${pos.pillar}.${pos.layer}.${pos.hiddenIndex}`;
+}
+
+/**
+ * 深拷贝一批载体。
+ *
+ * L2 与 L3 就地改写 `weight` / `activity` / `flags` / `trace`，
+ * 故任何要复用的载体集合（尤其基础盘的 L1）都必须先拷贝，否则会被下游污染。
+ */
+export function cloneCarriers(cs: readonly Carrier[]): Carrier[] {
+  return cs.map((c) => ({ ...c, flags: [...c.flags], trace: [...c.trace] }));
 }
 
 export function addTrace(c: Carrier, entry: Omit<TraceEntry, "from" | "to">, to: number): void {

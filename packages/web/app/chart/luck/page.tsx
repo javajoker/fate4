@@ -8,11 +8,11 @@ import { LuckBars } from "../../../components/charts";
 import { num, pillarText } from "../../../lib/format";
 
 export default function LuckPage() {
-  const { chart, params } = useChart();
+  const { chart, base } = useChart();
   const [pick, setPick] = useState<number | null>(null);
   const r = useMemo(
-    () => (chart === null ? null : buildReport(chart, { params, curveYears: 1 })),
-    [chart, params],
+    () => (base === null ? null : buildReport(base, { curveYears: 1 })),
+    [base],
   );
   if (r === null || chart === null) return null;
 

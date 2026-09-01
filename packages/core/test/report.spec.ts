@@ -10,6 +10,7 @@ import { YINGQI_RULES } from "../src/yingqi/rules.js";
 import { DOMAIN_LABEL } from "../src/yingqi/types.js";
 import { SHENSHA_DEFS } from "../src/shensha/tables.js";
 import { buildChart } from "../src/chart/buildChart.js";
+import { buildBaseChart } from "../src/chart/baseChart.js";
 import { buildReport, collectReportText } from "../src/report/assemble.js";
 import { renderMarkdown } from "../src/report/markdown.js";
 import { dayView, luckTimeline, monthView } from "../src/temporal/views.js";
@@ -248,6 +249,7 @@ const SAMPLES: readonly BirthInput[] = [
 const OPTS = { now: { year: 2026, month: 9, day: 1 }, curveYears: 40, cardYears: { from: 2024, to: 2028 } };
 
 describe("报告组装", () => {
+  const base2 = buildBaseChart(buildChart(EXAMPLE));
   const reports = SAMPLES.map((s) => buildReport(buildChart(s), OPTS));
 
   it("八节俱在，声明首尾各一次", () => {
@@ -319,6 +321,30 @@ describe("报告组装", () => {
     // 结构表仍在 —— 略去的是对人的描述，不是数据
     expect(other.kin.readings).toHaveLength(5);
     expect(other.chart.narrative.some((l) => l.templateId === "shensha.tone")).toBe(false);
+  });
+
+  it("卡片窗口落在曲线跨度之外时，§6.2 仍照常产出", () => {
+    // 曲线与卡片是两个产品、两个区间。原实现把卡片挂在曲线循环里，
+    // 窗口一旦越出跨度，那一节就**静默变空** —— 报告里没了，也不说为什么。
+    const r = buildReport(buildChart(EXAMPLE), {
+      curveYears: 20,                       // 1990–2009
+      now: { year: 2060, month: 1, day: 1 }, // 卡片窗口 2059–2064，远在曲线之外
+    });
+    expect(r.years.curve).toHaveLength(20);
+    expect(r.years.cards).toHaveLength(6);
+    expect(r.years.cards.map((c) => c.view.year)).toEqual([2059, 2060, 2061, 2062, 2063, 2064]);
+  });
+
+  it("曲线与卡片重叠的年份只解一次", () => {
+    // 两个环各自遍历，重叠处若不缓存就会把同一年算两遍。
+    const r = buildReport(base2, { now: { year: 2026, month: 9, day: 1 }, curveYears: 60 });
+    const overlap = r.years.cards.filter(
+      (c) => r.years.curve.some((p) => p.year === c.view.year));
+    expect(overlap.length).toBeGreaterThan(0);
+    for (const c of overlap) {
+      const fromCurve = r.years.curve.find((p) => p.year === c.view.year)!;
+      expect(c.view.favorIndex).toBe(fromCurve.favorIndex);
+    }
   });
 
   it("不取系统时间：不给 now 则第七节整节缺席", () => {

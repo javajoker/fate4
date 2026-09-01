@@ -8,19 +8,19 @@ import { Narrative } from "../../../components/Narrative";
 import { encodeShare } from "../../../lib/storage";
 
 export default function ReportPage() {
-  const { chart, params, record, overrides } = useChart();
+  const { base, params, record, overrides } = useChart();
   const today = useToday();
   const [tab, setTab] = useState<"read" | "markdown" | "json">("read");
   const [subject, setSubject] = useState<"self" | "other">("self");
   const [copied, setCopied] = useState("");
 
   const r = useMemo(() => {
-    if (chart === null || today === null) return null;
+    if (base === null || today === null) return null;
     // 卡片窗口不在此处指定 —— 默认值在 core 里，Web 与 CLI 因此同源。
-    return buildReport(chart, { params, subject, now: today });
-  }, [chart, params, subject, today]);
+    return buildReport(base, { subject, now: today });
+  }, [base, subject, today]);
 
-  if (r === null || chart === null || record === null) return <p className="sub">生成中…</p>;
+  if (r === null || base === null || record === null) return <p className="sub">生成中…</p>;
 
   const md = renderMarkdown(r);
   const json = JSON.stringify(r, null, 2);

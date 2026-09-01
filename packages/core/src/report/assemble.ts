@@ -24,13 +24,12 @@ import { toJulianDay } from "../astro/julian.js";
 import { enclosingTermOf } from "../chart/pillars.js";
 import type { NatalChart } from "../chart/types.js";
 import type { Params } from "../params/types.js";
-import { DEFAULT_PARAMS } from "../params/defaults.js";
-import { loadParams, paramsHash } from "../params/load.js";
+
 import type { Carrier, PillarKind } from "../weights/carrier.js";
 import { tenGodOf } from "../conclude/tenGods.js";
 import type { KinReading, Verdict } from "../conclude/types.js";
 import { PALACE, type PalaceName, type ShenshaHit } from "../shensha/scan.js";
-import { evaluate } from "../temporal/evaluate.js";
+import { toBaseChart, type BaseChart } from "../chart/baseChart.js";
 import { dayView, luckTimeline, monthView, yearView } from "../temporal/views.js";
 import type { YearView } from "../temporal/types.js";
 import { DOMAIN_LABEL } from "../yingqi/types.js";
@@ -191,14 +190,20 @@ function groupShenshaByPalace(hits: readonly ShenshaHit[]): ChartSection["shensh
 // 主入口
 // ─────────────────────────────────────────────────────────
 
-export function buildReport(chart: NatalChart, options: ReportOptions = {}): Report {
-  const params = options.params ?? DEFAULT_PARAMS;
+export function buildReport(
+  from: BaseChart | NatalChart, options: ReportOptions = {},
+): Report {
+  // **基础盘算一次。**下文全部时间层视图共用这一份 ——
+  // 每张即时盘都持有指回它的引用，同一次报告内是同一个对象。
+  const base = toBaseChart(from, options.params);
+  const chart = base.chart;
+  const params = base.params;
   const locale = options.locale ?? params.report.locale;
   const subject = options.subject ?? "self";
   const engineVersion = options.engineVersion ?? ENGINE_VERSION;
   const maxFlows = options.maxFlows ?? 14;
 
-  const natal = evaluate({ chart, params });
+  const natal = base;
   const C = natal.conclusions;
   const dm = C.dayMaster;
   const carrierLabels = carrierLabelMap(natal.carriers);
@@ -423,7 +428,7 @@ export function buildReport(chart: NatalChart, options: ReportOptions = {}): Rep
 
   // ── §5 大运 ──
   const L5 = new Lines(locale);
-  const steps = luckTimeline(chart, params);
+  const steps = luckTimeline(base);
   const birthYear = chart.input.year;
   for (const s of steps) {
     // LuckPillar.index 自 1 起（第一步即月柱的下一柱），此处不再加一。
@@ -454,8 +459,24 @@ export function buildReport(chart: NatalChart, options: ReportOptions = {}): Rep
   const cardTo = options.cardYears?.to ?? cardFrom + 5;
   const cards: YearCard[] = [];
 
+  /*
+   * 曲线与卡片是**两个产品，两个区间**，故各自成环。
+   *
+   * 原实现把卡片挂在曲线循环里 —— 卡片窗口一旦落在曲线跨度之外
+   * （例如 `curveYears: 20` 而 now 在四十年后），§6.2 会**静默变空**：
+   * 报告里那一节就没了，也不说为什么。两个区间各自算，就没有这种耦合。
+   */
+  const seen = new Map<number, YearView>();
+  const viewOf = (yr: number): YearView => {
+    const hit = seen.get(yr);
+    if (hit !== undefined) return hit;
+    const v = yearView(base, yr);
+    seen.set(yr, v);
+    return v;
+  };
+
   for (let yr = birthYear; yr < birthYear + curveYears; yr++) {
-    const v = yearView(chart, yr, params);
+    const v = viewOf(yr);
     curve.push({
       year: yr, pillar: v.pillar, luckIndex: v.luckIndex,
       favorIndex: v.favorIndex, vitality: v.vitality, dayMasterShare: v.dayMasterShare,
@@ -463,7 +484,9 @@ export function buildReport(chart: NatalChart, options: ReportOptions = {}): Rep
     for (const d of v.domains) {
       if (d.tension >= 0.6) highTension.push({ year: yr, domain: d.label, tension: d.tension });
     }
-    if (yr >= cardFrom && yr <= cardTo) cards.push({ view: v, narrative: yearLines(v, locale) });
+  }
+  for (let yr = cardFrom; yr <= cardTo; yr++) {
+    cards.push({ view: viewOf(yr), narrative: yearLines(viewOf(yr), locale) });
   }
   highTension.sort((a, b) => b.tension - a.tension);
   // §6 章节层只作一次指数释义。高张力年份以**数据**形式给出（highTension），
@@ -480,9 +503,9 @@ export function buildReport(chart: NatalChart, options: ReportOptions = {}): Rep
     const jd = toJulianDay({ year: ny, month: nm, day: nd, hour: 12, minute: 0, second: 0 });
     const mb = enclosingTermOf(jd, "节").prev.def.opensMonthBranch as Branch;
     const mi = MONTH_BRANCH_ORDER.indexOf(mb);
-    const yv2 = yearView(chart, ny, params);
-    const mv = monthView(chart, ny, mi, params);
-    const dv = dayView(chart, ny, nm, nd, params);
+    const yv2 = yearView(base, ny);
+    const mv = monthView(base, ny, mi);
+    const dv = dayView(base, ny, nm, nd);
 
     const L7 = new Lines(locale);
     L7.add("month.summary", {
@@ -517,7 +540,7 @@ export function buildReport(chart: NatalChart, options: ReportOptions = {}): Rep
     tiaohou: label(SCHOOL_LABEL, C.schoolsUsed.tiaohouSource),
     childStar: label(SCHOOL_LABEL, C.schoolsUsed.femaleChildStarVariant),
   });
-  const hash = paramsHash(loadParams());
+  const hash = base.paramsHash;
   L8.add("method.provenance", {
     engineVersion, paramsHash: hash, solarProvider: chart.rulesUsed.solarProviderId,
   });

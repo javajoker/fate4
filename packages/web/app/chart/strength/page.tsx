@@ -34,10 +34,10 @@ function Alternatives<T>({ v, render }: { v: Verdict<T>; render: (t: T) => strin
 }
 
 export default function StrengthPage() {
-  const { chart, params } = useChart();
+  const { base } = useChart();
   const r = useMemo(
-    () => (chart === null ? null : buildReport(chart, { params, curveYears: 1 })),
-    [chart, params],
+    () => (base === null ? null : buildReport(base, { curveYears: 1 })),
+    [base],
   );
   if (r === null) return null;
   const S = r.strength;

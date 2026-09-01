@@ -13,7 +13,10 @@ import type { Branch, Pillar, Stem } from "../types/ganzhi.js";
 import type { NatalChart } from "../chart/types.js";
 import type { Params } from "../params/types.js";
 import { DEFAULT_PARAMS } from "../params/defaults.js";
-import { addTrace, carrierId, type Carrier, type PillarKind, type Position } from "./carrier.js";
+import {
+  addTrace, carrierId,
+  type Carrier, type CarrierFlag, type PillarKind, type Position,
+} from "./carrier.js";
 
 export interface LuckContext {
   readonly pillar: Pillar;
@@ -82,31 +85,60 @@ function makeCarrier(
   };
 }
 
+/** 铺一柱：天干一个载体 + 地支藏干若干载体。 */
+function layPillar(
+  kind: PillarKind, pillar: Pillar, stemWeight: number, branchWeight: number,
+  note: Record<string, number>,
+): Carrier[] {
+  const made: Carrier[] = [makeCarrier(
+    pillar.stem, { pillar: kind, layer: "stem", hiddenIndex: null },
+    stemWeight, null, null, "L1.stemShare", { ...note, stemWeight },
+  )];
+  for (const [i, h] of hiddenStemsOf(pillar.branch).entries()) {
+    made.push(makeCarrier(
+      h.stem, { pillar: kind, layer: "branch", hiddenIndex: i },
+      branchWeight * h.share, pillar.branch, h.role,
+      "L1.hiddenSplit", { ...note, branchWeight, share: h.share },
+    ));
+  }
+  return made;
+}
+
+/**
+ * 铺大运与流年。
+ *
+ * 与本命部分**完全分开** —— 基础盘只含本命的 L1，即时盘在它之上追加外部柱。
+ * 这样「四柱的初始配重不随时点改变」是构造上的事实，而不是碰巧相等。
+ */
+export function layExternalCarriers(
+  luck: LuckContext | null | undefined,
+  annual: Pillar | null | undefined,
+  params: Params = DEFAULT_PARAMS,
+): { carriers: Carrier[]; luckStemShare: number | null } {
+  const w = params.weights;
+  const carriers: Carrier[] = [];
+  let luckStemShare: number | null = null;
+
+  // 大运：总量恒定，干支内部分配随经年变化
+  if (luck != null) {
+    luckStemShare = luckStemShareAt(luck.elapsedYears, params);
+    carriers.push(...layPillar("luck", luck.pillar,
+      w.luck.total * luckStemShare, w.luck.total * (1 - luckStemShare),
+      { total: w.luck.total, stemShare: luckStemShare, elapsedYears: luck.elapsedYears }));
+  }
+  // 流年：干支为固定的 40:70，非本命的 40:60
+  if (annual != null) {
+    carriers.push(...layPillar("annual", annual, w.year.stem, w.year.branch,
+      { total: w.year.total }));
+  }
+  return { carriers, luckStemShare };
+}
+
 export function assignWeights(input: AssignInput): WeightedCarriers {
   const p = input.params ?? DEFAULT_PARAMS;
   const w = p.weights;
   const chart = input.chart;
   const carriers: Carrier[] = [];
-
-  /** 铺一柱：天干一个载体 + 地支藏干若干载体。 */
-  const layPillar = (
-    kind: PillarKind, pillar: Pillar, stemWeight: number, branchWeight: number,
-    note: Record<string, number>,
-  ): Carrier[] => {
-    const made: Carrier[] = [];
-    made.push(makeCarrier(
-      pillar.stem, { pillar: kind, layer: "stem", hiddenIndex: null },
-      stemWeight, null, null, "L1.stemShare", { ...note, stemWeight },
-    ));
-    for (const [i, h] of hiddenStemsOf(pillar.branch).entries()) {
-      made.push(makeCarrier(
-        h.stem, { pillar: kind, layer: "branch", hiddenIndex: i },
-        branchWeight * h.share, pillar.branch, h.role,
-        "L1.hiddenSplit", { ...note, branchWeight, share: h.share },
-      ));
-    }
-    return made;
-  };
 
   const base = w.pillarBase;
   const stemW = base * w.stemShare;
@@ -161,29 +193,12 @@ export function assignWeights(input: AssignInput): WeightedCarriers {
       tW * w.stemShare, tW * w.branchShare, { base: tW }));
   }
 
-  // ── 大运：总量恒定，干支内部分配随经年变化 ──
-  let luckStemShare: number | null = null;
-  if (input.luck != null) {
-    luckStemShare = luckStemShareAt(input.luck.elapsedYears, p);
-    carriers.push(...layPillar("luck", input.luck.pillar,
-      w.luck.total * luckStemShare, w.luck.total * (1 - luckStemShare),
-      { total: w.luck.total, stemShare: luckStemShare, elapsedYears: input.luck.elapsedYears }));
-  }
+  // ── 大运与流年 ──
+  const ext = layExternalCarriers(input.luck, input.annual, p);
+  carriers.push(...ext.carriers);
+  const luckStemShare = ext.luckStemShare;
 
-  // ── 流年：干支为固定的 40:70，非本命的 40:60 ──
-  if (input.annual != null) {
-    carriers.push(...layPillar("annual", input.annual, w.year.stem, w.year.branch,
-      { total: w.year.total }));
-  }
-
-  // ── 标记：日主、透干 ──
-  const revealedStems = new Set(
-    carriers.filter((c) => c.position.layer === "stem").map((c) => c.stem),
-  );
-  for (const c of carriers) {
-    if (c.position.pillar === "day" && c.position.layer === "stem") c.flags.push("DAY_MASTER");
-    if (c.position.layer === "branch" && revealedStems.has(c.stem)) c.flags.push("REVEALED");
-  }
+  markFlags(carriers);
 
   return { carriers, totals: totalsOf(carriers), context: {
     silingStem: siling.stem,
@@ -192,6 +207,52 @@ export function assignWeights(input: AssignInput): WeightedCarriers {
     luckElapsedYears: input.luck?.elapsedYears ?? null,
     luckStemShare,
   } };
+}
+
+/** 本命一系的柱 —— 由出生时刻直接确定，与所处时点无关。 */
+const NATAL_PILLARS: ReadonlySet<PillarKind> = new Set(
+  ["year", "month", "day", "hour", "taiyuan"] as const,
+);
+
+const FLAGS_SET_HERE: readonly CarrierFlag[] = ["DAY_MASTER", "REVEALED", "EVOKED"];
+
+/**
+ * 标记日主、透干、引出。
+ *
+ * ## 透干只看本命天干
+ *
+ * 原实现把**全部**天干（含大运、流年）收进 `revealedStems`，于是流年天干
+ * 会把本命藏干标成「透干」。这混淆了两个不同的概念：
+ *
+ * - **透干**：藏干在本命天干中现身。这是盘面的**恒定结构属性**
+ * - **引出**：岁运带来同字天干。这是**当时的**引动，明年就没了
+ *
+ * 把后者标成前者，等于宣称一个并不存在的永久属性；
+ * 也让四柱的 L1 配重不再与时点无关，基础盘就无从冻结复用。
+ * 故拆成两个标记，二者可并存（本命已透，岁运再遇）。
+ *
+ * 此改动**不影响任何权重** —— `weights.revealedResonance` 刻意置 1.00，
+ * 透干效应由 L3 的距离模型承担。两个标记只用于展示与叙述。
+ *
+ * **幂等**：先清后设，故基础盘与即时盘可对同一批载体重复调用。
+ */
+export function markFlags(carriers: readonly Carrier[]): void {
+  const stemsOf = (natal: boolean) => new Set(
+    carriers
+      .filter((c) => c.position.layer === "stem" && NATAL_PILLARS.has(c.position.pillar) === natal)
+      .map((c) => c.stem),
+  );
+  const natalStems = stemsOf(true);
+  const externalStems = stemsOf(false);
+
+  for (const c of carriers) {
+    c.flags = c.flags.filter((f) => !FLAGS_SET_HERE.includes(f));
+    if (c.position.pillar === "day" && c.position.layer === "stem") c.flags.push("DAY_MASTER");
+    if (c.position.layer === "branch") {
+      if (natalStems.has(c.stem)) c.flags.push("REVEALED");
+      if (externalStems.has(c.stem)) c.flags.push("EVOKED");
+    }
+  }
 }
 
 export function totalsOf(carriers: readonly Carrier[]): WeightTotals {

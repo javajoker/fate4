@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import {
-  buildChart, DEFAULT_PARAMS, evaluate, label, loadParams, paramsHash,
+  buildBaseChart, buildChart, DEFAULT_PARAMS, label, loadParams, paramsHash,
   BAND_LABEL_ZH, YONGSHEN_METHOD_LABEL, type PartialParams,
 } from "@fate/core";
 import { useChart } from "../../../lib/chartContext";
@@ -55,24 +55,21 @@ function Row({ item, value, def, onChange }: {
 }
 
 export default function ParamsPage() {
-  const { chart, params, overrides, setOverrides, record } = useChart();
+  const { chart, base, params, overrides, setOverrides, record } = useChart();
   const [err, setErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const result = useMemo(() => {
-    if (chart === null) return null;
-    try {
-      const ev = evaluate({ chart, params });
-      return { ev, err: null as string | null };
-    } catch (e) {
-      return { ev: null, err: String(e) };
-    }
-  }, [chart, params]);
+  // 基础盘本身就是「当前参数下的盘面」，上下文已按 (chart, params) 记忆
+  const result = useMemo(
+    () => (base === null ? null : { ev: base, err: null as string | null }),
+    [base],
+  );
 
-  const base = useMemo(() => {
+  // 默认参数下的对照盘 —— 让面板能显示「改动前 → 改动后」
+  const reference = useMemo(() => {
     if (record === null) return null;
     try {
-      return evaluate({ chart: buildChart(record.input), params: DEFAULT_PARAMS });
+      return buildBaseChart(buildChart(record.input), DEFAULT_PARAMS);
     } catch { return null; }
   }, [record]);
 
@@ -111,15 +108,15 @@ export default function ParamsPage() {
           <div>
             <div className="dim" style={{ fontSize: 11 }}>日主旺衰</div>
             <b>{label(BAND_LABEL_ZH, result?.ev?.conclusions.strength.value ?? "")}</b>
-            {base !== null && base.conclusions.strength.value !== result?.ev?.conclusions.strength.value && (
-              <span className="dim"> ← {label(BAND_LABEL_ZH, base.conclusions.strength.value)}</span>
+            {reference !== null && reference.conclusions.strength.value !== result?.ev?.conclusions.strength.value && (
+              <span className="dim"> ← {label(BAND_LABEL_ZH, reference.conclusions.strength.value)}</span>
             )}
           </div>
           <div>
             <div className="dim" style={{ fontSize: 11 }}>同党占比</div>
             <b className="mono">{pct(result?.ev?.conclusions.party.ratio ?? 0, 2)}</b>
-            {base !== null && (
-              <span className="dim mono"> ← {pct(base.conclusions.party.ratio, 2)}</span>
+            {reference !== null && (
+              <span className="dim mono"> ← {pct(reference.conclusions.party.ratio, 2)}</span>
             )}
           </div>
           <div>
@@ -139,7 +136,7 @@ export default function ParamsPage() {
         {result?.ev !== null && result !== null && (
           <div style={{ marginTop: 10 }}>
             <ElementRadar size={190} layers={[
-              ...(base === null ? [] : [{ name: "默认参数", values: base.propagation.byElement, dash: "4 3" }]),
+              ...(reference === null ? [] : [{ name: "默认参数", values: reference.propagation.byElement, dash: "4 3" }]),
               { name: "当前参数", values: result.ev.propagation.byElement },
             ]} />
           </div>
