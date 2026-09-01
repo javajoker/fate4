@@ -64,7 +64,7 @@ export function renderMarkdown(r: Report): string {
   if (r.chart.shenshaByPalace.length > 0) {
     h(3, "神煞（按宫位）");
     for (const g of r.chart.shenshaByPalace) {
-      p(`- **${g.palace}**：${g.hits.map((x) => `${x.name}（${label(TONE_LABEL, x.tone)}）`).join("、")}`);
+      p(`- **${g.palace}**：${g.hits.map((x) => `${x.name}（${x.toneIsDefault ? "常态" : label(TONE_LABEL, x.tone)}）`).join("、")}`);
     }
   }
   if (r.chart.narrative.length > 0) { h(3, "说明"); p(nl(r.chart.narrative)); }

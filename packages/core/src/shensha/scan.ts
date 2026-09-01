@@ -70,6 +70,8 @@ export interface ShenshaHit {
   readonly polarity: ShenshaDef["polarity"];
   readonly tone: "strengthened" | "weakened" | "activated" | "neutralized";
   readonly toneReason: string;
+  /** 无修饰命中，tone 取的是缺省值 —— 缺省不是结论，叙述层据此跳过。 */
+  readonly toneIsDefault: boolean;
   readonly narrativeTags: readonly string[];
 }
 
@@ -223,7 +225,7 @@ export function scanShensha(input: ScanInput): ShenshaHit[] {
       { events, carriers, kongwang, occurrences: counts.get(r.name) ?? 1 },
       p, r.slot.stem,
     );
-    const { tone, why } = effectiveTone(def.polarity, modifiers);
+    const { tone, why, fromDefault } = effectiveTone(def.polarity, modifiers);
     const key = `${r.slot.pillar}.${r.slot.layer}`;
     return {
       name: r.name, category: def.category, base: def.base, basis: r.basis,
@@ -231,7 +233,7 @@ export function scanShensha(input: ScanInput): ShenshaHit[] {
       palace: PALACE[key] ?? "外部",
       branch: r.slot.branch, stem: r.slot.stem,
       modifiers, hostWeight,
-      polarity: def.polarity, tone, toneReason: why,
+      polarity: def.polarity, tone, toneReason: why, toneIsDefault: fromDefault,
       narrativeTags: def.narrativeTags,
     };
   });

@@ -200,6 +200,30 @@ describe("状态修饰：同一神煞在不同状态下语义相反", () => {
     expect(effectiveTone("neutral", ["逢合"]).tone).toBe("activated");
   });
 
+  it("无修饰时 tone 取缺省值，且如实标注 —— 缺省不是结论", () => {
+    // 吉神的缺省是 strengthened。照 tone 直接渲染，报告里会出现
+    //「天乙贵人落命宫，状态为坐旺得势：常态」—— 既无信息又自相矛盾。
+    for (const pol of ["auspicious", "inauspicious", "neutral"] as const) {
+      const t = effectiveTone(pol, []);
+      expect(t.fromDefault, pol).toBe(true);
+      expect(t.why).toBe("常态");
+    }
+    for (const mods of [["逢冲"], ["逢合"], ["落空亡"], ["坐旺"]] as const) {
+      for (const pol of ["auspicious", "inauspicious", "neutral"] as const) {
+        expect(effectiveTone(pol, mods).fromDefault, `${pol}/${mods[0]}`).toBe(false);
+      }
+    }
+  });
+
+  it("实盘中两类都存在，且缺省态一律标注为常态", () => {
+    const all = scan().hits;
+    const withTone = all.filter((h) => !h.toneIsDefault);
+    const allDefault = all.filter((h) => h.toneIsDefault);
+    expect(withTone.length).toBeGreaterThan(0);
+    expect(allDefault.length).toBeGreaterThan(0);
+    for (const h of allDefault) expect(h.toneReason).toBe("常态");
+  });
+
   it("坐旺增强，坐衰减弱", () => {
     expect(effectiveTone("auspicious", ["坐旺"]).tone).toBe("strengthened");
     expect(effectiveTone("auspicious", []).tone).toBe("strengthened");

@@ -8,6 +8,8 @@
 | `packages/web` | Next.js（App Router）Web 应用。命盘、大运、流年、流月、流日与报告的可视化。 |
 | `packages/skill` | Claude Agent Skill。通过 CLI 调用 `core`，拿到结构化 JSON 后由模型组织叙述。 |
 
+Web 应用全部计算在浏览器内完成，**生辰数据不出本机**：记录存 IndexedDB，命盘标识与分享链接走 URL 片段（`#` 之后）—— 片段不随请求发往服务器，也不进任何访问日志。故整站可静态导出，无服务端路由。
+
 **核心设计约束：Skill 与 Webapp 共用同一份 `core`。** 不存在两处实现，因此不存在结论漂移。
 
 ---
@@ -73,13 +75,29 @@ L6 报告   汇总为分层报告
 | **P7a** | `shensha` 神煞与状态修饰 | ✅ 完成 |
 | **P7b** | `yingqi` 应期规则引擎（32 条） | ✅ 完成 |
 | **P8** | `temporal` 大运/流年/流月/流日 | ✅ 完成 —— 流月流日零权重泄漏 |
-| P9–P10 | 报告 UI / Skill | 未开始 |
+| **P9a** | `report` L6 报告层 + 措辞守卫 | ✅ 完成 —— 措辞扫描全绿 |
+| **P9b** | `web` Next.js 应用 | ✅ 完成 —— 十个路由全部静态导出 |
+| P10 | `cli` + `skill` | 未开始 |
 
-全部 426 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
+全部 480 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
 
 ```bash
 pnpm install && pnpm test && pnpm typecheck
 ```
+
+Web 应用：
+
+```bash
+pnpm --filter @fate/web dev
+```
+
+`@fate/web` 消费 `@fate/core` 的**编译产物**而非 TS 源码 —— 源码里的相对导入按 TS 的 ESM 规范一律写作 `./x.js`，打包器不会把它回溯到 `./x.ts`。与其为此配一套扩展名别名，不如让内核照常经 `tsc -b` 出真正的 `.js`。故 web 的 `dev` / `build` 都以 `tsc -b ../..` 开头。
+
+### P9 的两条硬约束
+
+**措辞守卫拦的是断言的形状，不是词。**朴素的敏感词黑名单在本领域两头都失败：禁掉「病」等于禁掉自己的取用神法（`bingyao`），而「你 2027 年会离婚」里没有任何一个词单独有问题。规则由「主体 + 情态 + 后果」构成，词汇一律放行；另有 `requireContext` 一档，要求五行脏腑对应、灾病语汇必须带「传统上……」的框定语。扫描面覆盖模板库、流月流日的直出叙述、推导链与替代解读 —— 并配一条反向断言：**植入一句违规必须被逮到**，否则「全绿」可能只是因为扫描根本没跑到东西。
+
+**图表禁红绿吉凶配色。**顺逆指数低不等于「凶」，它衡量的是当年五行结构与本命喜用的契合度。凡有序的量一律用单色阶，深浅表大小、不换色相；只有分类的量（五行、阴阳、同党异党）才用色相区分。该约束写在参数里且不可关闭（`report.guard.neutralPalette`，改则参数校验失败）。
 
 ### P1 的精度实测
 

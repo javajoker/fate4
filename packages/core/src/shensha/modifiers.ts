@@ -96,32 +96,47 @@ export function modifiersFor(
  * 吉神被冲/落空 → 打折；凶神被冲 → 由静转动（应事，未必是坏事）；
  * 凶神落空 → 反解。
  */
+export interface ToneResult {
+  readonly tone: "strengthened" | "weakened" | "activated" | "neutralized";
+  readonly why: string;
+  /**
+   * 无任何修饰命中，`tone` 取的是该吉凶倾向的**缺省值**。
+   *
+   * 缺省不是结论。吉神的缺省是 strengthened，若照 tone 直接渲染，
+   * 报告里会冒出「天乙贵人落命宫，状态为坐旺得势：常态」——
+   * 一句既无信息又自相矛盾的话。叙述层据此跳过它们。
+   */
+  readonly fromDefault: boolean;
+}
+
 export function effectiveTone(
   polarity: "auspicious" | "inauspicious" | "neutral",
   mods: readonly ShenshaModifier[],
-): { tone: "strengthened" | "weakened" | "activated" | "neutralized"; why: string } {
+): ToneResult {
   const void_ = mods.includes("落空亡");
   const chong = mods.includes("逢冲");
   const he = mods.includes("逢合");
   const wang = mods.includes("坐旺");
+  const D = { fromDefault: false } as const;
 
   if (polarity === "auspicious") {
-    if (void_) return { tone: "neutralized", why: "吉神落空亡，大打折扣" };
-    if (chong) return { tone: "weakened", why: "吉神逢冲受损" };
-    if (he) return { tone: "weakened", why: "吉神被合住，其力不发" };
-    if (wang) return { tone: "strengthened", why: "坐旺，力量增强" };
-    return { tone: "strengthened", why: "常态" };
+    if (void_) return { tone: "neutralized", why: "吉神落空亡，大打折扣", ...D };
+    if (chong) return { tone: "weakened", why: "吉神逢冲受损", ...D };
+    if (he) return { tone: "weakened", why: "吉神被合住，其力不发", ...D };
+    if (wang) return { tone: "strengthened", why: "坐旺，力量增强", ...D };
+    return { tone: "strengthened", why: "常态", fromDefault: true };
   }
   if (polarity === "inauspicious") {
-    if (void_) return { tone: "neutralized", why: "凶神落空亡，反得其解" };
-    if (he) return { tone: "weakened", why: "凶神被合住，其性受制" };
-    if (chong) return { tone: "activated", why: "凶神逢冲而动，主应事" };
-    if (wang) return { tone: "strengthened", why: "坐旺，力量增强" };
-    return { tone: "weakened", why: "常态" };
+    if (void_) return { tone: "neutralized", why: "凶神落空亡，反得其解", ...D };
+    if (he) return { tone: "weakened", why: "凶神被合住，其性受制", ...D };
+    if (chong) return { tone: "activated", why: "凶神逢冲而动，主应事", ...D };
+    if (wang) return { tone: "strengthened", why: "坐旺，力量增强", ...D };
+    return { tone: "weakened", why: "常态", fromDefault: true };
   }
   // 中性神煞：冲则动、合则牵，本身不论吉凶
-  if (chong) return { tone: "activated", why: "逢冲而动" };
-  if (he) return { tone: "activated", why: "逢合而牵动" };
-  if (void_) return { tone: "neutralized", why: "落空亡" };
-  return { tone: wang ? "strengthened" : "weakened", why: wang ? "坐旺" : "常态" };
+  if (chong) return { tone: "activated", why: "逢冲而动", ...D };
+  if (he) return { tone: "activated", why: "逢合而牵动", ...D };
+  if (void_) return { tone: "neutralized", why: "落空亡", ...D };
+  if (wang) return { tone: "strengthened", why: "坐旺", ...D };
+  return { tone: "weakened", why: "常态", fromDefault: true };
 }

@@ -215,6 +215,9 @@ export function buildReport(chart: NatalChart, options: ReportOptions = {}): Rep
     // 按宫位分组的清单已在 shenshaByPalace 里，叙述不复述表格 ——
     // 只讲表格讲不出的那一层：哪几个被引动或坐旺，以及凭什么。
     for (const h of natal.shensha) {
+      // 只讲真的被修饰过的。缺省态没有信息，且照 tone 渲染会说出
+      //「天乙贵人落命宫，状态为坐旺得势：常态」这种自相矛盾的话。
+      if (h.toneIsDefault) continue;
       if (h.tone === "strengthened" || h.tone === "activated") {
         L1.add("shensha.tone", {
           name: h.name, palace: h.palace,
