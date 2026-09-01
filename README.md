@@ -79,6 +79,7 @@ L6 报告   汇总为分层报告
 | **P9a** | `report` L6 报告层 + 措辞守卫 | ✅ 完成 —— 措辞扫描全绿 |
 | **P9b** | `web` Next.js 应用 | ✅ 完成 —— 十个路由全部静态导出 |
 | **P10** | `cli` + `skill` | ✅ 完成 —— **Skill 与 Web 报告逐字节相同** |
+| P11–P15 | 人格层 · 生命曲线 · 统计节点 · 对治 · 两层结论 | 📋 [算法规格待拍板](docs/12-persona-curves-nodes.md) |
 
 全部 511 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
 
