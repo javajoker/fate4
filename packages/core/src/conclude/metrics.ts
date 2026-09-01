@@ -8,6 +8,7 @@
 import { ELEMENTS, type Element } from "../types/ganzhi.js";
 import type { FlowRecord } from "../propagate/iterate.js";
 import type { FlowMetrics } from "./types.js";
+import type { Carrier } from "../weights/carrier.js";
 
 export function flowMetrics(
   vitality: number,
@@ -29,4 +30,34 @@ export function flowMetrics(
   const evenness = entropy / Math.log(ELEMENTS.length);
 
   return { vitality, circulation, evenness };
+}
+
+/**
+ * 克流量矩阵 `keDamage[受害五行][施克五行]`。
+ *
+ * 病药法判「病」用它，人格层判「受克最重的五行」也用它 ——
+ * 同一份计算不写两遍。
+ */
+export function keDamageMatrix(
+  carriers: readonly Carrier[], flows: readonly FlowRecord[],
+): Record<Element, Record<Element, number>> {
+  const elementById = new Map(carriers.map((c) => [c.id, c.element]));
+  const m = Object.fromEntries(ELEMENTS.map((e) => [
+    e, Object.fromEntries(ELEMENTS.map((f) => [f, 0])) as Record<Element, number>,
+  ])) as Record<Element, Record<Element, number>>;
+  for (const f of flows) {
+    if (f.kind !== "ke") continue;
+    const from = elementById.get(f.from);
+    const to = elementById.get(f.to);
+    if (from === undefined || to === undefined) continue;
+    m[to][from] += f.totalAmount;
+  }
+  return m;
+}
+
+/** 某五行受到的总克流量。 */
+export function attackOn(
+  m: Readonly<Record<Element, Readonly<Record<Element, number>>>>, e: Element,
+): number {
+  return ELEMENTS.reduce((a, f) => a + m[e][f], 0);
 }

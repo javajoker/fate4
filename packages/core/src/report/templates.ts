@@ -409,9 +409,101 @@ const methodTemplates: NarrativeTemplate[] = [
   }),
 ];
 
+// ═══════════════════════════════════════════════════════════
+// §2.5 性格与偏好（L4p 人格层）
+//
+// 措辞的三条底线：
+//   · 主语是**结构**，不是读者。「本盘外在一面以正官为主」，不是「你自律」
+//   · 特质词一律带「传统上……常被解读为」的框定，不作直陈
+//   · 不用心理学量表词汇 —— 那会让读者以为背后有心理测量学的效度
+// ═══════════════════════════════════════════════════════════
+
+const personaTemplates: NarrativeTemplate[] = [
+  T("persona.innerOuter", "data", "persona",
+    ["innerTop", "innerTraits", "outerTop", "outerTraits"], {
+      zhHans: "藏而不透的一面以{innerTop}为主，传统上此类结构常被解读为{innerTraits}；"
+        + "透干显用的一面以{outerTop}为主，常被解读为{outerTraits}。"
+        + "「透干为显、藏支为隐」是这一划分的依据，二者说的是同一张盘的两个侧面。",
+      en: "The concealed side is led by {innerTop}, a configuration traditionally read as {innerTraits}; "
+        + "the revealed side is led by {outerTop}, read as {outerTraits}. "
+        + "The split follows the classical rule that revealed stems show and hidden stems conceal — "
+        + "both describe the same chart from two sides.",
+    }, 0.6, {
+      zhHans: "藏而不透的一面倾向{innerTop}，透干显用的一面倾向{outerTop}。"
+        + "两侧的前二名占比接近，主导之神尚可两说，故此处并列而不取一。",
+      en: "The concealed side leans toward {innerTop} and the revealed side toward {outerTop}. "
+        + "On each side the top two shares sit close together, so the leading god is arguable; "
+        + "both are listed rather than one chosen.",
+    }),
+
+  T("persona.tension", "data", "persona", ["tension", "divergent"], {
+    zhHans: "内外张力 {tension}。差异最大的是{divergent}。"
+      + "此值只描述内在构成与外在构成的差异大小，**不含褒贬** —— "
+      + "传统上既可解为含蓄内敛，也可解为言行不一，取决于分歧落在哪几组上。",
+    en: "Tension between the concealed and revealed sides: {tension}. The widest gaps are {divergent}. "
+      + "The figure describes only how far the two compositions differ and carries no valuation: "
+      + "the tradition reads it either as reserve or as inconsistency, depending on which groups diverge.",
+  }),
+
+  T("persona.revealRatio", "data", "persona", ["ratio"], {
+    zhHans: "显隐比 {ratio} —— 天干占全盘力量的这一份。"
+      + "此值的结构区间本就窄（八成的盘落在 25% 至 36% 之间），"
+      + "故它只在这个区间内部比较才有意义，不宜孤立解读。",
+    en: "Revealed share: {ratio} — the portion of the chart's force carried by the visible stems. "
+      + "Its structural range is narrow (four charts in five fall between 25% and 36%), "
+      + "so it means something only when compared within that band, not on its own.",
+  }),
+
+  T("persona.siling", "data", "persona", ["stem", "god"], {
+    zhHans: "月令当权者为{stem}，于日主为{god} —— 传统上以此为禀气的底色。"
+      + "它是标注，不另加权：月令的力量已在配重层放大过一次，不重复计入。",
+    en: "The month command is held by {stem}, which stands as {god} to the day master; "
+      + "the tradition treats this as the ground tone of one's endowment. "
+      + "It is a label, not extra weight — the month's force was already amplified in the weighting layer.",
+  }),
+
+  T("persona.excess", "data", "persona", ["gods", "traits"], {
+    zhHans: "{gods}过旺，传统上此时的表述转向{traits} —— "
+      + "同一个十神，适度与太过的解读相反，故不能只看它在不在。",
+    en: "{gods} runs to excess, at which point the traditional reading turns to {traits}: "
+      + "one and the same god reads oppositely in measure and in excess, "
+      + "so its mere presence settles nothing.",
+  }),
+
+  T("persona.absent", "data", "persona", ["gods", "traits"], {
+    zhHans: "四柱与藏干中不见{gods}。传统上此结构常被解读为{traits}。"
+      + "「不见」是占比恰为零，与「弱」是两回事。",
+    en: "Neither the stems nor the hidden stems carry {gods}. "
+      + "Traditionally such a configuration is read as {traits}. "
+      + "Absent means a share of exactly zero, which is a different statement from weak.",
+  }),
+
+  T("persona.elements", "data", "persona", ["strongest", "virtue", "traits", "weakest", "skew"], {
+    zhHans: "五行以{strongest}最盛（五常配{virtue}），传统上常被解读为{traits}；{weakest}最弱。"
+      + "偏枯度 {skew} —— 此值不是缺陷指标，偏枯而成格成局者不在少数。",
+    en: "Among the five phases {strongest} is strongest (paired with {virtue} among the five virtues), "
+      + "traditionally read as {traits}; {weakest} is weakest. "
+      + "Concentration index {skew} — not a defect measure: many well-formed charts are concentrated.",
+  }),
+
+  T("persona.mostAttacked", "data", "persona", ["element", "attack", "by"], {
+    zhHans: "受克最重的是{element}，累计受克流量 {attack}，主要来自{by}。"
+      + "受克最重者与占比最弱者常常不是同一个 —— 前者是被打，后者是本来就少。",
+    en: "The phase under the heaviest control is {element}, taking {attack} of cumulative control flow, "
+      + "chiefly from {by}. The most-attacked phase and the weakest phase are often not the same one: "
+      + "the first is being struck, the second simply has little to begin with.",
+  }),
+
+  T("persona.palace", "data", "persona", ["palace", "share", "gods", "note"], {
+    zhHans: "{palace}占全盘 {share}，宫中{gods}{note}。",
+    en: "{palace} holds {share} of the chart; it carries {gods}{note}.",
+  }),
+];
+
 export const NARRATIVE_TEMPLATES: readonly NarrativeTemplate[] = Object.freeze([
   ...strengthTemplates, ...rootTemplates, ...patternTemplates, ...yongshenTemplates,
   ...gejuTemplates, ...metricsTemplates, ...kinTemplates, ...shenshaTemplates,
+  ...personaTemplates,
   ...timelineTemplates, ...currentTemplates, ...methodTemplates,
 ]);
 

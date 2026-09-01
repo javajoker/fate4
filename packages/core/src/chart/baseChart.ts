@@ -47,6 +47,7 @@ import { propagate, type PropagationResult } from "../propagate/iterate.js";
 import { conclude } from "../conclude/conclude.js";
 import type { Conclusions } from "../conclude/types.js";
 import { scanShensha, type ShenshaHit } from "../shensha/scan.js";
+import { personaOf, type Persona } from "../conclude/persona.js";
 import type { NatalChart } from "./types.js";
 
 /**
@@ -65,6 +66,12 @@ export interface SolvedChart {
 
 export interface BaseChart extends SolvedChart {
   readonly chart: NatalChart;
+  /**
+   * 人格层。**只由基础盘导出** —— 个性是命的属性，不随流年改变。
+   * 时间层追踪的是它的两个标量（显隐比、内外张力）随时点的变化，
+   * 而不是整个 Persona 每年重算一遍。
+   */
+  readonly persona: Persona;
   readonly params: Params;
   /** 随盘的参数快照。半年后有人拿旧报告来问「为什么不一样」，这是唯一的依据。 */
   readonly paramsHash: string;
@@ -97,8 +104,14 @@ export function buildBaseChart(chart: NatalChart, params: Params = DEFAULT_PARAM
     },
   });
 
+  const persona = personaOf({
+    carriers: pr.carriers, events: st.events, flows: pr.flows, shensha,
+    conclusions, silingStem: chart.siling.stem, params: params.persona,
+  });
+
   return Object.freeze({
     chart, params, paramsHash: paramsHash(params),
+    persona,
     l1: Object.freeze(l1),
     events: st.events,
     carriers: pr.carriers,

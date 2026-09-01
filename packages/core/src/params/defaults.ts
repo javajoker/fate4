@@ -198,6 +198,12 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
     dayLayer: Object.freeze({ recomputeWeights: false as const, severityLevels: 2 }),
     index: Object.freeze({ a: 2.00, b: 0.20 }),   // [校准] 见 docs/08-temporal.md §5.2
   }),
+  persona: Object.freeze({
+    source: "conventional",   // [流派] 十神特质表底本，可替换
+    excessShare: 0.35,        // [校准]
+    deficientShare: 0.05,     // [校准]
+    dominantMargin: 0.05,     // [校准] 与置信度公式由构造对齐，见 types.ts
+  }),
   report: Object.freeze({
     locale: "zh-Hans",
     showConvergenceHistory: false,

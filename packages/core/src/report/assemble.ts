@@ -13,7 +13,9 @@
  * 而不是悄悄取系统时间 —— 后者会让同一份输入在不同时刻产出不同报告。
  */
 
-import { ELEMENTS, type Branch, type Element, type Pillar } from "../types/ganzhi.js";
+import {
+  ELEMENTS, type Branch, type Element, type Pillar, type TenGod,
+} from "../types/ganzhi.js";
 import {
   controlledBy, elementOf, generatedBy, nayinOf, polarityOf,
   sexagenaryIndexOf, xunKongOf,
@@ -28,6 +30,7 @@ import type { Params } from "../params/types.js";
 import type { Carrier, PillarKind } from "../weights/carrier.js";
 import { tenGodOf } from "../conclude/tenGods.js";
 import type { KinReading, Verdict } from "../conclude/types.js";
+import { ELEMENT_TRAITS, GOD_TRAITS } from "../conclude/traits.js";
 import { PALACE, type PalaceName, type ShenshaHit } from "../shensha/scan.js";
 import { toBaseChart, type BaseChart } from "../chart/baseChart.js";
 import { dayView, luckTimeline, monthView, yearView } from "../temporal/views.js";
@@ -45,7 +48,7 @@ import {
 import type {
   ChartSection, CurrentSection, ForceSection, GuardReport, HiddenCell, KinSection,
   LuckSection, MethodSection, PillarCell, Report, StrengthSection, YearCard,
-  YearCurvePoint, YearsSection,
+  PersonaSection, YearCurvePoint, YearsSection,
 } from "./types.js";
 
 export const ENGINE_VERSION = "0.1.0";
@@ -97,6 +100,17 @@ const STRUCTURE_LABEL: Readonly<Record<string, string>> = Object.freeze({
   liuhe: "六合", ganhe: "天干五合", chong: "相冲", ganchong: "天干相冲",
   xing: "相刑", hai: "相害", po: "相破", tombOpen: "开库", tombSealed: "闭库",
 });
+
+/** base 中「from 克 to」的累计流量。 */
+function keOnto(base: BaseChart, to: Element, from: Element): number {
+  const elementById = new Map(base.carriers.map((c) => [c.id, c.element]));
+  let sum = 0;
+  for (const f of base.propagation.flows) {
+    if (f.kind !== "ke") continue;
+    if (elementById.get(f.to) === to && elementById.get(f.from) === from) sum += f.totalAmount;
+  }
+  return sum;
+}
 
 /** 从推导链里取一个数值。取不到返回 null —— 不编造。 */
 function derivedNumber(v: Verdict<unknown>, step: string, key: string): number | null {
@@ -299,6 +313,79 @@ export function buildReport(
     events: natal.events,
     narrative: L2.items,
   };
+
+  // ── §2.5 性格与偏好 ──
+  //
+  // subject 为 other 时**整节不生成** —— 这是对一个人的描述，
+  // 结构性略去，不靠措辞扫描兜底。
+  let personaSection: PersonaSection | null = null;
+  if (subject === "self") {
+    const P = base.persona;
+    const LP = new Lines(locale);
+    const traitsOf = (gs: readonly TenGod[], col: "inner" | "outer" | "excess" | "deficient") =>
+      [...new Set(gs.flatMap((g) => GOD_TRAITS[g][col]))].join("、");
+
+    LP.add("persona.innerOuter", {
+      innerTop: P.dominantInner.value.join("、"),
+      innerTraits: traitsOf(P.dominantInner.value, "inner"),
+      outerTop: P.dominantOuter.value.join("、"),
+      outerTraits: traitsOf(P.dominantOuter.value, "outer"),
+    }, Math.min(P.dominantInner.confidence, P.dominantOuter.confidence), "persona.dominant");
+
+    LP.add("persona.tension", {
+      tension: fmtNum(P.innerOuterTension, 3),
+      divergent: P.divergentGroups
+        .map((d) => `${d.group}（${d.delta > 0 ? "外显" : "内蕴"} ${fmtPct(Math.abs(d.delta))}）`)
+        .join("、"),
+    });
+    LP.add("persona.revealRatio", { ratio: fmtPct(P.revealRatio) });
+    LP.add("persona.siling", { stem: P.silingStem, god: P.silingGod });
+
+    if (P.excess.length > 0) {
+      LP.add("persona.excess", {
+        gods: P.excess.join("、"), traits: traitsOf(P.excess, "excess"),
+      });
+    }
+    if (P.absent.length > 0) {
+      LP.add("persona.absent", {
+        gods: P.absent.join("、"), traits: traitsOf(P.absent, "deficient"),
+      });
+    }
+
+    const E = P.elements;
+    LP.add("persona.elements", {
+      strongest: E.strongest,
+      virtue: ELEMENT_TRAITS[E.strongest].virtue,
+      traits: ELEMENT_TRAITS[E.strongest].strong.join("、"),
+      weakest: E.weakest,
+      skew: fmtNum(E.skew, 3),
+    });
+    const attackers = ELEMENTS
+      .filter((e) => e !== E.mostAttacked)
+      .map((e) => ({ e, v: keOnto(base, E.mostAttacked, e) }))
+      .filter((x) => x.v > 0).sort((a, b) => b.v - a.v).slice(0, 2);
+    if (attackers.length > 0) {
+      LP.add("persona.mostAttacked", {
+        element: E.mostAttacked, attack: fmtNum(E.attack[E.mostAttacked]),
+        by: attackers.map((x) => x.e).join("、"),
+      });
+    }
+
+    for (const pal of P.palaces) {
+      const top = (Object.entries(pal.gods) as [TenGod, number][])
+        .filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 2);
+      if (top.length === 0 && !pal.isDayMaster) continue;
+      LP.add("persona.palace", {
+        palace: pal.palace, share: fmtPct(pal.share),
+        gods: pal.isDayMaster
+          ? `日主${dm.stem}`
+          : top.map(([g, v]) => `${g} ${fmtNum(v)}`).join("、"),
+        note: pal.afflicted.length === 0 ? ""
+          : `；该宫参与${pal.afflicted.map((e) => e.narrativeTag).join("、")}`,
+      });
+    }
+    personaSection = { persona: P, narrative: LP.items };
+  }
 
   // ── §3 旺衰与取用 ──
   const L3 = new Lines(locale);
@@ -558,7 +645,8 @@ export function buildReport(
       warnings: chart.warnings,
     },
     disclaimerTop: disclaimerText(locale),
-    chart: chartSection, force, strength: strengthSection, kin: kinSection,
+    chart: chartSection, force, persona: personaSection,
+    strength: strengthSection, kin: kinSection,
     luck: luckSection, years: yearsSection, current, method,
     disclaimerBottom: disclaimerText(locale),
     guard: { scanned: 0, violations: [], hedged: [] },
@@ -620,6 +708,7 @@ export function collectReportText(r: Report): { text: string; where: string }[] 
   const sections: readonly (readonly [string, { readonly narrative: readonly NarrativeLine[] }])[] = [
     ["chart", r.chart], ["force", r.force], ["strength", r.strength],
     ["kin", r.kin], ["luck", r.luck], ["years", r.years], ["method", r.method],
+    ...(r.persona === null ? [] : [["persona", r.persona] as const]),
     ...(r.current === null ? [] : [["current", r.current] as const]),
   ];
   for (const [name, s] of sections) {
@@ -656,6 +745,7 @@ export function guardReport(r: Report): GuardReport {
   const hedged: string[] = [];
   const sections: readonly { narrative: readonly NarrativeLine[] }[] = [
     r.chart, r.force, r.strength, r.kin, r.luck, r.years, r.method,
+    ...(r.persona === null ? [] : [r.persona]),
     ...(r.current === null ? [] : [r.current]),
   ];
   for (const s of sections) {

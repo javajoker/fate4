@@ -102,6 +102,26 @@ export function renderMarkdown(r: Report): string {
   }
   p(nl(r.force.narrative));
 
+  // ── §2.5 ──
+  if (r.persona !== null) {
+    const P = r.persona.persona;
+    h(2, "§2.5 性格与偏好");
+    out.push("| 十神 | 内（藏） | 外（透） | 差 |");
+    out.push("| --- | --- | --- | --- |");
+    for (const g of Object.keys(P.inner)) {
+      const i = P.inner[g as keyof typeof P.inner];
+      const o = P.outer[g as keyof typeof P.outer];
+      if (i === 0 && o === 0) continue;
+      out.push(`| ${g} | ${(i * 100).toFixed(1)}% | ${(o * 100).toFixed(1)}% | `
+        + `${((o - i) * 100).toFixed(1)}% |`);
+    }
+    out.push("");
+    p(`显隐比 ${(P.revealRatio * 100).toFixed(1)}%　内外张力 ${P.innerOuterTension.toFixed(3)}`
+      + `（十档下 ${P.innerOuterTensionByGod.toFixed(3)}）　偏枯度 ${P.elements.skew.toFixed(3)}`);
+    p(`底本 \`${P.source}\``);
+    p(nl(r.persona.narrative));
+  }
+
   // ── §3 ──
   h(2, "§3 旺衰与取用");
   p(nl(r.strength.narrative));

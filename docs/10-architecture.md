@@ -60,6 +60,8 @@ core/src/
 │   ├── relations.ts  distance.ts  resistance.ts
 │   └── iterate.ts                # L3 主循环
 ├── conclude/
+│   ├── traits.ts                 # 十神四栏 + 五行五常特质表（conventional，可替换）
+│   ├── persona.ts                # L4p 人格层
 │   ├── tenGods.ts  rootScore.ts  strength.ts
 │   ├── specialPattern.ts  yongshen.ts  geju.ts  kin.ts  metrics.ts
 │   └── conclude.ts               # L4 总装
@@ -88,9 +90,9 @@ core/src/
 > 这些文件最终没有出现：类型与实现同文件更便于维护，
 > 时间层四视图合并在 `views.ts` 里共享大量辅助函数。上表为实际结构。
 
-**P11–P15 将新增**（见 [12](12-persona-curves-nodes.md)）：
-`chart/baseChart.ts`、`conclude/persona.ts`、`conclude/neijing.ts`、
-`temporal/series.ts`、`temporal/nodes.ts`、`report/finding.ts`。
+`chart/baseChart.ts`（P11）与 `conclude/{traits,persona}.ts`（P12）已就位。
+**P13–P15 将新增**：`conclude/neijing.ts`、`temporal/series.ts`、
+`temporal/nodes.ts`、`report/finding.ts`。
 
 ### 2.1 公共 API
 
@@ -324,6 +326,8 @@ description: 四柱（八字）排盘与推演。当用户提供出生年月日�
 | L5 | 换运年分段、流月流日无 weight 字段 | 类型 + 运行时 |
 | L6 | **措辞扫描**：模板库 + 全部叙述语料 + 报告全文 + CLI 输出 | `pnpm guard`，随 `pnpm test` 执行 |
 | L6 | 中文输出不得漏出英文枚举（三个及以上连续拉丁字母） | vitest |
+| Web | JSX 文本里不得写 Markdown（`**粗体**` 会原样渲染成星号） | `pnpm check:web` |
+| L4p | 特质表四栏齐全、过旺与过弱不共用词、全中文、不用量表词汇 | vitest |
 | L4p | 内外分布归一化；特质表四栏齐全且全中文 | vitest（P12） |
 | 内经 | 配属表逐格；病名无条件禁；框定语与免责语缺一即拦 | vitest（P13） |
 | L5c | 序列条数；运内结构翻转的实证样例；月度采样耗时 | vitest（P14） |
@@ -362,7 +366,7 @@ description: 四柱（八字）排盘与推演。当用户提供出生年月日�
 | **P9** | `report` L6 + Web UI | ✅ 措辞扫描通过；十个路由静态导出；图表无红绿吉凶色 |
 | **P10** | `cli` + `skill` | ✅ **Skill 与 Web 报告逐字节相同**（构造保证，非人工约定） |
 | **P11** | `BaseChart` 一等对象 + `evaluateAt` | 📋 基础盘在一次报告生成中**恰好算一次**；现有断言全绿不变 |
-| **P12** | L4p 人格层 | 📋 内外分布归一化恒和为 1；前二并列时置信度下调 |
+| **P12** | L4p 人格层 | ✅ 张力改按五组算；真缺与过弱分开；置信度与并列门槛由构造对齐 |
 | **P13** | 内经配属 + 三条轴 + 守卫的「整段」判定域 | 📋 配属表逐格断言；病名与易感式各有真实反例；框定语缺一即拦 |
 | **P14** | L5c 曲线层 | 📋 47 条序列 + 扰动序列；**运内结构翻转**有实证样例 |
 | **P15** | L5n 节点层 + Finding 两层 | 📋 穿越区间；中节点走 MAD；summary 的每个数字可在 detail 的 evidence 中找到 |

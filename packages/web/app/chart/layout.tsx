@@ -7,6 +7,7 @@ import { withFrag } from "../../lib/format";
 
 const TABS: readonly [string, string][] = [
   ["/chart", "盘面 · 力量"],
+  ["/chart/persona", "性格 · 偏好"],
   ["/chart/strength", "旺衰 · 取用"],
   ["/chart/kin", "宫位 · 六亲"],
   ["/chart/luck", "大运"],

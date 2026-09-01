@@ -140,7 +140,7 @@ export default function StrengthPage() {
         <div className="card" style={{ borderColor: "var(--warm)" }}>
           <h3>取用与格局取向不一致</h3>
           <p>
-            两条线在此**并列**呈现，不作合并。合并会把这张盘真正的张力所在抹掉 ——
+            两条线在此<b>并列</b>呈现，不作合并。合并会把这张盘真正的张力所在抹掉 ——
             扶抑与格局本就是两条独立的判定线，允许不一致。
           </p>
         </div>

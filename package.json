@@ -8,8 +8,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b --pretty",
-    "guard": "vitest run packages/core/test/report.spec.ts",
-    "gen:vsop87": "node scripts/generate-vsop87.mjs"
+    "guard": "vitest run packages/core/test/report.spec.ts packages/core/test/persona.spec.ts && node scripts/check-web-text.mjs",
+    "gen:vsop87": "node scripts/generate-vsop87.mjs",
+    "check:web": "node scripts/check-web-text.mjs"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",

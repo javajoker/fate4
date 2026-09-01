@@ -63,6 +63,10 @@ const RANGES: readonly RangeRule[] = [
   { path: "temporal.yearRangeYears", min: 1, max: 200 },
   { path: "temporal.index.a", min: 0, max: 50 },
   { path: "temporal.index.b", min: 0, max: 50 },
+
+  { path: "persona.excessShare", min: 0.05, max: 0.9 },
+  { path: "persona.deficientShare", min: 0, max: 0.5 },
+  { path: "persona.dominantMargin", min: 0.001, max: 0.5 },
 ];
 
 const ENUMS: readonly EnumRule[] = [
@@ -79,6 +83,7 @@ const ENUMS: readonly EnumRule[] = [
   { path: "chart.hiddenStemVariant", values: ["standard", "alt"] },
   { path: "temporal.qiyun.mode", values: ["continuous", "traditionalDiscrete"] },
   { path: "report.locale", values: ["zh-Hans", "zh-Hant", "en"] },
+  { path: "persona.source", values: ["conventional"] },
 ];
 
 function at(obj: unknown, path: string): unknown {
@@ -206,6 +211,14 @@ function validateInvariants(p: Params): string[] {
   }
   if (p.report.guard.neutralPalette !== true) {
     errors.push("report.guard.neutralPalette 必须为 true（硬约束）");
+  }
+
+  // 过旺门槛须高于过弱门槛，否则同一个十神会被同时判为过旺与过弱
+  if (p.persona.excessShare <= p.persona.deficientShare) {
+    errors.push(
+      `persona.excessShare(${p.persona.excessShare}) 须大于 deficientShare(${p.persona.deficientShare})，`
+      + "否则同一个十神会被同时判为过旺与过弱",
+    );
   }
 
   const yearSum = w.year.stem + w.year.branch;

@@ -314,3 +314,69 @@ export function YearLines({ points, mark, onPick }: {
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────
+// 内外十神对照 —— 同一个十神的「藏」与「透」并排
+// ─────────────────────────────────────────────────────────
+
+export interface InnerOuterRow {
+  readonly god: string;
+  readonly inner: number;   // 归一化
+  readonly outer: number;
+}
+
+/**
+ * 背靠背横条：左内右外，中轴对齐。
+ *
+ * 用同一色相的两个深浅，**不用两个色相** —— 内与外没有好坏之分，
+ * 换色相会暗示一优一劣。差异最大的几行加一条中轴标记，
+ * 因为「哪几个十神分歧最大」才是这张图要说的，而不是「张力是 0.55」。
+ */
+export function InnerOuterBars({ rows, highlight = [] }: {
+  rows: readonly InnerOuterRow[]; highlight?: readonly string[];
+}) {
+  const shown = rows.filter((r) => r.inner > 0 || r.outer > 0);
+  const max = Math.max(0.01, ...shown.map((r) => Math.max(r.inner, r.outer)));
+  const H = 22; const W = 420; const mid = W / 2; const half = mid - 46;
+  return (
+    <div className="scroll">
+      <svg width="100%" viewBox={`0 0 ${W} ${shown.length * H + 26}`} role="img"
+        aria-label="内外十神对照">
+        <text x={mid - half} y={12} fontSize={11} fill="var(--ink-3)">藏（内）</text>
+        <text x={mid + half} y={12} textAnchor="end" fontSize={11} fill="var(--ink-3)">透（外）</text>
+        {shown.map((r, i) => {
+          const y = 20 + i * H;
+          const on = highlight.includes(r.god);
+          const li = (r.inner / max) * half;
+          const lo = (r.outer / max) * half;
+          return (
+            <g key={r.god}>
+              <rect x={mid - li} y={y + 3} width={li} height={13} rx={2}
+                fill="var(--accent)" fillOpacity={0.35} />
+              <rect x={mid} y={y + 3} width={lo} height={13} rx={2}
+                fill="var(--accent)" fillOpacity={0.8} />
+              <text x={mid} y={y + 13} textAnchor="middle" fontSize={11}
+                fill={on ? "var(--ink)" : "var(--ink-3)"}
+                fontWeight={on ? 600 : 400}
+                style={{ paintOrder: "stroke", stroke: "var(--surface)", strokeWidth: 4 }}>
+                {r.god}
+              </text>
+              <text x={mid - li - 4} y={y + 13} textAnchor="end" fontSize={10} fill="var(--ink-3)"
+                style={{ fontVariantNumeric: "tabular-nums" }}>
+                {r.inner > 0 ? `${(r.inner * 100).toFixed(0)}%` : ""}
+              </text>
+              <text x={mid + lo + 4} y={y + 13} fontSize={10} fill="var(--ink-3)"
+                style={{ fontVariantNumeric: "tabular-nums" }}>
+                {r.outer > 0 ? `${(r.outer * 100).toFixed(0)}%` : ""}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <div className="legend">
+        <span><i style={{ background: "var(--accent)", opacity: 0.35 }} />藏支为隐 —— 心里的那一面</span>
+        <span><i style={{ background: "var(--accent)", opacity: 0.8 }} />透干为显 —— 外人看见的那一面</span>
+      </div>
+    </div>
+  );
+}

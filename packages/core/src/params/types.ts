@@ -274,6 +274,30 @@ export interface ChartParams {
   readonly includeTaiXi: boolean;
 }
 
+/**
+ * L4p 人格层。
+ *
+ * 两张知识表（十神特质、《内经》五行配属）按 `conventional`（通行表述）实现，
+ * **允许经参数替换底本** —— 与《穷通宝鉴》调候表同样的处理：
+ * 表在代码里，来源在参数里，随盘声明。
+ */
+export interface PersonaParams {
+  /** [流派] 十神特质表的底本。 */
+  readonly source: "conventional";
+  /** [校准] 某十神占同侧分布的比例超此值判「过旺」。 */
+  readonly excessShare: number;
+  /** [校准] 低于此值判「过弱」；为 0 即「缺」。 */
+  readonly deficientShare: number;
+  /**
+   * [校准] 主导十神的并列判据：前二名占比之差小于此值即并列，且置信度随之下调。
+   *
+   * 置信度公式 `0.45 + 0.15 × gap / dominantMargin` 与它**由构造对齐** ——
+   * `gap = dominantMargin` 时恰好得 0.60，即模板的 `confidenceFloor`。
+   * 于是「判为并列」与「改用留有余地的措辞」永远同进同出，与本值取多少无关。
+   */
+  readonly dominantMargin: number;
+}
+
 export interface ReportParams {
   readonly locale: "zh-Hans" | "zh-Hant" | "en";
   readonly showConvergenceHistory: boolean;
@@ -296,6 +320,7 @@ export interface Params {
   readonly conclusion: ConclusionParams;
   readonly shensha: ShenshaParams;
   readonly temporal: TemporalParams;
+  readonly persona: PersonaParams;
   readonly report: ReportParams;
 }
 

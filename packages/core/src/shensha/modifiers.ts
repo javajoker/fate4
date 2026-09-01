@@ -38,7 +38,7 @@ const STEM_KINDS: ReadonlySet<string> = new Set(["ganhe", "ganchong"]);
  * 修饰一旦近乎恒真，它就不再是修饰；且因 effectiveTone 先判合后判冲，
  * 虚假的「逢合」会把真正的「逢冲」整个盖掉，令四条应期规则永不触发。
  */
-function touches(
+export function eventTouches(
   e: StructureEvent, pillar: string, layer: "stem" | "branch",
   stem: string | null, branch: string | null,
 ): boolean {
@@ -69,7 +69,7 @@ export function modifiersFor(
   const hostWeight = hostCarriers.reduce((a, c) => a + c.weight, 0);
 
   const hit = (kinds: readonly string[]) => ctx.events.some(
-    (e) => kinds.includes(e.kind) && touches(e, pillar, layer, stem, branch));
+    (e) => kinds.includes(e.kind) && eventTouches(e, pillar, layer, stem, branch));
 
   if (hit(["chong", "ganchong"])) mods.push("逢冲");
   if (hit(["liuhe", "ganhe", "sanhe", "sanhui", "banhe"])) mods.push("逢合");

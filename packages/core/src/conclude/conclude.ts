@@ -21,7 +21,7 @@ import { specialPatternVerdict } from "./specialPattern.js";
 import { yongshenVerdict } from "./yongshen.js";
 import { gejuVerdict } from "./geju.js";
 import { kinReadings } from "./kin.js";
-import { flowMetrics } from "./metrics.js";
+import { flowMetrics, keDamageMatrix } from "./metrics.js";
 import type { Conclusions } from "./types.js";
 
 export interface ConcludeInput {
@@ -54,18 +54,8 @@ export function conclude(input: ConcludeInput): Conclusions {
     dayMaster, monthBranch, carriers,
   }, cp);
 
-  // 克流量矩阵 keDamage[受害][施克] —— 病药法的门槛判在流量上，不在权重上。
-  const elementById = new Map(carriers.map((c) => [c.id, c.element]));
-  const keDamage = Object.fromEntries(ELEMENTS.map((e) => [
-    e, Object.fromEntries(ELEMENTS.map((f) => [f, 0])) as Record<Element, number>,
-  ])) as Record<Element, Record<Element, number>>;
-  for (const f of input.flows) {
-    if (f.kind !== "ke") continue;
-    const from = elementById.get(f.from);
-    const to = elementById.get(f.to);
-    if (from === undefined || to === undefined) continue;
-    keDamage[to][from] += f.totalAmount;
-  }
+  // 克流量矩阵 —— 病药法的门槛判在流量上，不在权重上。人格层也用同一份。
+  const keDamage = keDamageMatrix(carriers, input.flows);
 
   const yongshen = yongshenVerdict({
     dayMasterElement: dayMaster.element, monthBranch, byElement,
