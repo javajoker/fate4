@@ -223,6 +223,15 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
       layerLuck: 1.00, layerAnnual: 0.85, layerMonth: 0.45,
     }),
   }),
+  nodes: Object.freeze({
+    threshold: 2.0,                    // [校准]
+    noticeThreshold: 1.5,              // [校准]
+    mediumEstimator: "robustMAD" as const,  // [硬约束] n=6，样本 σ 不可用
+    interpolateTo: "month" as const,        // [硬约束] 月内无独立信息
+    minRelativeSwing: 0.05,            // [校准]
+    bridgeGapMonths: 2,                // [校准]
+    maxShown: 12,
+  }),
   report: Object.freeze({
     locale: "zh-Hans",
     showConvergenceHistory: false,

@@ -354,6 +354,40 @@ export interface SeriesParams {
   };
 }
 
+/** L5n 统计节点。 */
+export interface NodesParams {
+  /** [校准] 主门槛。|z| 或 |ż| 超此值即进入穿越区间。 */
+  readonly threshold: number;
+  /** [校准] 次级门槛，供「值得注意」一档。 */
+  readonly noticeThreshold: number;
+  /**
+   * [硬约束] 中尺度的估计量。
+   *
+   * 中节点的样本量只有六（六十年六步运）。样本标准差在 n=6 时极不稳 ——
+   * 任何一步稍偏都会被放大成 2σ，中节点近乎恒有产出，也就等于没有产出。
+   * 必须用中位数与绝对中位差：`0.6745 × (x − M) / MAD`。
+   */
+  readonly mediumEstimator: "robustMAD";
+  /**
+   * [硬约束] 交点的时间精度。
+   *
+   * 采样本就是月度，在两个相邻月之间线性插值到某一天是伪精度 ——
+   * 流月不加权，序列在月内并无独立信息。
+   */
+  readonly interpolateTo: "month";
+  /**
+   * [校准] 峰值处的相对摆动下限。
+   *
+   * 近乎平直的序列里，σ 极小，任何抖动都会被放大成大 z。
+   * 故除 σ>0 之外再加一条：峰值须真的动了 —— 相对自身量级至少这么多。
+   */
+  readonly minRelativeSwing: number;
+  /** [校准] 两段同号穿越之间若只隔这么多个月，合并为一段。 */
+  readonly bridgeGapMonths: number;
+  /** 每个尺度呈现的最大条数。 */
+  readonly maxShown: number;
+}
+
 export interface ReportParams {
   readonly locale: "zh-Hans" | "zh-Hant" | "en";
   readonly showConvergenceHistory: boolean;
@@ -378,6 +412,7 @@ export interface Params {
   readonly temporal: TemporalParams;
   readonly persona: PersonaParams;
   readonly series: SeriesParams;
+  readonly nodes: NodesParams;
   readonly report: ReportParams;
 }
 

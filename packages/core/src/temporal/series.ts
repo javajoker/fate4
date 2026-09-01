@@ -43,13 +43,15 @@
  */
 
 import {
-  ELEMENTS, TEN_GODS, type Branch, type Element, type Pillar,
+  ELEMENTS, TEN_GODS,
+  type Branch, type Element, type Pillar, type Polarity, type TenGod,
 } from "../types/ganzhi.js";
 import {
   BRANCH_CLASHES, BRANCH_DESTRUCTIONS, BRANCH_HARMS, BRANCH_SIX_COMBINATIONS,
-  DIRECTIONALS, MONTH_BRANCH_ORDER, PUNISHMENTS, TRINITIES,
+  CONTROLS, DIRECTIONALS, GENERATES, MONTH_BRANCH_ORDER, PUNISHMENTS, TRINITIES,
 } from "../ganzhi/tables.js";
-import { monthStemOf } from "../ganzhi/algebra.js";
+import { controlledBy, generatedBy, monthStemOf } from "../ganzhi/algebra.js";
+import { GOD_GROUPS, tenGodOf } from "../conclude/tenGods.js";
 import { TROPICAL_YEAR_DAYS } from "../chart/qiyun.js";
 import type { BaseChart } from "../chart/baseChart.js";
 import type { SeriesParams } from "../params/types.js";
@@ -101,6 +103,20 @@ export interface Series {
   readonly deltas: readonly number[];
   /** 该量是用神向、忌神向，还是不判方向（宫位、域张力）。 */
   readonly polarity: "favorable" | "adverse" | "neutral";
+  /**
+   * 流月是否真的进入这条序列 —— 决定节点报到年还是报到月。
+   *
+   * 流月**只入符号层**（`fleetingMonthInWeights: false`，硬约束）。
+   * 于是立春年内唯一在动的权重来源是大运斜坡，而它是缓慢单调的；
+   * 真正的跳变全部发生在立春换柱那一刻。实测后果很直白：
+   * 权重类序列的节点有 **81%–100% 起于寅月**，而扰动序列只有 27%。
+   *
+   * 所以对权重类序列写「2046 年寅月起」是伪精度 ——
+   * 它说的其实是「2046 这个立春年」。报告据此改写措辞，不是把这件事藏起来。
+   *
+   * 应期域取 `scope: "year"`，按构造也是年尺度，故同样为 false。
+   */
+  readonly monthResolving: boolean;
 }
 
 export interface SeriesSet {
@@ -244,18 +260,23 @@ export function buildSeries(base: BaseChart, opts: SeriesOptions = {}): SeriesSe
   });
 
   const out: Series[] = [];
+  // 除扰动外一律 monthResolving: false —— 流月不加权，见 Series.monthResolving
   const push = (
     id: string, kind: SeriesKind, label: string, baseValue: number,
     polarity: Series["polarity"], pick: (ev: EvaluatedChart, i: number) => number,
   ) => {
     const values = evs.map(pick);
     out.push({ id, kind, label, baseValue, values,
-      deltas: values.map((v) => v - baseValue), polarity });
+      deltas: values.map((v) => v - baseValue), polarity, monthResolving: false });
   };
 
   // ── 十神 10 条 ──
+  // 十神有用忌方向：先换算到五行，再看它落在喜用还是忌仇。
+  // 初版一律给 neutral，于是全部节点都报「只报变动」，方向那一栏形同虚设。
   for (const g of TEN_GODS) {
-    push(`tenGod.${g}`, "tenGod", g, base.conclusions.tenGods[g], "neutral",
+    const el = godElementOf(base.conclusions.dayMaster.element, g);
+    push(`tenGod.${g}`, "tenGod", g, base.conclusions.tenGods[g],
+      favorable.has(el) ? "favorable" : adverse.has(el) ? "adverse" : "neutral",
       (ev) => ev.conclusions.tenGods[g]);
   }
   // ── 五行 5 条 ──
@@ -287,7 +308,8 @@ export function buildSeries(base: BaseChart, opts: SeriesOptions = {}): SeriesSe
   push("innerOuter.revealRatio", "innerOuter", "显隐比",
     base.persona.revealRatio, "neutral", (ev) => revealRatioOf(ev));
   push("innerOuter.tension", "innerOuter", "内外张力",
-    base.persona.innerOuterTension, "neutral", () => base.persona.innerOuterTension);
+    base.persona.innerOuterTension, "neutral",
+    (ev) => innerOuterTensionOf(ev, base.conclusions.dayMaster));
   // ── 域 18 条（张力恒不判方向）──
   const domains = Object.keys(DOMAIN_LABEL) as Domain[];
   for (const d of domains) {
@@ -318,6 +340,8 @@ export function buildSeries(base: BaseChart, opts: SeriesOptions = {}): SeriesSe
       id: `agitation.${name}`, kind: "agitation", label: `${name}扰动`,
       // 扰动在基础盘上无对应物 —— 本命自身不引动自身，零点即 0
       baseValue: 0, values, deltas: values, polarity: "neutral",
+      // 唯一吃流月的一类：`agitationAt` 收 `f.fleetingMonth`
+      monthResolving: true,
     });
   }
 
@@ -332,6 +356,32 @@ export function buildSeries(base: BaseChart, opts: SeriesOptions = {}): SeriesSe
 
 // ─────────────────────────────────────────────────────────
 
+/**
+ * 某一时点的内外张力。按五组算，与 L4p 同一形式。
+ *
+ * 初版此处直接返回基础盘的值 —— 那条序列于是全程恒定，
+ * 既没有信息，又会成为统计节点的假阳性温床（σ≈0 时任何抖动都放大成大 z）。
+ */
+function innerOuterTensionOf(
+  ev: EvaluatedChart, dm: { element: Element; polarity: Polarity },
+): number {
+  const inner = Object.fromEntries(TEN_GODS.map((g) => [g, 0])) as Record<TenGod, number>;
+  const outer = Object.fromEntries(TEN_GODS.map((g) => [g, 0])) as Record<TenGod, number>;
+  for (const c of ev.carriers) {
+    if (c.flags.includes("DAY_MASTER")) continue;
+    const g = tenGodOf(dm.element, dm.polarity, c.element, c.polarity);
+    if (c.origin === "hidden") inner[g] += c.weight; else outer[g] += c.weight;
+  }
+  const norm = (v: Record<TenGod, number>) => {
+    const sum = TEN_GODS.reduce((a, g) => a + v[g], 0);
+    return (k: keyof typeof GOD_GROUPS) =>
+      (sum > 0 ? GOD_GROUPS[k].reduce((a, g) => a + v[g], 0) / sum : 0);
+  };
+  const gi = norm(inner); const go = norm(outer);
+  return 0.5 * (Object.keys(GOD_GROUPS) as (keyof typeof GOD_GROUPS)[])
+    .reduce((a, k) => a + Math.abs(gi(k) - go(k)), 0);
+}
+
 function revealRatioOf(ev: EvaluatedChart): number {
   let inner = 0; let outer = 0;
   for (const c of ev.carriers) {
@@ -339,6 +389,17 @@ function revealRatioOf(ev: EvaluatedChart): number {
     if (c.origin === "hidden") inner += c.weight; else outer += c.weight;
   }
   return inner + outer > 0 ? outer / (inner + outer) : 0;
+}
+
+/** 十神 → 五行。与 report/assemble.ts 的同名函数同一张表。 */
+function godElementOf(D: Element, god: TenGod): Element {
+  switch (god) {
+    case "比肩": case "劫财": return D;
+    case "食神": case "伤官": return GENERATES[D];
+    case "正财": case "偏财": return CONTROLS[D];
+    case "正官": case "七杀": return controlledBy(D);
+    default: return generatedBy(D);
+  }
 }
 
 /** 与 views.ts 的同名函数一致：相对「中性的一年」，不是相对本命盘。 */

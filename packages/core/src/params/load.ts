@@ -84,6 +84,12 @@ const RANGES: readonly RangeRule[] = [
   { path: "series.agitation.layerLuck", min: 0, max: 3 },
   { path: "series.agitation.layerAnnual", min: 0, max: 3 },
   { path: "series.agitation.layerMonth", min: 0, max: 3 },
+
+  { path: "nodes.threshold", min: 0.5, max: 6 },
+  { path: "nodes.noticeThreshold", min: 0.3, max: 6 },
+  { path: "nodes.minRelativeSwing", min: 0, max: 1 },
+  { path: "nodes.bridgeGapMonths", min: 0, max: 24 },
+  { path: "nodes.maxShown", min: 1, max: 200 },
 ];
 
 const ENUMS: readonly EnumRule[] = [
@@ -103,6 +109,8 @@ const ENUMS: readonly EnumRule[] = [
   { path: "persona.source", values: ["conventional"] },
   { path: "persona.neijingSource", values: ["conventional"] },
   { path: "persona.wuqiaoSource", values: ["yinyangYingxiang", "jinguiZhenyan"] },
+  { path: "nodes.mediumEstimator", values: ["robustMAD"] },
+  { path: "nodes.interpolateTo", values: ["month"] },
 ];
 
 function at(obj: unknown, path: string): unknown {
@@ -253,6 +261,14 @@ function validateInvariants(p: Params): string[] {
     errors.push(
       `series.spanYears(${p.series.spanYears}) 不得大于 drawYears(${p.series.drawYears})，`
       + "否则统计窗内有一段没有采样点",
+    );
+  }
+
+  // 次级门槛须低于主门槛，否则「值得注意」一档为空
+  if (p.nodes.noticeThreshold >= p.nodes.threshold) {
+    errors.push(
+      `nodes.noticeThreshold(${p.nodes.noticeThreshold}) 须小于 threshold(${p.nodes.threshold})，`
+      + "否则「值得注意」一档恒为空",
     );
   }
 
