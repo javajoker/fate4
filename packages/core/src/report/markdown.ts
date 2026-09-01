@@ -11,8 +11,8 @@
 
 import { DOMAIN_LABEL } from "../yingqi/types.js";
 import {
-  BAND_LABEL_ZH, label, OUTCOME_LABEL, QUADRANT_LABEL, SCHOOL_LABEL,
-  SEVERITY_LABEL, TONE_LABEL, YONGSHEN_METHOD_LABEL,
+  BAND_LABEL_ZH, label, OUTCOME_LABEL, PILLAR_LABEL, QUADRANT_LABEL,
+  SCHOOL_LABEL, SEVERITY_LABEL, TONE_LABEL, YONGSHEN_METHOD_LABEL,
 } from "./labels.js";
 import type { NarrativeLine } from "./render.js";
 import type { Report } from "./types.js";
@@ -23,10 +23,7 @@ const nl = (lines: readonly NarrativeLine[]): string =>
 const pillarOf = (p: { stem: string; branch: string } | null): string =>
   p === null ? "—" : `${p.stem}${p.branch}`;
 
-const PILLAR_ZH: Readonly<Record<string, string>> = Object.freeze({
-  year: "年", month: "月", day: "日", hour: "时",
-  luck: "大运", annual: "流年", taiyuan: "胎元",
-});
+
 
 export function renderMarkdown(r: Report): string {
   const out: string[] = [];
@@ -99,7 +96,7 @@ export function renderMarkdown(r: Report): string {
     out.push("| --- | --- | --- | --- |");
     for (const e of r.force.events) {
       out.push(`| ${e.narrativeTag} | ${label(OUTCOME_LABEL, e.outcome)} | `
-        + `${e.pillars.map((x) => PILLAR_ZH[x] ?? x).join("、")} | ${e.distanceCoef.toFixed(2)} |`);
+        + `${e.pillars.map((x) => label(PILLAR_LABEL, x)).join("、")} | ${e.distanceCoef.toFixed(2)} |`);
     }
     out.push("");
   }

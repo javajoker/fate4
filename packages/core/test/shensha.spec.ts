@@ -232,13 +232,28 @@ describe("扫描输出", () => {
   });
 
   it("工作例：庚年天乙在丑未，二者皆在盘中且逢冲", () => {
-    const ty = hits.filter((h) => h.name === "天乙贵人");
+    const ty = hits.filter((h) => h.name === "天乙贵人" && h.basis === "year");
     expect(ty.length).toBe(2);
     expect(new Set(ty.map((h) => h.branch))).toEqual(new Set(["丑", "未"]));
     for (const h of ty) {
       expect(h.modifiers).toContain("逢冲");   // 丑未相冲
       expect(h.modifiers).toContain("重见");
       expect(h.tone).toBe("weakened");
+    }
+  });
+
+  it("命宫独立成一个落点，不冒充胎元", () => {
+    // 丁日干的天乙在亥酉，本例命宫正是丁亥。它曾被硬塞进 taiyuan，
+    // 于是宫位报成「外部」—— 多一个字面量比错一个宫位划算。
+    const mg = hits.filter((h) => h.landsOn.pillar === "mingGong");
+    expect(mg.length).toBeGreaterThan(0);
+    for (const h of mg) {
+      expect(h.palace).toBe("命宫");
+      expect(h.landsOn.layer).toBe("branch");
+      // 命宫不参与配重，故既无载体也不论坐旺坐衰
+      expect(h.hostWeight).toBe(0);
+      expect(h.modifiers).not.toContain("坐衰");
+      expect(h.modifiers).not.toContain("坐旺");
     }
   });
 
@@ -249,11 +264,15 @@ describe("扫描输出", () => {
     expect(hg!.tone).toBe("activated");
   });
 
-  it("宫位映射覆盖八宫", () => {
+  it("宫位映射覆盖八宫，另加命宫与外部", () => {
     const palaces = new Set(hits.map((h) => h.palace));
     for (const p of palaces) {
-      expect(["祖上宫", "根基宫", "父母兄弟宫", "门户宫", "自身", "配偶宫", "志向宫", "子女宫", "外部"])
-        .toContain(p);
+      expect([
+        "祖上宫", "根基宫", "父母兄弟宫", "门户宫",
+        "自身", "配偶宫", "志向宫", "子女宫",
+        "命宫",   // 不参与配重，但传统上是神煞的重要落点
+        "外部",   // 大运、流年、胎元
+      ]).toContain(p);
     }
   });
 

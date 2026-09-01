@@ -6,7 +6,7 @@ import type {
 import type { NatalChart, SilingInfo, TimeCorrections } from "../chart/types.js";
 import type { PillarKind } from "../weights/carrier.js";
 import type { StructureEvent } from "../structure/types.js";
-import type { FlowRecord } from "../propagate/iterate.js";
+import type { ConvergenceReport, FlowRecord } from "../propagate/iterate.js";
 import type { Conclusions, KinReading } from "../conclude/types.js";
 import type { ShenshaHit, PalaceName } from "../shensha/scan.js";
 import type { DayView, LuckStep, MonthView, YearView } from "../temporal/types.js";
@@ -64,6 +64,8 @@ export interface ForceSection {
   readonly flows: readonly FlowRecord[];
   /** 载体 id → 可读标签。流量表若直接显示 id，读者无从对照盘面。 */
   readonly carrierLabels: Readonly<Record<string, string>>;
+  /** 迭代收敛过程。调试与教学用，由 report.showConvergenceHistory 开启，默认不产出。 */
+  readonly convergence?: ConvergenceReport;
   readonly events: readonly StructureEvent[];
   readonly narrative: readonly NarrativeLine[];
 }

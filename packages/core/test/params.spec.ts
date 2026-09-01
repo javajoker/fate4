@@ -32,7 +32,12 @@ describe("YAML 与 TS 默认值一致", () => {
   // 三段全覆盖。只查 weights 会让后加的 structure / propagation 悄悄漂移 ——
   // 实测 propagation 就曾漂出两处（新增 inflowDamageCap、maxRounds 30→3）。
   // conclusion 段同样纳入 —— 它含四个流派开关，漂移会让报告声明错误的流派。
-  for (const section of ["weights", "structure", "propagation", "conclusion", "shensha", "temporal"] as const) {
+  // chart 与 report 两段起初只存在于 YAML 里，TS 侧无对应物 ——
+  // 于是它们既不受这条断言保护，也进不了参数校准面板。补齐后一并纳入。
+  for (const section of [
+    "chart", "weights", "structure", "propagation",
+    "conclusion", "shensha", "temporal", "report",
+  ] as const) {
     it(`${section} 段逐项相同（含嵌套）`, () => {
       // stableStringify 递归排序键，使比较与书写顺序无关
       expect(stableStringify(doc[section])).toBe(stableStringify(DEFAULT_PARAMS[section]));
@@ -86,6 +91,37 @@ describe("参数校验", () => {
     expect(() => loadParams({ weights: { year: { stem: 50 } } }))
       .toThrow(/year\.stem \+ branch/);
     expect(() => loadParams({ weights: { year: { stem: 50, total: 120 } } })).not.toThrow();
+  });
+
+  it("[硬约束] 措辞扫描与中性配色不可关闭", () => {
+    // 这两项若可配置，「违反的输出视为 bug」就降格成了一句建议。
+    expect(() => loadParams({ report: { guard: { enforceBannedTerms: false as never } } }))
+      .toThrow(/enforceBannedTerms/);
+    expect(() => loadParams({ report: { guard: { neutralPalette: false as never } } }))
+      .toThrow(/neutralPalette/);
+  });
+
+  it("[硬约束] 南半球不反转季节", () => {
+    expect(() => loadParams({ chart: { southernHemisphereFlip: true } }))
+      .toThrow(/southernHemisphereFlip/);
+  });
+
+  it("未实现的开关锁在默认值上，且抛错时说明原因", () => {
+    // 静默忽略是最坏的一种：用户改了值、以为生效了，而盘面纹丝不动。
+    expect(() => loadParams({ chart: { hiddenStemVariant: "alt" } })).toThrow(/尚未录入|只支持 standard/);
+    expect(() => loadParams({ chart: { includeShenGong: true } })).toThrow(/尚未实现/);
+    expect(() => loadParams({ chart: { handleDst: false } })).toThrow(/不可关闭/);
+  });
+
+  it("四个流派开关都能改，且改动确实进入参数", () => {
+    const p = loadParams({
+      chart: { ziHourRule: "earlyZiSameDay", mingGongBoundary: "zhongqi" },
+      conclusion: { changshengSchool: "sameBirthDeath", earthChangsheng: "waterEarthSame" },
+    });
+    expect(p.chart.ziHourRule).toBe("earlyZiSameDay");
+    expect(p.chart.mingGongBoundary).toBe("zhongqi");
+    expect(p.conclusion.changshengSchool).toBe("sameBirthDeath");
+    expect(p.conclusion.earthChangsheng).toBe("waterEarthSame");
   });
 
   it("一次报出全部错误，而非只报第一条", () => {

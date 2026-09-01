@@ -9,6 +9,7 @@ import { aggregateDomains } from "../src/yingqi/domains.js";
 import { YINGQI_RULES } from "../src/yingqi/rules.js";
 import { DOMAIN_LABEL } from "../src/yingqi/types.js";
 import { loadParams } from "../src/params/load.js";
+import { DEFAULT_PARAMS } from "../src/params/defaults.js";
 import { isValidPair } from "../src/ganzhi/algebra.js";
 import type { BirthInput } from "../src/chart/types.js";
 
@@ -110,8 +111,11 @@ describe("流年视图与顺逆指数", () => {
   });
 
   it("指数由权重结构变化与应期事件两部分合成", () => {
+    // 系数从参数读，不写死 —— a 与 b 是 [校准] 项，写死等于每次重标定都要改测试，
+    // 而这条断言真正要验的是「raw 是两项的线性组合」，与取值无关。
+    const { a, b } = DEFAULT_PARAMS.temporal.index;
     expect(v.indexParts.raw).toBeCloseTo(
-      4.0 * v.indexParts.base + 0.35 * v.indexParts.eventDelta, 9);
+      a * v.indexParts.base + b * v.indexParts.eventDelta, 9);
   });
 
   it("产出应期事件与域聚合", () => {
@@ -184,6 +188,54 @@ describe("应期规则", () => {
     expect(eventDelta(evs)).toBeCloseTo(0, 9);
     // 但两条事件本身都保留，未被合并掉
     expect(evs).toHaveLength(2);
+  });
+});
+
+describe("应期规则的统计体检 —— 恒真的规则不是规则", () => {
+  /**
+   * 一条 9 年里有 8 年为真的规则，不是应期，是背景；
+   * 一条从不触发的规则，是死代码而看起来像覆盖率。两端都要拦。
+   *
+   * 这条测试是有历史的。首版实测：四条规则触发率为 0（神煞不扫大运流年支，
+   * 且修饰按柱匹配，虚假的「逢合」盖掉了真正的「逢冲」），
+   * 另有五条顺向规则触发率 63–90%（判据是常驻结构事实，不是当年的变化）。
+   */
+  const CHARTS: BirthInput[] = [
+    EXAMPLE,
+    { year: 1968, month: 1, day: 9, hour: 5, minute: 5, gender: "female", timeZone: "Asia/Shanghai", longitude: 113.3 },
+    { year: 1984, month: 11, day: 2, hour: 12, minute: 0, gender: "female", timeZone: "Asia/Taipei", longitude: 121.5 },
+    { year: 2001, month: 3, day: 21, hour: 18, minute: 15, gender: "male", timeZone: "Asia/Shanghai", longitude: 104.1 },
+  ];
+
+  const fire = new Map<string, number>();
+  const idx: number[] = [];
+  let years = 0;
+  for (const b of CHARTS) {
+    const c = buildChart(b);
+    for (let y = b.year; y < b.year + 40; y++) {
+      const v = yearView(c, y);
+      years++; idx.push(v.favorIndex);
+      for (const e of v.events) fire.set(e.ruleId, (fire.get(e.ruleId) ?? 0) + 1);
+    }
+  }
+
+  it("没有一条规则从不触发", () => {
+    const never = YINGQI_RULES.filter((r) => !fire.has(r.id)).map((r) => `${r.id}(${r.narrativeTag})`);
+    expect(never, `这些规则在 ${years} 个盘年里一次也没触发，多半是谓词写错而非罕见`).toEqual([]);
+  });
+
+  it("没有一条规则近乎恒真", () => {
+    const always = [...fire.entries()]
+      .filter(([, k]) => k / years > 0.7)
+      .map(([id, k]) => `${id} ${(k / years * 100).toFixed(0)}%`);
+    expect(always, "触发率超过七成的规则已退化为背景，须改判「变化」而非「状态」").toEqual([]);
+  });
+
+  it("顺逆指数不得大面积饱和 —— 饱和即丢弃信息", () => {
+    // tanh 两端压缩。系数过大时指数退化成近乎二值的信号：
+    // a=4.0 时实测 32% 的年份落在 <5 或 >95，故降至 2.0。
+    const sat = idx.filter((x) => x < 5 || x > 95).length / idx.length;
+    expect(sat, `饱和率 ${(sat * 100).toFixed(1)}%`).toBeLessThan(0.10);
   });
 });
 

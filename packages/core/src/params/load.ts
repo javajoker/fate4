@@ -74,6 +74,11 @@ const ENUMS: readonly EnumRule[] = [
   { path: "conclusion.earthChangsheng", values: ["fireEarthSame", "waterEarthSame"] },
   { path: "conclusion.yongshen.tiaohou.source", values: ["heuristic", "table"] },
   { path: "conclusion.femaleChildStarVariant", values: ["standard", "reversed"] },
+  { path: "chart.ziHourRule", values: ["lateZiNextDay", "earlyZiSameDay", "split"] },
+  { path: "chart.mingGongBoundary", values: ["jie", "zhongqi"] },
+  { path: "chart.hiddenStemVariant", values: ["standard", "alt"] },
+  { path: "temporal.qiyun.mode", values: ["continuous", "traditionalDiscrete"] },
+  { path: "report.locale", values: ["zh-Hans", "zh-Hant", "en"] },
 ];
 
 function at(obj: unknown, path: string): unknown {
@@ -169,6 +174,38 @@ function validateInvariants(p: Params): string[] {
   }
   if (p.temporal.dayLayer.recomputeWeights !== false) {
     errors.push("temporal.dayLayer.recomputeWeights 必须为 false（硬约束）");
+  }
+
+  // ── 未实现的开关必须锁在默认值上 ──
+  //
+  // 这几项在 params/default.yaml 里有条目、在 Params 里有字段，但引擎尚未实现。
+  // 三种处置里只有一种是诚实的：
+  //   删掉它们 → 丢掉路线图，日后会被当作疏漏补回来
+  //   静默忽略 → 用户改了值、以为生效了，而盘面纹丝不动
+  //   锁在默认值上并说明 → 条目还在，但改不动，且改的时候会告诉你为什么
+  if (p.chart.hiddenStemVariant !== "standard") {
+    errors.push("chart.hiddenStemVariant 目前只支持 standard —— 申/亥的藏干别本尚未录入（待校准 #5）");
+  }
+  if (p.chart.handleDst !== true) {
+    errors.push("chart.handleDst 不可关闭 —— 时区换算无条件走 IANA 历史规则，没有旁路");
+  }
+  if (p.chart.includeShenGong !== false || p.chart.includeTaiXi !== false) {
+    errors.push("chart.includeShenGong / includeTaiXi 尚未实现，须保持 false");
+  }
+
+  // [硬约束] 传统不反转季节。南半球生人仍按北半球节气定月 ——
+  // 反转会同时改变月柱、司令、大运顺逆，而典籍中并无此说。
+  if (p.chart.southernHemisphereFlip !== false) {
+    errors.push("chart.southernHemisphereFlip 必须为 false（硬约束）");
+  }
+
+  // [硬约束] 措辞扫描与中性配色不可关闭。见 docs/09-report.md §6。
+  // 这两项若可配置，就等于把「违反的输出视为 bug」降格成一句建议。
+  if (p.report.guard.enforceBannedTerms !== true) {
+    errors.push("report.guard.enforceBannedTerms 必须为 true（硬约束）");
+  }
+  if (p.report.guard.neutralPalette !== true) {
+    errors.push("report.guard.neutralPalette 必须为 true（硬约束）");
   }
 
   const yearSum = w.year.stem + w.year.branch;

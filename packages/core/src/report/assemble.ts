@@ -41,7 +41,7 @@ import {
 } from "./render.js";
 import { scanText, type GuardViolation } from "./guard.js";
 import {
-  carrierLabelMap, label, ROOT_KIND_LABEL, SCHOOL_LABEL, TONE_LABEL,
+  carrierLabelMap, label, PILLAR_LABEL, ROOT_KIND_LABEL, SCHOOL_LABEL, TONE_LABEL,
 } from "./labels.js";
 import type {
   ChartSection, CurrentSection, ForceSection, GuardReport, HiddenCell, KinSection,
@@ -84,11 +84,6 @@ const PENDING_CALIBRATION: readonly string[] = Object.freeze([
 // ─────────────────────────────────────────────────────────
 // 小工具
 // ─────────────────────────────────────────────────────────
-
-const PILLAR_LABEL: Readonly<Record<string, string>> = Object.freeze({
-  year: "年柱", month: "月柱", day: "日柱", hour: "时柱",
-  luck: "大运", annual: "流年", taiyuan: "胎元",
-});
 
 /** 结构类型的中文标签。叙述文本里不得漏出 StructureKind 的英文键名。 */
 const STRUCTURE_LABEL: Readonly<Record<string, string>> = Object.freeze({
@@ -191,7 +186,7 @@ function groupShenshaByPalace(hits: readonly ShenshaHit[]): ChartSection["shensh
 
 export function buildReport(chart: NatalChart, options: ReportOptions = {}): Report {
   const params = options.params ?? DEFAULT_PARAMS;
-  const locale = options.locale ?? "zh-Hans";
+  const locale = options.locale ?? params.report.locale;
   const subject = options.subject ?? "self";
   const engineVersion = options.engineVersion ?? ENGINE_VERSION;
   const maxFlows = options.maxFlows ?? 14;
@@ -276,6 +271,9 @@ export function buildReport(chart: NatalChart, options: ReportOptions = {}): Rep
   }
 
   const force: ForceSection = {
+    ...(params.report.showConvergenceHistory
+      ? { convergence: natal.propagation.convergence }
+      : {}),
     byElement: natal.propagation.byElement,
     byPolarity: natal.propagation.byPolarity,
     tenGods: C.tenGods,

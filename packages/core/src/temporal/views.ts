@@ -33,15 +33,41 @@ const PILLAR_LABEL: Readonly<Record<string, string>> = Object.freeze({
   year: "年", month: "月", day: "日", hour: "时",
 });
 
-function shareOf(by: Readonly<Record<Element, number>>): Record<Element, number> {
-  const total = ELEMENTS.reduce((a, e) => a + by[e], 0);
-  return Object.fromEntries(ELEMENTS.map((e) => [e, total > 0 ? by[e] / total : 0])) as Record<Element, number>;
-}
-
+/**
+ * 五行占比的变化 —— **相对于「中性的一年」，不是相对于本命盘**。
+ *
+ * ## 为什么不能直接作差
+ *
+ * 本命盘约 400 单位、加上大运流年约 640。直接比较两者的占比，量到的主要是**稀释**：
+ * 份额之和恒为 1，新增的载体必然把各五行的占比拉向均匀。
+ * 而用神之所以是用神，正因为它在本命盘里弱；忌神之所以是忌神，正因为它强。
+ * 于是「用神占比上升、忌神占比下降」成了**加载体这个动作本身**的必然结果，
+ * 与那两根柱子究竟是什么干支无关。
+ *
+ * 实测这条偏置：现行作差法下 base 的中位数为 +0.054、61.7% 的年份为正；
+ * 「用神得力」触发率 63%，而对称的「忌神转旺」只有 38%。
+ *
+ * ## 零假设
+ *
+ * 取「新增的力量在五行上均摊」为中性的一年。某五行只有偏离这个均摊，
+ * 才算这一年真的带来了什么：
+ *
+ *     期望份额(e) = (W本命(e) + 新增/5) / 总量_now
+ *     实际份额(e) = W_now(e) / 总量_now
+ *     delta(e)   = 实际 − 期望
+ *
+ * 五行求和恒为 0，故不再有整体漂移。无大运流年时 delta 恒为 0。
+ */
 function shareDeltaOf(natal: EvaluatedChart, now: EvaluatedChart): Record<Element, number> {
-  const a = shareOf(natal.propagation.byElement);
-  const b = shareOf(now.propagation.byElement);
-  return Object.fromEntries(ELEMENTS.map((e) => [e, b[e] - a[e]])) as Record<Element, number>;
+  const a = natal.propagation.byElement;
+  const b = now.propagation.byElement;
+  const massN = ELEMENTS.reduce((t, e) => t + a[e], 0);
+  const massNow = ELEMENTS.reduce((t, e) => t + b[e], 0);
+  if (massNow <= 0) return Object.fromEntries(ELEMENTS.map((e) => [e, 0])) as Record<Element, number>;
+  const addedPerElement = (massNow - massN) / ELEMENTS.length;
+  return Object.fromEntries(ELEMENTS.map(
+    (e) => [e, (b[e] - a[e] - addedPerElement) / massNow],
+  )) as Record<Element, number>;
 }
 
 /** 某公历年的年柱。以立春为界，此处取该年立春之后的干支。 */

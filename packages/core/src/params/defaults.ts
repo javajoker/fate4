@@ -9,6 +9,17 @@ import type { Params } from "./types.js";
 
 export const DEFAULT_PARAMS: Params = Object.freeze({
   version: 1,
+  chart: Object.freeze({
+    ziHourRule: "lateZiNextDay",      // [流派] ⚠️ 待校准 #6
+    mingGongBoundary: "jie",          // [流派] ⚠️ 待校准 #1
+    hiddenStemVariant: "standard",    // [流派] ⚠️ 待校准 #5
+    trueSolarTime: true,
+    equationOfTime: true,
+    handleDst: true,
+    southernHemisphereFlip: false,    // [硬约束]
+    includeShenGong: false,
+    includeTaiXi: false,
+  }),
   weights: Object.freeze({
     pillarBase: 100,
     stemShare: 0.40,
@@ -185,6 +196,16 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
     // [硬约束] 月与日是引动的扳机，不是力量的来源
     monthLayer: Object.freeze({ recomputeWeights: false as const, maxInteractionsShown: 3 }),
     dayLayer: Object.freeze({ recomputeWeights: false as const, severityLevels: 2 }),
-    index: Object.freeze({ a: 4.00, b: 0.35 }),   // [校准]
+    index: Object.freeze({ a: 2.00, b: 0.20 }),   // [校准] 见 docs/08-temporal.md §5.2
+  }),
+  report: Object.freeze({
+    locale: "zh-Hans",
+    showConvergenceHistory: false,
+    showParamsSnapshot: true,
+    guard: Object.freeze({
+      enforceBannedTerms: true as const,   // [硬约束]
+      scanExportBeforeWrite: true,
+      neutralPalette: true as const,       // [硬约束]
+    }),
   }),
 }) as Params;

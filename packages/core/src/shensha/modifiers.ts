@@ -11,7 +11,7 @@
  */
 
 import type { StructureEvent } from "../structure/types.js";
-import type { Carrier, PillarKind } from "../weights/carrier.js";
+import type { Carrier } from "../weights/carrier.js";
 import type { ShenshaParams } from "../params/types.js";
 
 export type ShenshaModifier =
@@ -25,21 +25,51 @@ export interface ModifierContext {
   readonly occurrences: number;
 }
 
+/** 作用于天干层的结构事件。其余一律作用于地支层。 */
+const STEM_KINDS: ReadonlySet<string> = new Set(["ganhe", "ganchong"]);
+
+/**
+ * 某结构事件是否真的打到了这个神煞所在的位置。
+ *
+ * **必须落到「层」与「字」，不能只落到「柱」。**
+ * 原先只判 `e.pillars.includes(pillar)`：于是年干的一个天干五合，
+ * 会把坐在**年支**上的每一个神煞都标成「逢合」—— 而天干合根本没碰到地支。
+ * 实测后果：天乙贵人出现 360 次，其中 299 次被标为逢合、272 次逢刑。
+ * 修饰一旦近乎恒真，它就不再是修饰；且因 effectiveTone 先判合后判冲，
+ * 虚假的「逢合」会把真正的「逢冲」整个盖掉，令四条应期规则永不触发。
+ */
+function touches(
+  e: StructureEvent, pillar: string, layer: "stem" | "branch",
+  stem: string | null, branch: string | null,
+): boolean {
+  if (e.outcome === "neutralized") return false;
+  if (!(e.pillars as readonly string[]).includes(pillar)) return false;
+  // 层不符即无关：天干的合冲不动地支，反之亦然
+  if (STEM_KINDS.has(e.kind) !== (layer === "stem")) return false;
+  if (layer === "branch") {
+    return branch !== null && (e.branches === undefined || e.branches.includes(branch as never));
+  }
+  return stem !== null && (e.stems === undefined || e.stems.includes(stem as never));
+}
+
 export function modifiersFor(
-  pillar: PillarKind,
+  // 宽到 string 是为了容纳命宫：它没有载体、也不出现在任何结构事件里，
+  // 于是 hostWeight 为 0、除落空亡外无修饰 —— 正是命宫应有的行为。
+  pillar: string,
   layer: "stem" | "branch",
   branch: string | null,
   ctx: ModifierContext,
   p: ShenshaParams,
+  stem: string | null = null,
 ): { modifiers: ShenshaModifier[]; hostWeight: number } {
   const mods: ShenshaModifier[] = [];
 
   const hostCarriers = ctx.carriers.filter(
-    (c) => c.position.pillar === pillar && c.position.layer === layer);
+    (c) => (c.position.pillar as string) === pillar && c.position.layer === layer);
   const hostWeight = hostCarriers.reduce((a, c) => a + c.weight, 0);
 
   const hit = (kinds: readonly string[]) => ctx.events.some(
-    (e) => kinds.includes(e.kind) && e.outcome !== "neutralized" && e.pillars.includes(pillar));
+    (e) => kinds.includes(e.kind) && touches(e, pillar, layer, stem, branch));
 
   if (hit(["chong", "ganchong"])) mods.push("逢冲");
   if (hit(["liuhe", "ganhe", "sanhe", "sanhui", "banhe"])) mods.push("逢合");
@@ -49,7 +79,9 @@ export function modifiersFor(
   const total = ctx.carriers.reduce((a, c) => a + c.weight, 0);
   const pillars = new Set(ctx.carriers.map((c) => c.position.pillar));
   const mean = pillars.size > 0 ? total / (pillars.size * 2) : 0;
-  if (mean > 0) {
+  // 宿主没有载体（命宫、未计入配重的胎元）时不论坐旺坐衰 ——
+  // 权重为 0 会被判成「坐衰」，而那不是衰，是压根不参与力量层。
+  if (mean > 0 && hostCarriers.length > 0) {
     if (hostWeight >= mean * p.modifiers.zuowangThreshold) mods.push("坐旺");
     else if (hostWeight <= mean * p.modifiers.zuoshuaiThreshold) mods.push("坐衰");
   }

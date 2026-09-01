@@ -58,6 +58,9 @@ export function evaluate(input: EvaluateInput): EvaluatedChart {
   });
   const shensha = scanShensha({
     chart, carriers: pr.carriers, events: st.events,
+    // 大运与流年一并纳入扫描 —— 「流年驿马」「流年桃花」正是最典型的应期
+    luck: input.luck?.pillar ?? null,
+    annual: input.annual ?? null,
     params: params.shensha,
     changsheng: {
       school: params.conclusion.changshengSchool,

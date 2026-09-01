@@ -77,6 +77,12 @@ export const label = (map: Readonly<Record<string, string>>, key: string): strin
 // 载体 id → 可读标签
 // ─────────────────────────────────────────────────────────
 
+/** 柱名。UI 与 Markdown 共用 —— 英文键名不得出现在任何面向读者的位置。 */
+export const PILLAR_LABEL: Readonly<Record<string, string>> = Object.freeze({
+  year: "年柱", month: "月柱", day: "日柱", hour: "时柱",
+  luck: "大运", annual: "流年", taiyuan: "胎元",
+});
+
 const PILLAR_SHORT: Readonly<Record<string, string>> = Object.freeze({
   year: "年", month: "月", day: "日", hour: "时",
   luck: "运", annual: "岁", taiyuan: "胎",

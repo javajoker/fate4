@@ -16,6 +16,7 @@ import { luOf, yangRenOf, type ChangshengOptions } from "../ganzhi/changsheng.js
 import { xunKongOf, sexagenaryIndexOf } from "../ganzhi/algebra.js";
 import type { Branch, Stem } from "../types/ganzhi.js";
 import type { NatalChart } from "../chart/types.js";
+import type { Pillar } from "../types/ganzhi.js";
 import type { ShenshaParams } from "../params/types.js";
 import { DEFAULT_PARAMS } from "../params/defaults.js";
 import type { Carrier, PillarKind } from "../weights/carrier.js";
@@ -33,7 +34,16 @@ import { effectiveTone, modifiersFor, type ShenshaModifier } from "./modifiers.j
 
 export type PalaceName =
   | "祖上宫" | "根基宫" | "父母兄弟宫" | "门户宫"
-  | "自身" | "配偶宫" | "志向宫" | "子女宫" | "外部";
+  | "自身" | "配偶宫" | "志向宫" | "子女宫" | "命宫" | "外部";
+
+/**
+ * 神煞的落点。
+ *
+ * 比 `PillarKind` 多一个命宫 —— 命宫不参与配重（没有载体、不入生克），
+ * 但传统上它是神煞的重要落点之一。把它硬塞进 taiyuan 曾让命宫的天乙
+ * 被报成「胎元」，宫位也随之错成「外部」。多一个字面量比错一个宫位划算。
+ */
+export type ShenshaTarget = PillarKind | "mingGong";
 
 /** 八宫 —— 报告层按宫位分组神煞时也用它。「有华盖」是废话，「华盖在时支子女宫」才是信息。 */
 export const PALACE: Readonly<Record<string, PalaceName>> = Object.freeze({
@@ -41,6 +51,7 @@ export const PALACE: Readonly<Record<string, PalaceName>> = Object.freeze({
   "month.stem": "父母兄弟宫", "month.branch": "门户宫",
   "day.stem": "自身", "day.branch": "配偶宫",
   "hour.stem": "志向宫", "hour.branch": "子女宫",
+  "mingGong.branch": "命宫",
 });
 
 export interface ShenshaHit {
@@ -49,7 +60,7 @@ export interface ShenshaHit {
   readonly base: ShenshaDef["base"];
   /** 起例所依：日干起还是年干起。二者可能落在不同支，都保留。 */
   readonly basis: "day" | "year";
-  readonly landsOn: { readonly pillar: PillarKind; readonly layer: "stem" | "branch" };
+  readonly landsOn: { readonly pillar: ShenshaTarget; readonly layer: "stem" | "branch" };
   /** **强制字段**。「有华盖」是废话，「华盖在时支子女宫且逢空」才是信息。 */
   readonly palace: PalaceName;
   readonly branch: Branch | null;
@@ -68,19 +79,41 @@ export interface ScanInput {
   readonly events: readonly StructureEvent[];
   readonly params?: ShenshaParams;
   readonly changsheng?: ChangshengOptions;
+  /** 当前大运柱。不传则大运不入扫描范围。 */
+  readonly luck?: Pillar | null;
+  /** 当前流年柱。不传则流年不入扫描范围。 */
+  readonly annual?: Pillar | null;
 }
 
-interface Slot { pillar: PillarKind; layer: "stem" | "branch"; stem: Stem | null; branch: Branch | null }
+interface Slot { pillar: ShenshaTarget; layer: "stem" | "branch"; stem: Stem | null; branch: Branch | null }
 
-function slotsOfChart(chart: NatalChart): Slot[] {
+/**
+ * 扫描范围。
+ *
+ * `scanTargets` 原先列了 luck 与 annual，而此处只铺四本命柱 —— 参数形同虚设，
+ * 于是「流年驿马」「流年桃花」这类最典型的应期一条也扫不到。实测后果：
+ * 240 个盘年里，驿马与桃花的出现次数恒等于它们在本命盘里的次数，
+ * 流年支换过 60 轮却从未被看见，四条依赖流年神煞的应期规则因此永不触发。
+ */
+function slotsOf(
+  chart: NatalChart, p: ShenshaParams,
+  luck: Pillar | null, annual: Pillar | null,
+): Slot[] {
   const out: Slot[] = [];
-  const add = (pillar: PillarKind, p: { stem: Stem; branch: Branch } | null) => {
-    if (p === null) return;
-    out.push({ pillar, layer: "stem", stem: p.stem, branch: null });
-    out.push({ pillar, layer: "branch", stem: null, branch: p.branch });
+  const targets = new Set<string>(p.scanTargets);
+  const add = (pillar: ShenshaTarget, pil: { stem: Stem; branch: Branch } | null) => {
+    if (pil === null || !targets.has(pillar)) return;
+    out.push({ pillar, layer: "stem", stem: pil.stem, branch: null });
+    out.push({ pillar, layer: "branch", stem: null, branch: pil.branch });
   };
   add("year", chart.year); add("month", chart.month);
   add("day", chart.day); add("hour", chart.hour);
+  add("luck", luck); add("annual", annual);
+  add("taiyuan", chart.taiyuan);
+  // 命宫只取支：命宫的干由月将推得，传统上论宫不论干。
+  if (targets.has("mingGong") && chart.mingGong !== null) {
+    out.push({ pillar: "mingGong", layer: "branch", stem: null, branch: chart.mingGong.branch });
+  }
   return out;
 }
 
@@ -94,7 +127,7 @@ export function scanShensha(input: ScanInput): ShenshaHit[] {
   const p = input.params ?? DEFAULT_PARAMS.shensha;
   const { chart, carriers, events } = input;
   const cs = input.changsheng ?? {};
-  const slots = slotsOfChart(chart);
+  const slots = slotsOf(chart, p, input.luck ?? null, input.annual ?? null);
 
   const kongwang = [...xunKongOf(sexagenaryIndexOf(chart.day.stem, chart.day.branch))] as string[];
 
@@ -188,7 +221,7 @@ export function scanShensha(input: ScanInput): ShenshaHit[] {
     const { modifiers, hostWeight } = modifiersFor(
       r.slot.pillar, r.slot.layer, r.slot.branch,
       { events, carriers, kongwang, occurrences: counts.get(r.name) ?? 1 },
-      p,
+      p, r.slot.stem,
     );
     const { tone, why } = effectiveTone(def.polarity, modifiers);
     const key = `${r.slot.pillar}.${r.slot.layer}`;

@@ -18,6 +18,7 @@ import { mingGongOf, monthBranchByZhongqi } from "./mingGong.js";
 import { silingOf } from "./siling.js";
 import { computeLuck } from "./qiyun.js";
 import type { BirthInput, ChartOptions, NatalChart } from "./types.js";
+import type { Params } from "../params/types.js";
 
 const DEFAULTS = {
   ziHourRule: "lateZiNextDay",
@@ -27,6 +28,24 @@ const DEFAULTS = {
   qiyunMode: "continuous",
   luckPillarCount: 12,
 } as const;
+
+/**
+ * 由完整参数集导出 L0 的开关。
+ *
+ * `buildChart` 收的是 `ChartOptions`（低层 API，不依赖参数系统），
+ * 而界面与 CLI 手里拿的是 `Params`。若各自手工对映，迟早漂移 ——
+ * 加一个 L0 开关而忘了改某一处，症状是「面板里改了没反应」，极难定位。
+ */
+export function chartOptionsOf(p: Params): ChartOptions {
+  return {
+    ziHourRule: p.chart.ziHourRule,
+    mingGongBoundary: p.chart.mingGongBoundary,
+    trueSolarTime: p.chart.trueSolarTime,
+    equationOfTime: p.chart.equationOfTime,
+    qiyunMode: p.temporal.qiyun.mode,
+    luckPillarCount: p.temporal.luckPillarCount,
+  };
+}
 
 export function buildChart(input: BirthInput, options: ChartOptions = {}): NatalChart {
   const opt = { ...DEFAULTS, ...options };

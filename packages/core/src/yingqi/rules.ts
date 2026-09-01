@@ -13,7 +13,7 @@
  */
 
 import { FOUR_TOMBS } from "../ganzhi/tables.js";
-import type { Branch } from "../types/ganzhi.js";
+import type { Branch, TenGod } from "../types/ganzhi.js";
 import {
   adverseElements, opposingBranch, chongTargets, elementHomeBranches, eventHits,
   favorableElements, godWeight, samePillar, shenshaWith, tianKeDiChong,
@@ -199,10 +199,20 @@ export const YINGQI_RULES: readonly YingqiRule[] = Object.freeze([
     id: "sha_restrained", name: "食印制化", scope: YEAR_LUCK, priority: 75,
     polarity: 1, weight: 0.70, domains: ["career"],
     narrativeTag: "杀得制化",
+    // 原判据是 `zhi > sha` —— 一条**常驻的结构事实**，多数盘面恒真，实测触发率 75%。
+    // 应期规则要的是「今年变了什么」，不是「这张盘本来是什么样」。
+    // 改判制化比相对本命的**改善幅度**。
     when: (c) => {
       const sha = godWeight(c, "七杀");
+      if (sha <= 0) return false;
       const zhi = godWeight(c, "食神") + godWeight(c, "正印") + godWeight(c, "偏印");
-      return sha > 0 && zhi > sha && `制化之神 ${zhi.toFixed(1)} 足以驾驭七杀 ${sha.toFixed(1)}`;
+      const n = c.natal.conclusions.tenGods;
+      const shaN = n["七杀"];
+      const zhiN = n["食神"] + n["正印"] + n["偏印"];
+      if (shaN <= 0 || zhiN <= 0) return false;
+      const ratio = zhi / sha; const ratioN = zhiN / shaN;
+      return ratio > ratioN * 1.2 && zhi > sha
+        && `制化比自 ${ratioN.toFixed(2)} 升至 ${ratio.toFixed(2)}，七杀 ${sha.toFixed(1)} 得以驾驭`;
     },
   },
 
@@ -241,8 +251,15 @@ export const YINGQI_RULES: readonly YingqiRule[] = Object.freeze([
     id: "tianyi_activated", name: "贵人引动", scope: YEAR_SCOPE, priority: 50,
     polarity: 1, weight: 0.45, domains: ["career", "social"],
     narrativeTag: "得贵人",
+    // 原判据含 `tone === "strengthened"` —— 而 strengthened 正是吉神的**常态**，
+    // 于是只要盘里有天乙贵人且未被冲空，此条即成立，实测触发率 90%。
+    // 贵人是本命的静态特征，要成为应期，须由今年送来的干支引动：
+    // 流年/大运之支即贵人位，或与贵人位相合。
+    // 且只认主起例（日干起）。开了 alsoComputeYearBase 之后，天乙的落点由 2 支变 4 支，
+    // 触发率随之翻倍 —— 展示时两套都留，作应期扳机时只用主起例。
     when: (c) => c.now.shensha.some(
-      (h) => h.name === "天乙贵人" && (h.modifiers.includes("逢合") || h.tone === "strengthened"))
+      (h) => h.name === "天乙贵人" && h.basis === "day"
+        && (h.landsOn.pillar === "annual" || h.landsOn.pillar === "luck"))
       && "天乙贵人得力",
   },
   {
@@ -310,10 +327,19 @@ export const YINGQI_RULES: readonly YingqiRule[] = Object.freeze([
     id: "xiangshen_damaged", name: "相神被伤", scope: YEAR_LUCK, priority: 92,
     polarity: -1, weight: 0.85, domains: ["career"],
     narrativeTag: "破格",
+    // 按**组内权重之和**判，不按「任一成员转旺」。
+    // 后者会让候选多的一方更容易触发：相神常有三个（食神、伤官、比肩），
+    // 败格之神常只有一两个，于是「成格」的触发率天然高于「破格」——
+    // 那是清单长度的产物，不是这张盘的性质。实测曾为 72% 对 40%。
     when: (c) => {
       const g = c.natal.conclusions.geju.value;
-      const hurt = g.breakers.filter((b) => godWeight(c, b) > c.natal.conclusions.tenGods[b] * 1.3);
-      return hurt.length > 0 && `${g.name}的败格之神 ${hurt.join("、")} 转旺`;
+      if (g.breakers.length === 0) return false;
+      const sum = (gs: readonly TenGod[], v: Readonly<Record<TenGod, number>>) =>
+        gs.reduce((a, b) => a + v[b], 0);
+      const now = sum(g.breakers, c.now.conclusions.tenGods);
+      const nat = sum(g.breakers, c.natal.conclusions.tenGods);
+      return nat > 0 && now > nat * 1.3
+        && `${g.name}的败格之神合计自 ${nat.toFixed(1)} 升至 ${now.toFixed(1)}`;
     },
   },
   {
@@ -322,8 +348,13 @@ export const YINGQI_RULES: readonly YingqiRule[] = Object.freeze([
     narrativeTag: "成格",
     when: (c) => {
       const g = c.natal.conclusions.geju.value;
-      const help = g.xiangshen.filter((b) => godWeight(c, b) > c.natal.conclusions.tenGods[b] * 1.3);
-      return help.length > 0 && `${g.name}的相神 ${help.join("、")} 转旺`;
+      if (g.xiangshen.length === 0) return false;
+      const sum = (gs: readonly TenGod[], v: Readonly<Record<TenGod, number>>) =>
+        gs.reduce((a, b) => a + v[b], 0);
+      const now = sum(g.xiangshen, c.now.conclusions.tenGods);
+      const nat = sum(g.xiangshen, c.natal.conclusions.tenGods);
+      return nat > 0 && now > nat * 1.3
+        && `${g.name}的相神合计自 ${nat.toFixed(1)} 升至 ${now.toFixed(1)}`;
     },
   },
 ]);

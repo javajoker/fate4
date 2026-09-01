@@ -292,20 +292,32 @@ temporal:
     severityLevels: 2
 
   index:
-    a: 4.00                        # [校准] 权重结构变化的贡献
-    b: 0.35                        # [校准] 应期事件的贡献
+    # [校准] 顺逆指数 = 50 + 50·tanh(a·结构项 + b·事件项)
+    # 原取 4.00 / 0.35，实测 240 个盘年中 32% 落在 <5 或 >95 —— 三分之一的年份
+    # 被 tanh 压到两端，指数退化成近乎二值的信号。降到下列取值后饱和率 1%，
+    # 落在 25–75 中段的年份由 21% 升至 45%。见 docs/08-temporal.md §5.2。
+    a: 2.00                        # 权重结构变化的贡献
+    b: 0.20                        # 应期事件的贡献
 
 # ═══════════════════════════════════════════════════════════
 # L6 · 报告
 # ═══════════════════════════════════════════════════════════
 report:
   locale: zh-Hans                  # zh-Hans | zh-Hant | en
-  hedgeBelowConfidence: 0.60
+                                   # ⚠️ zh-Hant 的模板尚未撰写，取此值会抛错，不回落简体
   showConvergenceHistory: false
   showParamsSnapshot: true
-  showGoldSetScore: true
+
+  # 原有两项已删除，理由记在此处，免得日后被当成疏漏补回来：
+  #
+  # hedgeBelowConfidence —— 被模板自带的 confidenceFloor 取代。
+  #   单一全局阈值无法表达「格局判定天然比旺衰判定更不确定」：
+  #   geju 取 0.55、strength 取 0.60 是刻意的分档，一个全局值会把它抹平。
+  #
+  # showGoldSetScore —— 金标准集尚不存在（见 11-validation §4.1）。
+  #   为一个不存在的功能留开关，是在参数文件里写谎话。
 
   guard:
-    enforceBannedTerms: true       # [硬约束] 构建期扫描，命中即失败
+    enforceBannedTerms: true       # [硬约束] 不可关闭
     scanExportBeforeWrite: true
     neutralPalette: true           # [硬约束] 禁止红绿吉凶配色

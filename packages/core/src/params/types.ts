@@ -254,14 +254,49 @@ export interface TemporalParams {
   readonly index: { readonly a: number; readonly b: number };
 }
 
+/**
+ * L0 排盘的开关。
+ *
+ * 这些原先只存在于 `params/default.yaml` 的文档里，TS 侧没有对应物 ——
+ * 实际取值靠调用方逐项传 `ChartOptions`。于是参数校准面板拿不到它们，
+ * 而其中四项恰是最需要人工择定的流派开关。补进真源。
+ */
+export interface ChartParams {
+  readonly ziHourRule: "lateZiNextDay" | "earlyZiSameDay" | "split";
+  readonly mingGongBoundary: "jie" | "zhongqi";
+  readonly hiddenStemVariant: "standard" | "alt";
+  readonly trueSolarTime: boolean;
+  readonly equationOfTime: boolean;
+  readonly handleDst: boolean;
+  /** [硬约束] 传统不反转季节。南半球生人仍按北半球节气定月。 */
+  readonly southernHemisphereFlip: boolean;
+  readonly includeShenGong: boolean;
+  readonly includeTaiXi: boolean;
+}
+
+export interface ReportParams {
+  readonly locale: "zh-Hans" | "zh-Hant" | "en";
+  readonly showConvergenceHistory: boolean;
+  readonly showParamsSnapshot: boolean;
+  readonly guard: {
+    /** [硬约束] 措辞扫描不可关闭。 */
+    readonly enforceBannedTerms: boolean;
+    readonly scanExportBeforeWrite: boolean;
+    /** [硬约束] 禁止红绿吉凶配色。低顺逆指数是结构描述，不是价值判断。 */
+    readonly neutralPalette: boolean;
+  };
+}
+
 export interface Params {
   readonly version: number;
+  readonly chart: ChartParams;
   readonly weights: WeightParams;
   readonly structure: StructureParams;
   readonly propagation: PropagationParams;
   readonly conclusion: ConclusionParams;
   readonly shensha: ShenshaParams;
   readonly temporal: TemporalParams;
+  readonly report: ReportParams;
 }
 
 /** 递归可选，供覆盖用。 */
