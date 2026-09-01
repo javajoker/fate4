@@ -34,7 +34,7 @@ import { effectiveTone, modifiersFor, type ShenshaModifier } from "./modifiers.j
 
 export type PalaceName =
   | "祖上宫" | "根基宫" | "父母兄弟宫" | "门户宫"
-  | "自身" | "配偶宫" | "志向宫" | "子女宫" | "命宫" | "外部";
+  | "自身" | "配偶宫" | "志向宫" | "子女宫" | "命宫" | "胎元" | "流月" | "外部";
 
 /**
  * 神煞的落点。
@@ -43,7 +43,7 @@ export type PalaceName =
  * 但传统上它是神煞的重要落点之一。把它硬塞进 taiyuan 曾让命宫的天乙
  * 被报成「胎元」，宫位也随之错成「外部」。多一个字面量比错一个宫位划算。
  */
-export type ShenshaTarget = PillarKind | "mingGong";
+export type ShenshaTarget = PillarKind | "mingGong" | "fleetingMonth";
 
 /** 八宫 —— 报告层按宫位分组神煞时也用它。「有华盖」是废话，「华盖在时支子女宫」才是信息。 */
 export const PALACE: Readonly<Record<string, PalaceName>> = Object.freeze({
@@ -52,6 +52,8 @@ export const PALACE: Readonly<Record<string, PalaceName>> = Object.freeze({
   "day.stem": "自身", "day.branch": "配偶宫",
   "hour.stem": "志向宫", "hour.branch": "子女宫",
   "mingGong.branch": "命宫",
+  "taiyuan.stem": "胎元", "taiyuan.branch": "胎元",
+  "fleetingMonth.stem": "流月", "fleetingMonth.branch": "流月",
 });
 
 export interface ShenshaHit {
@@ -85,6 +87,14 @@ export interface ScanInput {
   readonly luck?: Pillar | null;
   /** 当前流年柱。不传则流年不入扫描范围。 */
   readonly annual?: Pillar | null;
+  /**
+   * 当前流月柱。
+   *
+   * 单列一个落点，而不是把本命月柱替换掉 —— 后者会让流月的神煞被标成
+   * 「门户宫」，即本命的父母/门户宫。流月是个过路的月份，它没有宫位。
+   * 冒充别人的位置，产出的名字对而宫位错，是这一层最难被发现的一类错。
+   */
+  readonly fleetingMonth?: Pillar | null;
 }
 
 interface Slot { pillar: ShenshaTarget; layer: "stem" | "branch"; stem: Stem | null; branch: Branch | null }
@@ -99,10 +109,11 @@ interface Slot { pillar: ShenshaTarget; layer: "stem" | "branch"; stem: Stem | n
  */
 function slotsOf(
   chart: NatalChart, p: ShenshaParams,
-  luck: Pillar | null, annual: Pillar | null,
+  luck: Pillar | null, annual: Pillar | null, fleeting: Pillar | null,
 ): Slot[] {
   const out: Slot[] = [];
-  const targets = new Set<string>(p.scanTargets);
+  // 流月不受 scanTargets 约束：它只在流月视图里出现，且调用方给了才有。
+  const targets = new Set<string>([...p.scanTargets, "fleetingMonth"]);
   const add = (pillar: ShenshaTarget, pil: { stem: Stem; branch: Branch } | null) => {
     if (pil === null || !targets.has(pillar)) return;
     out.push({ pillar, layer: "stem", stem: pil.stem, branch: null });
@@ -111,6 +122,7 @@ function slotsOf(
   add("year", chart.year); add("month", chart.month);
   add("day", chart.day); add("hour", chart.hour);
   add("luck", luck); add("annual", annual);
+  add("fleetingMonth", fleeting);
   add("taiyuan", chart.taiyuan);
   // 命宫只取支：命宫的干由月将推得，传统上论宫不论干。
   if (targets.has("mingGong") && chart.mingGong !== null) {
@@ -129,7 +141,7 @@ export function scanShensha(input: ScanInput): ShenshaHit[] {
   const p = input.params ?? DEFAULT_PARAMS.shensha;
   const { chart, carriers, events } = input;
   const cs = input.changsheng ?? {};
-  const slots = slotsOf(chart, p, input.luck ?? null, input.annual ?? null);
+  const slots = slotsOf(chart, p, input.luck ?? null, input.annual ?? null, input.fleetingMonth ?? null);
 
   const kongwang = [...xunKongOf(sexagenaryIndexOf(chart.day.stem, chart.day.branch))] as string[];
 
@@ -225,14 +237,18 @@ export function scanShensha(input: ScanInput): ShenshaHit[] {
       { events, carriers, kongwang, occurrences: counts.get(r.name) ?? 1 },
       p, r.slot.stem,
     );
-    const { tone, why, fromDefault } = effectiveTone(def.polarity, modifiers);
+    // 「空亡」这个神煞的定义就是落在旬空里，于是它必然带「落空亡」修饰，
+    // 经 effectiveTone 又必然得出「反得其解」—— 一个恒真的自指。
+    // 自身的定义不能同时充当自身的修饰，故剔除。
+    const mods = r.name === "空亡" ? modifiers.filter((m) => m !== "落空亡") : modifiers;
+    const { tone, why, fromDefault } = effectiveTone(def.polarity, mods);
     const key = `${r.slot.pillar}.${r.slot.layer}`;
     return {
       name: r.name, category: def.category, base: def.base, basis: r.basis,
       landsOn: { pillar: r.slot.pillar, layer: r.slot.layer },
       palace: PALACE[key] ?? "外部",
       branch: r.slot.branch, stem: r.slot.stem,
-      modifiers, hostWeight,
+      modifiers: mods, hostWeight,
       polarity: def.polarity, tone, toneReason: why, toneIsDefault: fromDefault,
       narrativeTags: def.narrativeTags,
     };

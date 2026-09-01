@@ -8,7 +8,9 @@ import {
 } from "../ganzhi/algebra.js";
 import { BRANCH_CLASHES, BRANCH_HARMS, BRANCH_DESTRUCTIONS, BRANCH_SIX_COMBINATIONS, MONTH_BRANCH_ORDER } from "../ganzhi/tables.js";
 import { fromJulianDay, julianDayNumber, toJulianDay } from "../astro/julian.js";
-import { enclosingTermOf } from "../chart/pillars.js";
+import { enclosingTermOf, utToTT } from "../chart/pillars.js";
+import { solveSolarTerm, SOLAR_TERMS } from "../astro/solarTerms.js";
+import { asTT } from "../astro/julian.js";
 import { TROPICAL_YEAR_DAYS } from "../chart/qiyun.js";
 import type { NatalChart } from "../chart/types.js";
 import type { Params } from "../params/types.js";
@@ -190,6 +192,50 @@ export function yearView(
 const pairHit = (t: readonly (readonly [Branch, Branch])[], a: Branch, b: Branch) =>
   t.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
 
+/**
+ * 节气月的精确起讫。
+ *
+ * `monthIndex` 自寅月起（0 = 寅），所属为 `year` 这一**立春年**：
+ * 索引 0 起于该年立春，索引 11（丑月）起于次年小寒。
+ *
+ * ## 为什么不能估算
+ *
+ * 原先取「2 月 4 日 + monthIndex × 30.4368 日」作近似，再问「这一刻落在哪个节里」。
+ * 两处误差叠加：锚点用固定的 2 月 4 日而非真实立春；月长按均值，
+ * 而真实的节气月自 29.4 日（近日点附近）到 31.4 日（远日点附近）不等。
+ * 于是估算点可能落到真节**之前**，问出来的就是上一个月的节 ——
+ * 实测索引 7（酉月）报出的是「立秋 → 白露」，即申月的区间。
+ * 月柱与它自称的区间对不上，是这一层最难被发现的一类错：
+ * 两个字段各自看都合理。
+ *
+ * 正解是直接按黄经求根：开启寅月的节是立春（λ = 315°），此后每月 +30°。
+ * 均值只用来给牛顿法一个初值，不参与结果。
+ */
+function jieMonthBounds(
+  year: number, monthIndex: number,
+): { openJd: number; closeJd: number; openName: string } {
+  const i = mod(monthIndex, 12);
+  const lonOf = (k: number) => mod(315 + 30 * k, 360);
+  const nameOf = (lon: number) => {
+    const d = SOLAR_TERMS.find((t) => t.longitude === lon && t.kind === "节");
+    if (d === undefined) throw new Error(`黄经 ${lon}° 不是节`);
+    return d.name;
+  };
+
+  const MEAN_MONTH = TROPICAL_YEAR_DAYS / 12;
+  // 锚点取该立春年真实的立春，而非日历上的 2 月 4 日
+  const lichunGuess = toJulianDay({ year, month: 2, day: 4, hour: 0, minute: 0, second: 0 });
+  const lichun = solveSolarTerm(315, asTT(utToTT(lichunGuess)));
+
+  const open = solveSolarTerm(lonOf(i), asTT((lichun.jdTT as number) + i * MEAN_MONTH));
+  const close = solveSolarTerm(lonOf(i + 1), asTT((open.jdTT as number) + MEAN_MONTH));
+  return {
+    openJd: open.jdUT as number,
+    closeJd: close.jdUT as number,
+    openName: nameOf(lonOf(i)),
+  };
+}
+
 export function monthView(
   chart: NatalChart, year: number, monthIndex: number, params: Params = DEFAULT_PARAMS,
 ): MonthView {
@@ -197,16 +243,14 @@ export function monthView(
   const monthBranch = MONTH_BRANCH_ORDER[mod(monthIndex, 12)]!;
   const pillar: Pillar = { stem: monthStemOf(yearPillar.stem, monthBranch), branch: monthBranch };
 
-  // 该月的节界。由黄经直接定位，不枚举全年。
-  const approx = toJulianDay({ year, month: 2, day: 4, hour: 0, minute: 0, second: 0 })
-    + monthIndex * (TROPICAL_YEAR_DAYS / 12);
-  const term = enclosingTermOf(approx, "节");
+  const { openJd, closeJd, openName } = jieMonthBounds(year, monthIndex);
+  const mid = (openJd + closeJd) / 2;
 
   const natal = evaluate({ chart, params });
   const dm = natal.conclusions.dayMaster;
   const y = natal.conclusions.yongshen.value;
   const monthElement = elementOf(pillar.stem);
-  const step = chart.luck.pillars.find((lp) => approx >= lp.startJd && approx < lp.endJd) ?? null;
+  const step = chart.luck.pillars.find((lp) => mid >= lp.startJd && mid < lp.endJd) ?? null;
 
   // ── 引动：月柱干支与本命四柱的合冲刑害 ──
   const interactions: Interaction[] = [];
@@ -227,10 +271,11 @@ export function monthView(
     if (pillar.stem === p.stem && pillar.branch === p.branch) push("fuyin", `流月与本命${L}柱伏吟`);
   }
 
+  // 流月单列一个落点，不冒充本命月柱 —— 否则流月的神煞会被标成「门户宫」。
   const shensha = scanShensha({
-    chart: { ...chart, month: pillar } as NatalChart,
-    carriers: natal.carriers, events: natal.events, params: params.shensha,
-  }).filter((h) => h.branch === pillar.branch || h.stem === pillar.stem);
+    chart, carriers: natal.carriers, events: natal.events, params: params.shensha,
+    fleetingMonth: pillar,
+  }).filter((h) => h.landsOn.pillar === "fleetingMonth");
 
   const relationToYongshen =
     monthElement === y.primary || y.xishen.includes(monthElement) ? "supports"
@@ -248,8 +293,8 @@ export function monthView(
 
   return {
     year, monthIndex, pillar,
-    range: { fromJd: term.prev.jdUT, toJd: term.next.jdUT },
-    openedBy: term.prev.def.name,
+    range: { fromJd: openJd, toJd: closeJd },
+    openedBy: openName,
     yearPillar, luckPillar: step?.pillar ?? null,
     shensha,
     interactions: interactions.slice(0, params.temporal.monthLayer.maxInteractionsShown),

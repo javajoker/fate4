@@ -11,6 +11,7 @@ import { DOMAIN_LABEL } from "../src/yingqi/types.js";
 import { loadParams } from "../src/params/load.js";
 import { DEFAULT_PARAMS } from "../src/params/defaults.js";
 import { isValidPair } from "../src/ganzhi/algebra.js";
+import { fromJulianDay } from "../src/astro/julian.js";
 import type { BirthInput } from "../src/chart/types.js";
 
 const EXAMPLE: BirthInput = {
@@ -188,6 +189,55 @@ describe("应期规则", () => {
     expect(eventDelta(evs)).toBeCloseTo(0, 9);
     // 但两条事件本身都保留，未被合并掉
     expect(evs).toHaveLength(2);
+  });
+});
+
+describe("节气月的起讫", () => {
+  /**
+   * 月柱与它自称的节气区间必须对得上。
+   *
+   * 这条曾经不成立：原实现取「2 月 4 日 + i × 30.4368 日」作近似，再问
+   * 「这一刻落在哪个节里」。锚点不是真立春，月长又按均值（真实自 29.4 日到
+   * 31.4 日不等），估算点落到真节之前时，问出来的就是上一个月的节 ——
+   * 索引 7（酉月）报出「立秋 → 白露」，那是申月的区间。
+   *
+   * 两个字段各自看都合理，是最难被发现的一类错。故此处逐月对账。
+   */
+  const OPENS: readonly [string, string][] = [
+    ["寅", "立春"], ["卯", "惊蛰"], ["辰", "清明"], ["巳", "立夏"],
+    ["午", "芒种"], ["未", "小暑"], ["申", "立秋"], ["酉", "白露"],
+    ["戌", "寒露"], ["亥", "立冬"], ["子", "大雪"], ["丑", "小寒"],
+  ];
+
+  it("十二个月的月支与开启它的节逐一对上", () => {
+    for (const y of [1990, 2000, 2026, 2050]) {
+      for (const [i, [branch, jie]] of OPENS.entries()) {
+        const v = monthView(chart, y, i);
+        expect([v.pillar.branch, v.openedBy], `${y} 年索引 ${i}`).toEqual([branch, jie]);
+      }
+    }
+  });
+
+  it("区间长度落在 29–32 日，且首尾相接无缝无叠", () => {
+    for (const y of [1990, 2026]) {
+      let prevEnd: number | null = null;
+      for (let i = 0; i < 12; i++) {
+        const v = monthView(chart, y, i);
+        const len = v.range.toJd - v.range.fromJd;
+        expect(len, `${y} 年索引 ${i} 的月长 ${len.toFixed(2)} 日`).toBeGreaterThan(29);
+        expect(len).toBeLessThan(32);
+        if (prevEnd !== null) expect(v.range.fromJd).toBeCloseTo(prevEnd, 6);
+        prevEnd = v.range.toJd;
+      }
+    }
+  });
+
+  it("丑月属于下一个公历年 —— 立春年与公历年不是一回事", () => {
+    const v = monthView(chart, 2026, 11);
+    expect(v.openedBy).toBe("小寒");
+    // 2026 立春年的丑月起于 2027 年 1 月的小寒
+    const cal = fromJulianDay(v.range.fromJd);
+    expect([cal.year, cal.month]).toEqual([2027, 1]);
   });
 });
 

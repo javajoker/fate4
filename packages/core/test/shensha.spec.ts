@@ -288,16 +288,34 @@ describe("扫描输出", () => {
     expect(hg!.tone).toBe("activated");
   });
 
-  it("宫位映射覆盖八宫，另加命宫与外部", () => {
-    const palaces = new Set(hits.map((h) => h.palace));
-    for (const p of palaces) {
-      expect([
-        "祖上宫", "根基宫", "父母兄弟宫", "门户宫",
-        "自身", "配偶宫", "志向宫", "子女宫",
-        "命宫",   // 不参与配重，但传统上是神煞的重要落点
-        "外部",   // 大运、流年、胎元
-      ]).toContain(p);
+  it("每个落点都有自己的宫位，不冒充别人的", () => {
+    // 命宫曾被塞进胎元、流月曾被塞进本命月柱 —— 两次都是产出的**名字对而宫位错**，
+    // 而宫位恰恰是神煞唯一有信息量的那一半：「有华盖」是废话，「华盖在配偶宫」才是信息。
+    const KNOWN = [
+      "祖上宫", "根基宫", "父母兄弟宫", "门户宫",
+      "自身", "配偶宫", "志向宫", "子女宫",
+      "命宫", "胎元", "流月",   // 三者皆不参与配重，但各有其位
+      "外部",                   // 大运与流年
+    ];
+    for (const p of new Set(hits.map((h) => h.palace))) expect(KNOWN).toContain(p);
+
+    // 且落点与宫位一一对应，不得串位
+    for (const h of hits) {
+      if (h.landsOn.pillar === "mingGong") expect(h.palace).toBe("命宫");
+      if (h.landsOn.pillar === "taiyuan") expect(h.palace).toBe("胎元");
+      if (h.landsOn.pillar === "fleetingMonth") expect(h.palace).toBe("流月");
+      if (h.landsOn.pillar === "luck" || h.landsOn.pillar === "annual") {
+        expect(h.palace).toBe("外部");
+      }
     }
+  });
+
+  it("「空亡」不以自身的定义充当自身的修饰", () => {
+    // 空亡这个神煞的定义就是落在旬空里，若照常施加「落空亡」修饰，
+    // 它必然被判为「反得其解」—— 一个恒真的自指。
+    const all = scan().hits.filter((h) => h.name === "空亡");
+    expect(all.length).toBeGreaterThan(0);
+    for (const h of all) expect(h.modifiers).not.toContain("落空亡");
   });
 
   it("**神煞不改动任何权重** —— 符号层与力量层严格分离", () => {

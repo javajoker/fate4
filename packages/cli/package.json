@@ -1,0 +1,14 @@
+{
+  "name": "@fate/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "fate": "./bin/fate.mjs" },
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": { ".": { "types": "./dist/src/index.d.ts", "default": "./dist/src/index.js" } },
+  "dependencies": {
+    "@fate/core": "workspace:*",
+    "js-yaml": "^5.4.1"
+  }
+}

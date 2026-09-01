@@ -6,6 +6,7 @@
 | --- | --- |
 | `packages/core` | 纯 TypeScript、零运行时依赖的推演内核。排盘、配重、传导、断论、神煞、应期全在这里。可单测、可被任何宿主调用。 |
 | `packages/web` | Next.js（App Router）Web 应用。命盘、大运、流年、流月、流日与报告的可视化。 |
+| `packages/cli` | 命令行。Skill 的执行后端，也是回归测试的入口。零第三方依赖（除 YAML 解析）。 |
 | `packages/skill` | Claude Agent Skill。通过 CLI 调用 `core`，拿到结构化 JSON 后由模型组织叙述。 |
 
 Web 应用全部计算在浏览器内完成，**生辰数据不出本机**：记录存 IndexedDB，命盘标识与分享链接走 URL 片段（`#` 之后）—— 片段不随请求发往服务器，也不进任何访问日志。故整站可静态导出，无服务端路由。
@@ -77,21 +78,35 @@ L6 报告   汇总为分层报告
 | **P8** | `temporal` 大运/流年/流月/流日 | ✅ 完成 —— 流月流日零权重泄漏 |
 | **P9a** | `report` L6 报告层 + 措辞守卫 | ✅ 完成 —— 措辞扫描全绿 |
 | **P9b** | `web` Next.js 应用 | ✅ 完成 —— 十个路由全部静态导出 |
-| P10 | `cli` + `skill` | 未开始 |
+| **P10** | `cli` + `skill` | ✅ 完成 —— **Skill 与 Web 报告逐字节相同** |
 
-全部 480 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
+全部 511 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
 
 ```bash
 pnpm install && pnpm test && pnpm typecheck
 ```
 
-Web 应用：
+Web 应用与命令行：
 
 ```bash
 pnpm --filter @fate/web dev
 ```
 
+```bash
+node packages/cli/bin/fate.mjs chart --date 1990-05-12 --time 14:30 --city 上海 --gender male
+```
+
 `@fate/web` 消费 `@fate/core` 的**编译产物**而非 TS 源码 —— 源码里的相对导入按 TS 的 ESM 规范一律写作 `./x.js`，打包器不会把它回溯到 `./x.ts`。与其为此配一套扩展名别名，不如让内核照常经 `tsc -b` 出真正的 `.js`。故 web 的 `dev` / `build` 都以 `tsc -b ../..` 开头。
+
+### P10 的验收：逐字一致是构造保证，不是维护约定
+
+「Skill 与 Web 结论逐字一致」若靠两边各自实现再比对，就成了一条需要时时维护的约定。
+本项目让它成为**构造保证**：`report` 的输出直接是
+`renderMarkdown(buildReport(...))` —— 与网页调用的是同一个函数、同一份模板、
+同一套默认值。想让两者不一致，得先让它们走上两条代码路径。
+
+为此，逐年卡片窗口这类默认值也被下沉进 `core`：只要还留在调用方手里，
+Web 与 CLI 就有各自决定的余地。测试逐字节比对 CLI 输出与内核直调的结果。
 
 ### P9 的两条硬约束
 

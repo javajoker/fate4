@@ -62,7 +62,14 @@ export interface ReportOptions {
   readonly subject?: "self" | "other";
   /** §7 当前时段的日期。core 无 Date.now()，不传则该节为 null。 */
   readonly now?: { readonly year: number; readonly month: number; readonly day: number };
-  /** §6.2 逐年卡片的窗口（含端点）。默认自 now 或出生年起十年。 */
+  /**
+   * §6.2 逐年卡片的窗口（含端点）。
+   *
+   * 默认以 `now` 为中心取前一年至后四年；无 `now` 时自出生年起六年。
+   * **默认值放在这里，而不是各调用方各写一份** —— Web 与 CLI 一旦各自
+   * 决定窗口，「Skill 与 Web 结论逐字一致」就从构造保证退化成一条需要
+   * 时时维护的约定。能由构造保证的事，不要交给约定。
+   */
   readonly cardYears?: { readonly from: number; readonly to: number };
   /** §6.1 三线曲线的年数。默认取 params.temporal.yearRangeYears。 */
   readonly curveYears?: number;
@@ -442,8 +449,9 @@ export function buildReport(chart: NatalChart, options: ReportOptions = {}): Rep
   const curveYears = options.curveYears ?? params.temporal.yearRangeYears;
   const curve: YearCurvePoint[] = [];
   const highTension: { year: number; domain: string; tension: number }[] = [];
-  const cardFrom = options.cardYears?.from ?? options.now?.year ?? birthYear;
-  const cardTo = options.cardYears?.to ?? cardFrom + 9;
+  const centre = options.now?.year ?? birthYear;
+  const cardFrom = options.cardYears?.from ?? (options.now === undefined ? centre : centre - 1);
+  const cardTo = options.cardYears?.to ?? cardFrom + 5;
   const cards: YearCard[] = [];
 
   for (let yr = birthYear; yr < birthYear + curveYears; yr++) {

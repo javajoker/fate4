@@ -16,11 +16,8 @@ export default function ReportPage() {
 
   const r = useMemo(() => {
     if (chart === null || today === null) return null;
-    return buildReport(chart, {
-      params, subject, now: today,
-      curveYears: params.temporal.yearRangeYears,
-      cardYears: { from: today.year - 1, to: today.year + 4 },
-    });
+    // 卡片窗口不在此处指定 —— 默认值在 core 里，Web 与 CLI 因此同源。
+    return buildReport(chart, { params, subject, now: today });
   }, [chart, params, subject, today]);
 
   if (r === null || chart === null || record === null) return <p className="sub">生成中…</p>;
