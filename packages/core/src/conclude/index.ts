@@ -8,5 +8,6 @@ export * from "./geju.js";
 export * from "./kin.js";
 export * from "./metrics.js";
 export * from "./traits.js";
+export * from "./neijing.js";
 export * from "./persona.js";
 export * from "./conclude.js";

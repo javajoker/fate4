@@ -438,7 +438,7 @@ const personaTemplates: NarrativeTemplate[] = [
 
   T("persona.tension", "data", "persona", ["tension", "divergent"], {
     zhHans: "内外张力 {tension}。差异最大的是{divergent}。"
-      + "此值只描述内在构成与外在构成的差异大小，**不含褒贬** —— "
+      + "此值只描述内在构成与外在构成的差异大小，不含褒贬 —— "
       + "传统上既可解为含蓄内敛，也可解为言行不一，取决于分歧落在哪几组上。",
     en: "Tension between the concealed and revealed sides: {tension}. The widest gaps are {divergent}. "
       + "The figure describes only how far the two compositions differ and carries no valuation: "
@@ -500,10 +500,76 @@ const personaTemplates: NarrativeTemplate[] = [
   }),
 ];
 
+// ═══════════════════════════════════════════════════════════
+// §2.6 形体与脏腑（《内经》五行配属）
+//
+// **这两条模板的形状是定死的，不允许自由发挥。**
+//
+// 边界只有一条：陈述「传统对照 + 本盘事实」，不作「关于这个人的判断」。
+//   ✅ 「本盘水最弱，占 4.8%；《内经》中水应肾与膀胱」——两个可验证的陈述并列
+//   ❌ 「肾弱」「易患结石」「注意泌尿系统」——替读者做了推论
+//
+// 「传统养生之说据此提示相应系统宜加留意」做到了要的功能（读者知道该留意哪一系），
+// 而没做出这个系统没资格做的断言。差别不是修辞技巧：前者把「留意」归于传统之说，
+// 后者把它归于本系统的计算结果。
+//
+// 由两条规则强制：zh.body.framing（段级，框定语与免责导向缺一即拦）、
+// zh.medical.diseaseName（无条件，病名一个都不行）。
+// ═══════════════════════════════════════════════════════════
+
+const bodyTemplates: NarrativeTemplate[] = [
+  T("body.form", "data", "body", ["element", "share", "xingti"], {
+    zhHans: "本盘{element}最旺，占 {share}。传统相法中{element}对应{xingti}一类形貌。"
+      + "此为五行与形貌的传统对照，非体检结论。",
+    en: "{element} is the strongest phase in this chart at {share}. "
+      + "In the traditional physiognomic correspondence, {element} is paired with a "
+      + "{xingti} build. This is a classical correspondence, not a physical finding.",
+  }),
+
+  T("body.organ", "data", "body",
+    ["element", "state", "share", "attackNote", "yang", "heat", "dryness",
+      "zang", "fu", "qiao", "ti", "zhi", "qi"], {
+      zhHans: "{element}{state}，占 {share}{attackNote}，{yang}；"
+        + "寒热{heat}、燥湿{dryness}。"
+        + "《内经》五行配属中，{element}应{zang}与{fu}，在窍为{qiao}，在体为{ti}，"
+        + "在志为{zhi}，在气为{qi}。"
+        + "传统养生之说据此提示相应系统宜加留意。"
+        + "以上为传统对照与本盘数值的并列陈述，不构成任何关于身体状况的判断，"
+        + "亦不指向任何具体病症；健康相关的决定请咨询持证专业人士。",
+      en: "{element} reads as {state} at {share}{attackNote}, {yang}; "
+        + "on the warm-cold axis {heat}, on the dry-damp axis {dryness}. "
+        + "In the classical correspondences of the Neijing, {element} pairs with the {zang} "
+        + "and the {fu}, opens at the {qiao}, governs the {ti}, "
+        + "answers to the emotion {zhi} and the climatic factor {qi}. "
+        + "Traditional health lore takes this as a cue to keep the corresponding system in view. "
+        + "The above sets a classical correspondence beside a chart figure; it constitutes no "
+        + "judgement about anyone's physical condition and points to no specific ailment. "
+        + "For decisions touching health, please consult a licensed professional.",
+    }),
+
+  T("body.axes", "data", "body", ["heat", "heatValue", "dryness", "drynessValue"], {
+    zhHans: "全盘寒热{heat}（{heatValue}）、燥湿{dryness}（{drynessValue}）。"
+      + "此二轴由五行占比与月令推得，是命理自有的量，与《内经》的五气可相对照。",
+    en: "Overall the chart reads {heat} on the warm-cold axis ({heatValue}) and "
+      + "{dryness} on the dry-damp axis ({drynessValue}). "
+      + "Both are derived from the phase shares and the month command — quantities native to "
+      + "the Four Pillars method, which line up with the five climatic factors of the Neijing.",
+  }),
+
+  T("body.yangNote", "data", "body", [], {
+    zhHans: "「以阳干为主」说的是天干的形式阴阳（甲阳乙阴），"
+      + "与中医的阴阳（阴液与阳气）同名而异指，不可混用。"
+      + "此处的「阴阳虚实」由虚实档与阳干份额两项并列给出，不合成中医的证型名。",
+    en: "「Carried mainly by yang stems」 refers to the formal parity of the heavenly stems, "
+      + "which shares a name with — but does not mean — the yin and yang of Chinese medicine. "
+      + "The two readings here are given side by side and are never merged into a medical pattern name.",
+  }),
+];
+
 export const NARRATIVE_TEMPLATES: readonly NarrativeTemplate[] = Object.freeze([
   ...strengthTemplates, ...rootTemplates, ...patternTemplates, ...yongshenTemplates,
   ...gejuTemplates, ...metricsTemplates, ...kinTemplates, ...shenshaTemplates,
-  ...personaTemplates,
+  ...personaTemplates, ...bodyTemplates,
   ...timelineTemplates, ...currentTemplates, ...methodTemplates,
 ]);
 

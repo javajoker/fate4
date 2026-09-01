@@ -14,13 +14,17 @@
  *
  * ## 两种模式
  *
- * | 模式 | 语义 | 判定窗口 |
+ * | 模式 | 语义 | 判定域 |
  * | `forbid` | 命中即违规 | 命中处 ±4 字的 `allow` 豁免窗 |
- * | `requireContext` | 命中后，所在**整句**必须带框定语 | 句子 |
+ * | `requireContext` | 命中后，判定域内必须带框定语 | **句**或**段**，逐规则声明 |
  *
  * 窗口大小的差别是刻意的：`allow` 要豁免的是「病药」这种紧邻的合法复合词，
  * 用整句作窗会让「病药用神在此，注意心脏病」整句放行 —— 那正是要拦的东西。
- * 而 `requireContext` 要求的是叙述框架（「传统上……」），框架是句级的。
+ *
+ * 判定域分两档：多数框定语与被框定的词同句，用「句」即可；
+ * 但脏腑一节要求**同时**带传统框定语与免责导向，而框定语在段首、免责语在段尾，
+ * 必须用「段」。段的切分见 `paragraphAround` —— 空行与 Markdown 块首都算段界，
+ * 于是一份 Markdown 里每一条列表项各自成段，段与段之间不会互相担保。
  *
  * ## 词汇与断语
  *
@@ -47,6 +51,8 @@ export type GuardCategory =
   | "secondPerson";   // §6.2 保留主体性
 
 export type GuardMode = "forbid" | "requireContext";
+/** `requireContext` 的判定域。默认「句」。 */
+export type ContextDomain = "sentence" | "paragraph";
 export type TextKind = "narrative" | "vocabulary";
 
 export interface GuardRule {
@@ -58,8 +64,10 @@ export interface GuardRule {
   readonly pattern: RegExp;
   /** forbid：命中处 ±4 字窗内若匹配任一条，视为合法复合词，放行。 */
   readonly allow?: readonly RegExp[];
-  /** requireContext：所在句须匹配，否则违规。 */
+  /** requireContext：判定域内须匹配，否则违规。 */
   readonly context?: RegExp;
+  /** requireContext 的判定域。默认 `sentence`。 */
+  readonly domain?: ContextDomain;
   readonly why: string;
   readonly fix: string;
 }
@@ -69,6 +77,7 @@ export interface GuardViolation {
   readonly category: GuardCategory;
   readonly locale: GuardLocale;
   readonly mode: GuardMode;
+  readonly domain?: ContextDomain;
   readonly match: string;
   readonly index: number;
   readonly excerpt: string;
@@ -86,7 +95,43 @@ function windowAround(text: string, start: number, end: number, pad: number): st
   return text.slice(Math.max(0, start - pad), Math.min(text.length, end + pad));
 }
 
-/** 命中处所在的一整句。requireContext 的判定域。 */
+/**
+ * 命中处所在的一整段。
+ *
+ * 段界取空行，或 Markdown 的块首（列表项、编号、标题、引用、表格行）。
+ * 这样一份 Markdown 里每条列表项各自成段 —— 否则第五条里的免责声明
+ * 会替第二条把关，而读者只会读到第二条。
+ *
+ * 单行文本（报告层逐条 NarrativeLine 扫描时的常态）整条即一段，
+ * 这正是我们要的粒度：**能被单独复制走的那一块，必须自带框定与免责**。
+ */
+function paragraphAround(text: string, start: number, end: number): string {
+  const isBlockStart = (line: string): boolean =>
+    line.trim().length === 0 || /^\s*(?:[-*+]\s|\d+[.、]\s|#{1,6}\s|>\s|\|)/.test(line);
+
+  const lines = text.split("\n");
+  // 行首偏移
+  const offsets: number[] = [];
+  let acc = 0;
+  for (const ln of lines) { offsets.push(acc); acc += ln.length + 1; }
+
+  const lineOf = (pos: number) => {
+    let i = 0;
+    while (i + 1 < offsets.length && offsets[i + 1]! <= pos) i++;
+    return i;
+  };
+  const a0 = lineOf(start);
+  const b0 = lineOf(Math.max(start, end - 1));
+
+  let from = a0;
+  while (from > 0 && !isBlockStart(lines[from]!)) from--;
+  let to = b0;
+  while (to + 1 < lines.length && !isBlockStart(lines[to + 1]!)) to++;
+
+  return lines.slice(from, to + 1).join("\n");
+}
+
+/** 命中处所在的一整句。requireContext 的默认判定域。 */
 function sentenceAround(text: string, start: number, end: number): string {
   let a = start;
   while (a > 0 && !SENTENCE_SEP.test(text[a - 1]!)) a--;
@@ -131,15 +176,25 @@ const ZH_HANS: readonly GuardRule[] = [
   {
     id: "zh.medical.contract",
     locale: "zh-Hans", category: "medical", mode: "forbid",
-    pattern: /易患|会患|将患|恐患|易得病|会生病|多病灾|体弱多病/g,
-    why: "疾病倾向的预测。",
-    fix: "删除。",
+    pattern: /易患|会患|将患|恐患|易得病|会生病|多病灾|体弱多病|易感|易生[病疾]|素有[^。；\n]{0,4}之[疾患]|(?:恐有|难免|多有|常有)[^。；\n]{0,6}(?:之疾|之症|不适|隐患)/g,
+    why: "疾病倾向的断语。「肝系易感」仍是对这个人身体下的判断，只是换了个说法。",
+    fix: "要表达同一功能，用「传统养生之说据此提示相应系统宜加留意」的框定式写法。",
+  },
+  {
+    id: "zh.medical.diseaseName",
+    locale: "zh-Hans", category: "medical", mode: "forbid",
+    pattern: /癌|肿瘤|结石|中风|梗塞|心梗|脑梗|糖尿病|高血压|低血压|冠心病|肝炎|肾炎|胃炎|肠炎|炎症|哮喘|抑郁症|癫痫|风湿|痛风|结核|溃疡|中暑|失眠症/g,
+    // 「五气之中，风为木之气」里的「中风」不是病名 —— 窗口取命中处 ±4 字，足以看到前缀。
+    allow: [/之中[，、]?风/, /其中风/, /中风池/],
+    why: "**病名无条件禁止，不看上下文。**器官名（肝、心、目、筋）可以出现在带传统"
+      + "框定与免责导向的对照句里；病名一个都不行。这条线清楚、可执行，且不需要判断语境。",
+    fix: "只说五行与脏腑的传统对照，不指向任何具体病症。",
   },
   {
     id: "zh.medical.correspondence",
     locale: "zh-Hans", category: "medical", mode: "requireContext",
     pattern: /(?:木|火|土|金|水)(?:主|对应|应)(?:肝|胆|心|小肠|脾|胃|肺|大肠|肾|膀胱)/g,
-    context: /传统|典籍|古人|旧说|对照|之说/,
+    context: /传统|典籍|古人|旧说|对照|之说|内经|素问|配属/,
     why: "五行脏腑对应若不加框定，读者会当作对自己身体的描述。",
     fix: "写成「传统上木对应肝胆」，并且到此为止，不作推论。",
   },
@@ -150,6 +205,28 @@ const ZH_HANS: readonly GuardRule[] = [
     context: /传统|典籍|古人|旧说|相联系|相关联|之象|一类语汇|所指/,
     why: "灾病类语汇是神煞的传统语义，出现在正文时必须框定为传统关联，而非对命主的判断。",
     fix: "写成「传统上此煞与灾厄一类语汇相联系」。",
+  },
+  {
+    id: "zh.body.framing",
+    locale: "zh-Hans", category: "medical", mode: "requireContext",
+    domain: "paragraph",
+    pattern: /(?:肝|胆|小肠|脾|胃|肺|大肠|肾|膀胱)|在窍为|在体为|在志为|在气为|其华在/g,
+    // 全表唯一要求**两个条件同时成立**的一条：既要有传统框定，又要有免责导向。
+    // 脏腑是所有输出里最容易被当成医嘱的一节，只框定不免责、或只免责不框定，
+    // 都放行不得。框定语常在段首、免责语在段尾，故判定域必须是段。
+    context: /(?=[\s\S]*(?:内经|素问|传统|典籍|配属|对照))(?=[\s\S]*(?:不构成|请咨询|非体检|非诊断))/,
+    why: "脏腑段须**同时**带传统框定语与免责导向，缺一即拦。",
+    fix: "写成「《内经》五行配属中，木应肝与胆……以上不构成任何关于身体状况的判断；"
+      + "健康相关的决定请咨询持证专业人士。」",
+  },
+  {
+    id: "zh.stats.probability",
+    locale: "zh-Hans", category: "prediction", mode: "forbid",
+    pattern: /(?:概率|几率|可能性)[^。；！？\n]{0,6}(?:为|是|达|约)\s*[\d百千万]|\d+\s*%\s*(?:的概率|的可能)|(?:小概率|大概率)事件/g,
+    why: "命盘的时间序列是**确定性的**准周期序列，σ 只是它自身的经验散布 ——"
+      + "「六十年中最偏离常态的三段」成立，「发生巨变的概率是 5%」不成立。"
+      + "把百分位包装成统计推断，恰恰会让本来有用的排序失去可信度。",
+    fix: "改用排序陈述：「本命六十年中最偏离常态的三段时期」。",
   },
   {
     id: "zh.financial.advice",
@@ -384,14 +461,18 @@ export function scanText(
           const win = windowAround(text, start, end, ALLOW_WINDOW);
           if (rule.allow?.some((a) => a.test(win))) { re.lastIndex = start + 1; continue; }
         } else {
-          const sentence = sentenceAround(text, start, end);
-          if (rule.context !== undefined && rule.context.test(sentence)) {
+          const domain = rule.domain ?? "sentence";
+          const scope = domain === "paragraph"
+            ? paragraphAround(text, start, end)
+            : sentenceAround(text, start, end);
+          if (rule.context !== undefined && rule.context.test(scope)) {
             re.lastIndex = start + 1; continue;
           }
         }
 
         out.push({
           ruleId: rule.id, category: rule.category, locale: rule.locale, mode: rule.mode,
+          ...(rule.domain === undefined ? {} : { domain: rule.domain }),
           match: m[0], index: start,
           excerpt: windowAround(text, start, end, EXCERPT_WINDOW),
           why: rule.why, fix: rule.fix, where,

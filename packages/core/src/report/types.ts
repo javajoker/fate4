@@ -8,7 +8,7 @@ import type { PillarKind } from "../weights/carrier.js";
 import type { StructureEvent } from "../structure/types.js";
 import type { ConvergenceReport, FlowRecord } from "../propagate/iterate.js";
 import type { Conclusions, KinReading } from "../conclude/types.js";
-import type { Persona } from "../conclude/persona.js";
+import type { BodyCorrespondence, Persona } from "../conclude/persona.js";
 import type { ShenshaHit, PalaceName } from "../shensha/scan.js";
 import type { DayView, LuckStep, MonthView, YearView } from "../temporal/types.js";
 import type { Locale } from "./templates.js";
@@ -59,6 +59,17 @@ export interface ChartSection {
 /** §2.5 性格与偏好。`subject: other` 时整节缺席 —— 那是对一个人的描述。 */
 export interface PersonaSection {
   readonly persona: Persona;
+  readonly narrative: readonly NarrativeLine[];
+}
+
+/**
+ * §2.6 形体与脏腑对照。
+ *
+ * 三种情况下为 null：`subject: other`、参数关闭、人格层未产出。
+ * 都是**结构性略去** —— 不生成，而不是生成后再过滤。
+ */
+export interface BodySection {
+  readonly body: BodyCorrespondence;
   readonly narrative: readonly NarrativeLine[];
 }
 
@@ -167,6 +178,8 @@ export interface Report {
   readonly force: ForceSection;
   /** subject 为 other 时为 null。 */
   readonly persona: PersonaSection | null;
+  /** subject 为 other、或参数关闭时为 null。 */
+  readonly body: BodySection | null;
   readonly strength: StrengthSection;
   readonly kin: KinSection;
   readonly luck: LuckSection;

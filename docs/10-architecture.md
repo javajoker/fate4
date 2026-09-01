@@ -61,6 +61,7 @@ core/src/
 │   └── iterate.ts                # L3 主循环
 ├── conclude/
 │   ├── traits.ts                 # 十神四栏 + 五行五常特质表（conventional，可替换）
+│   ├── neijing.ts                # 《内经》五行配属十三行 + 五窍两派
 │   ├── persona.ts                # L4p 人格层
 │   ├── tenGods.ts  rootScore.ts  strength.ts
 │   ├── specialPattern.ts  yongshen.ts  geju.ts  kin.ts  metrics.ts
@@ -91,8 +92,8 @@ core/src/
 > 时间层四视图合并在 `views.ts` 里共享大量辅助函数。上表为实际结构。
 
 `chart/baseChart.ts`（P11）与 `conclude/{traits,persona}.ts`（P12）已就位。
-**P13–P15 将新增**：`conclude/neijing.ts`、`temporal/series.ts`、
-`temporal/nodes.ts`、`report/finding.ts`。
+`conclude/neijing.ts`（P13）亦已就位。
+**P14–P15 将新增**：`temporal/series.ts`、`temporal/nodes.ts`、`report/finding.ts`。
 
 ### 2.1 公共 API
 
@@ -329,7 +330,8 @@ description: 四柱（八字）排盘与推演。当用户提供出生年月日�
 | Web | JSX 文本里不得写 Markdown（`**粗体**` 会原样渲染成星号） | `pnpm check:web` |
 | L4p | 特质表四栏齐全、过旺与过弱不共用词、全中文、不用量表词汇 | vitest |
 | L4p | 内外分布归一化；特质表四栏齐全且全中文 | vitest（P12） |
-| 内经 | 配属表逐格；病名无条件禁；框定语与免责语缺一即拦 | vitest（P13） |
+| 内经 | 配属表十三行逐格对账；病名无条件禁；框定语与免责语缺一即拦 | vitest |
+| L6 | 模板文本不得含 Markdown（同一份要进 Web、CLI、JSON 三处） | vitest |
 | L5c | 序列条数；运内结构翻转的实证样例；月度采样耗时 | vitest（P14） |
 | L5n | 三尺度；中节点用 MAD；**平直序列不产出节点**的反向对照 | vitest（P15） |
 | 端到端 | CLI 的 Markdown 与内核直调**逐字节相同** | vitest |
@@ -367,7 +369,7 @@ description: 四柱（八字）排盘与推演。当用户提供出生年月日�
 | **P10** | `cli` + `skill` | ✅ **Skill 与 Web 报告逐字节相同**（构造保证，非人工约定） |
 | **P11** | `BaseChart` 一等对象 + `evaluateAt` | 📋 基础盘在一次报告生成中**恰好算一次**；现有断言全绿不变 |
 | **P12** | L4p 人格层 | ✅ 张力改按五组算；真缺与过弱分开；置信度与并列门槛由构造对齐 |
-| **P13** | 内经配属 + 三条轴 + 守卫的「整段」判定域 | 📋 配属表逐格断言；病名与易感式各有真实反例；框定语缺一即拦 |
+| **P13** | 内经配属 + 三条轴 + 守卫的「整段」判定域 | ✅ 配属表十三行逐格对账；病名无条件禁；框定语与免责语缺一即拦；虚实补第六档 |
 | **P14** | L5c 曲线层 | 📋 47 条序列 + 扰动序列；**运内结构翻转**有实证样例 |
 | **P15** | L5n 节点层 + Finding 两层 | 📋 穿越区间；中节点走 MAD；summary 的每个数字可在 detail 的 evidence 中找到 |
 

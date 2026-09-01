@@ -77,6 +77,19 @@ describe("模板库的自洽性", () => {
     }
   });
 
+  it("模板文本里不得写 Markdown —— 同一份文本要进 Web、CLI、JSON", () => {
+    // 报告层的模板同时喂给 Markdown 导出、Web 的纯文本渲染、CLI 与 Skill 的 JSON。
+    // 只有 Markdown 认得 `**粗体**`，其余三处会原样显示成星号。
+    // 强调不是承重的东西，去掉即可 —— 让模板保持格式中立。
+    for (const t of NARRATIVE_TEMPLATES) {
+      for (const [which, text] of localeTexts(t)) {
+        expect(text, `${t.id}.${which} 含 Markdown 粗体`).not.toMatch(/\*\*[^*]+\*\*/);
+        expect(text, `${t.id}.${which} 含 Markdown 代码跨度`).not.toMatch(/`[^`]+`/);
+        expect(text, `${t.id}.${which} 含 Markdown 链接`).not.toMatch(/\[[^\]]+\]\([^)]+\)/);
+      }
+    }
+  });
+
   it("繁体全缺席，且缺席是显式的", () => {
     // 不做简转繁自动降级：余气→餘氣（非余氣）、历法→曆法（非歷法）、后天→後天。
     // 机械转换会在术语上出错，而术语出错的报告比没有报告更糟。
@@ -93,6 +106,56 @@ describe("模板库的自洽性", () => {
 describe("措辞守卫 —— 拦断言的形状，不拦词", () => {
   const hits = (t: string, kind: "narrative" | "vocabulary" = "narrative") =>
     scanText(t, "test", { kind }).map((v) => v.ruleId);
+
+  it("**新增三条：病名、易感式断语、概率陈述**", () => {
+    const cases: readonly [string, string][] = [
+      ["此运需防高血压。", "zh.medical.diseaseName"],
+      ["木弱者多有结石。", "zh.medical.diseaseName"],
+      ["本盘肝系易感。", "zh.medical.contract"],
+      ["土弱者恐有脾胃之疾。", "zh.medical.contract"],
+      ["该年发生变动的概率为 5%。", "zh.stats.probability"],
+      ["此为 5% 的概率事件。", "zh.stats.probability"],
+    ];
+    for (const [text, ruleId] of cases) {
+      expect(hits(text), `「${text}」应命中 ${ruleId}`).toContain(ruleId);
+    }
+  });
+
+  it("病名无条件禁止，但「炎上」「之中，风」不是病名", () => {
+    // 火曰炎上是五行的本义；「五气之中，风为木之气」里的「中风」是断句巧合。
+    expect(hits("火之性明朗炎上。")).not.toContain("zh.medical.diseaseName");
+    expect(hits("五气之中，风为木之气。")).not.toContain("zh.medical.diseaseName");
+    expect(hits("此结构易生炎症。")).toContain("zh.medical.diseaseName");
+  });
+
+  it("**脏腑段：框定语与免责导向缺一即拦**（判定域为「段」）", () => {
+    const organ = "《内经》五行配属中，木应肝与胆，在窍为目，在体为筋。";
+    const disclaim = "以上为传统对照与盘面数值的并列陈述，不构成任何关于身体状况的判断；"
+      + "健康相关的决定请咨询持证专业人士。";
+    // 只有框定，没有免责 → 拦
+    expect(hits(organ)).toContain("zh.body.framing");
+    // 只有免责，没有框定 → 也拦（此句提到脏腑但不说是传统对照）
+    expect(hits(`木弱则肝与胆当留意。${disclaim.replace("传统对照与盘面数值的并列陈述，", "")}`))
+      .toContain("zh.body.framing");
+    // 两者俱全 → 放行
+    expect(hits(organ + disclaim)).not.toContain("zh.body.framing");
+  });
+
+  it("段与段之间不互相担保 —— 免责声明不能替别的段落把关", () => {
+    // 一份 Markdown 里，第五条列表项的免责声明不该替第二条把关，
+    // 因为读者只会读到第二条。故段界取空行与 Markdown 块首。
+    const doc = [
+      "- 《内经》五行配属中，木应肝与胆，在窍为目。",
+      "- 另一条无关的话。",
+      "- 以上为传统对照，不构成任何关于身体状况的判断；请咨询持证专业人士。",
+    ].join("\n");
+    expect(hits(doc), "跨列表项的免责被误判为有效").toContain("zh.body.framing");
+
+    // 同一条之内则放行
+    const ok = "- 《内经》五行配属中，木应肝与胆。以上为传统对照，"
+      + "不构成任何关于身体状况的判断；请咨询持证专业人士。";
+    expect(hits(ok)).not.toContain("zh.body.framing");
+  });
 
   it("每条禁令都拦得住一个真实的反例", () => {
     // 每一类都给一个具体的坏句子。这条测试若某天空转，禁令表就形同虚设。
@@ -123,7 +186,10 @@ describe("措辞守卫 —— 拦断言的形状，不拦词", () => {
     const clean = [
       "取水为用，法从病药：土为病，取木去之。",
       "其他条件相同的两张盘，结论可能不同。",
-      "传统上木对应肝胆，此处仅作对照，不作推论。",
+      // 脏腑段须**同时**带传统框定与免责导向 —— 缺一即拦，见 zh.body.framing
+      "《内经》五行配属中，木应肝与胆，在窍为目。以上为传统对照，"
+        + "不构成任何关于身体状况的判断；健康相关的决定请咨询持证专业人士。",
+      "五气之中，风为木之气，与中焦无涉。",   // 「之中，风」不是中风
       "传统上灾煞与灾厄、疾病一类语汇相联系。",
       "顺逆指数衡量的是当年五行结构与本命喜用的契合度。",
       "月令格局为七杀格，凶神逆用，相神取食神。",

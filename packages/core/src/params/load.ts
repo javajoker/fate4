@@ -67,6 +67,11 @@ const RANGES: readonly RangeRule[] = [
   { path: "persona.excessShare", min: 0.05, max: 0.9 },
   { path: "persona.deficientShare", min: 0, max: 0.5 },
   { path: "persona.dominantMargin", min: 0.001, max: 0.5 },
+  { path: "persona.excessBand", min: 0.05, max: 3 },
+  { path: "persona.deficientBand", min: 0.05, max: 1 },
+  { path: "persona.attackedBand", min: 0, max: 5 },
+  { path: "persona.seasonAdjust", min: 0, max: 1 },
+  { path: "persona.axisBand", min: 0.01, max: 1 },
 ];
 
 const ENUMS: readonly EnumRule[] = [
@@ -84,6 +89,8 @@ const ENUMS: readonly EnumRule[] = [
   { path: "temporal.qiyun.mode", values: ["continuous", "traditionalDiscrete"] },
   { path: "report.locale", values: ["zh-Hans", "zh-Hant", "en"] },
   { path: "persona.source", values: ["conventional"] },
+  { path: "persona.neijingSource", values: ["conventional"] },
+  { path: "persona.wuqiaoSource", values: ["yinyangYingxiang", "jinguiZhenyan"] },
 ];
 
 function at(obj: unknown, path: string): unknown {

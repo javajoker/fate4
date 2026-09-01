@@ -296,6 +296,28 @@ export interface PersonaParams {
    * 于是「判为并列」与「改用留有余地的措辞」永远同进同出，与本值取多少无关。
    */
   readonly dominantMargin: number;
+
+  // ── 形体与脏腑（§2.7）──
+  /** [流派] 《内经》五行配属表的底本。 */
+  readonly neijingSource: "conventional";
+  /** [流派] 五窍配属。内经内部两篇不一致，见 conclude/neijing.ts。 */
+  readonly wuqiaoSource: "yinyangYingxiang" | "jinguiZhenyan";
+  /** `subject: other` 时强制关闭 —— 形体与脏腑都是对一个人身体的描述。 */
+  readonly bodyCorrespondence: boolean;
+  /** [校准] 相对五行均分的偏离超此值判「实」。 */
+  readonly excessBand: number;
+  /** [校准] 低于负此值判「虚」。 */
+  readonly deficientBand: number;
+  /**
+   * [校准] **受克份额**相对均分的偏离，超此值判「受制」或「被伐」。
+   *
+   * 不用「受克 / 自身权重」—— 低权重必然高比值，虚与被伐会由构造耦合。
+   */
+  readonly attackedBand: number;
+  /** [校准] 月令对寒热轴的修正幅度。 */
+  readonly seasonAdjust: number;
+  /** [校准] 寒热轴与燥湿轴判「偏」的门槛，|H| 或 |D| 小于此值即为平。 */
+  readonly axisBand: number;
 }
 
 export interface ReportParams {

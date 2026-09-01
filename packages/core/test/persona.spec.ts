@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { buildChart } from "../src/chart/buildChart.js";
 import { buildBaseChart } from "../src/chart/baseChart.js";
-import { buildReport } from "../src/report/assemble.js";
+import { buildReport, collectReportText } from "../src/report/assemble.js";
 import { GOD_TRAITS, ELEMENT_TRAITS, allTraitWords } from "../src/conclude/traits.js";
 import { GOD_GROUPS } from "../src/conclude/tenGods.js";
+import { NEIJING, wuqiaoOf, allNeijingWords } from "../src/conclude/neijing.js";
 import { scanText, formatViolations } from "../src/report/guard.js";
 import { loadParams, ParamsValidationError } from "../src/params/load.js";
 import { DEFAULT_PARAMS } from "../src/params/defaults.js";
@@ -252,5 +253,169 @@ describe("报告 §2.5", () => {
   it("底本随盘声明", () => {
     expect(bases[0]!.persona.source).toBe(DEFAULT_PARAMS.persona.source);
     expect(bases[0]!.persona.source).toBe("conventional");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// P13 · 《内经》五行配属与三条轴
+// ═══════════════════════════════════════════════════════════
+
+describe("《内经》配属表", () => {
+  it("十三行逐格对账 —— 与代码分开写一遍，两处一致才算数", () => {
+    // 表在 conclude/neijing.ts，此处按行独立列出。改错一格即被逮住。
+    const EXPECT: Record<string, readonly string[]> = {
+      //     脏    腑      体      华    液    志    气    味    色    时      方
+      木: ["肝", "胆", "筋", "爪", "泪", "怒", "风", "酸", "青", "春", "东"],
+      火: ["心", "小肠", "脉", "面", "汗", "喜", "暑", "苦", "赤", "夏", "南"],
+      土: ["脾", "胃", "肉", "唇", "涎", "思", "湿", "甘", "黄", "长夏", "中"],
+      金: ["肺", "大肠", "皮毛", "毛", "涕", "忧", "燥", "辛", "白", "秋", "西"],
+      水: ["肾", "膀胱", "骨", "发", "唾", "恐", "寒", "咸", "黑", "冬", "北"],
+    };
+    for (const e of ELEMENTS) {
+      const r = NEIJING[e];
+      expect([r.zang, r.fu, r.ti, r.hua, r.ye, r.zhi, r.qi, r.wei, r.se, r.shi, r.fang], e)
+        .toEqual(EXPECT[e]);
+    }
+  });
+
+  it("五脏、六腑、五体各自互不重复", () => {
+    for (const key of ["zang", "fu", "ti", "hua", "ye", "zhi", "qi", "wei", "se"] as const) {
+      const vals = ELEMENTS.map((e) => NEIJING[e][key]);
+      expect(new Set(vals).size, `${key} 有重复`).toBe(5);
+    }
+  });
+
+  it("**五窍是内经内部的真实分歧，两派各成一套**", () => {
+    // 《阴阳应象大论》心在窍为舌、肾在窍为耳
+    expect(wuqiaoOf("火", "yinyangYingxiang")).toBe("舌");
+    expect(wuqiaoOf("水", "yinyangYingxiang")).toBe("耳");
+    // 《金匮真言论》心开窍于耳、肾开窍于二阴
+    expect(wuqiaoOf("火", "jinguiZhenyan")).toBe("耳");
+    expect(wuqiaoOf("水", "jinguiZhenyan")).toBe("二阴");
+    // 其余三行两派一致
+    for (const e of ["木", "土", "金"] as const) {
+      expect(wuqiaoOf(e, "yinyangYingxiang")).toBe(wuqiaoOf(e, "jinguiZhenyan"));
+    }
+  });
+
+  it("流派切换随盘生效并声明", () => {
+    const p = loadParams({ persona: { wuqiaoSource: "jinguiZhenyan" } });
+    const b = buildBaseChart(buildChart(SAMPLES[0]!), p);
+    expect(b.persona.body!.wuqiaoSource).toBe("jinguiZhenyan");
+    expect(bases[0]!.persona.body!.wuqiaoSource).toBe("yinyangYingxiang");
+  });
+
+  it("全表字面值皆为中文，且通过措辞扫描", () => {
+    for (const w of allNeijingWords()) {
+      expect(w, `「${w}」含非中文`).toMatch(/^[一-鿿]+$/);
+      expect(formatViolations(scanText(w, "neijing", { kind: "vocabulary" })))
+        .toBe("措辞扫描通过。");
+    }
+  });
+});
+
+describe("三条轴", () => {
+  it("阳干份额 ∈ [0,1]，且与阴干份额互补", () => {
+    for (const b of bases) {
+      for (const e of ELEMENTS) {
+        const y = b.persona.body!.details[e].yangShare;
+        expect(y, e).toBeGreaterThanOrEqual(0);
+        expect(y, e).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it("**「被伐」判受克份额，不判受克比 —— 否则虚与被伐由构造耦合**", () => {
+    // A = 受克/自身权重：低权重必然高比值，「虚而被伐」只是在复述「虚」。
+    // 实测按前者判时该档占 32%，成了最常见的一档，与「值得单独措辞」相悖。
+    for (const b of bases) {
+      const D = b.persona.body!.details;
+      const shares = ELEMENTS.map((e) => D[e].attackDeviation);
+      // 份额偏离之和恒为 0（五个份额和为 1，各减 0.2 再除 0.2）
+      expect(shares.reduce((a, x) => a + x, 0)).toBeCloseTo(0, 6);
+    }
+  });
+
+  it("虚实六档 —— 「平」那一档也看受克", () => {
+    // 规格初稿只列五档，「平」不看受克，于是一个占比适中却承担全盘 2.6 倍
+    // 份额克流量的五行会被报成干净的「平」。那恰是最值得说的一件事。
+    const STATES = ["实", "实而受制", "平", "平而受制", "虚", "虚而被伐"];
+    for (const b of bases) {
+      for (const e of ELEMENTS) expect(STATES).toContain(b.persona.body!.details[e].state);
+    }
+    const worked = bases[0]!.persona.body!;
+    const most = ELEMENTS.reduce((a, e) =>
+      worked.details[e].attackDeviation > worked.details[a].attackDeviation ? e : a, ELEMENTS[0]!);
+    expect(worked.details[most].state, "受克最重者不该被报成干净的「平」").not.toBe("平");
+  });
+
+  it("寒热与燥湿轴：月令修正方向正确", () => {
+    // 生于冬月应更偏寒，生于夏月应更偏热
+    const p0 = loadParams({ persona: { seasonAdjust: 0 } });
+    const p1 = loadParams({ persona: { seasonAdjust: 0.4 } });
+    const winter = buildChart({
+      year: 1991, month: 12, day: 20, hour: 2, minute: 0,
+      gender: "female", timeZone: "Asia/Shanghai", longitude: 121.47,
+    });
+    const h0 = buildBaseChart(winter, p0).persona.body!.axes.heat;
+    const h1 = buildBaseChart(winter, p1).persona.body!.axes.heat;
+    expect(h1, "冬月加大修正应更偏寒").toBeLessThan(h0);
+  });
+
+  it("入选详述者至多三个，且含最旺、最弱、受克最重", () => {
+    for (const b of bases) {
+      const B = b.persona.body!;
+      expect(B.focus.length).toBeGreaterThanOrEqual(1);
+      expect(B.focus.length).toBeLessThanOrEqual(3);
+      expect(B.focus).toContain(b.persona.elements.strongest);
+      expect(B.focus).toContain(b.persona.elements.weakest);
+      expect(B.focus).toContain(b.persona.elements.mostAttacked);
+    }
+  });
+});
+
+describe("§2.6 的措辞边界", () => {
+  it("subject 为他人时整节不生成", () => {
+    const chart = buildChart(SAMPLES[0]!);
+    expect(buildReport(chart, { curveYears: 1 }).body).not.toBeNull();
+    expect(buildReport(chart, { curveYears: 1, subject: "other" }).body).toBeNull();
+  });
+
+  it("参数关闭时整节不生成", () => {
+    const p = loadParams({ persona: { bodyCorrespondence: false } });
+    const b = buildBaseChart(buildChart(SAMPLES[0]!), p);
+    expect(b.persona.body).toBeNull();
+    expect(buildReport(b, { curveYears: 1 }).body).toBeNull();
+  });
+
+  it("**每一条脏腑叙述都自带框定语与免责导向** —— 单独摘出来也成立", () => {
+    // 判定域是「段」，而报告层逐条 NarrativeLine 扫描 ——
+    // 也就是说，能被单独复制走的那一块，必须自己站得住。
+    for (const b of bases) {
+      const r = buildReport(b, { curveYears: 1 });
+      expect(r.body).not.toBeNull();
+      for (const l of r.body!.narrative) {
+        expect(formatViolations(scanText(l.text, l.templateId))).toBe("措辞扫描通过。");
+      }
+      const organ = r.body!.narrative.filter((l) => l.templateId === "body.organ");
+      expect(organ.length).toBeGreaterThan(0);
+      for (const l of organ) {
+        expect(l.text, "缺传统框定").toMatch(/内经|传统/);
+        expect(l.text, "缺免责导向").toMatch(/不构成|请咨询/);
+      }
+    }
+  });
+
+  it("**报告全文不出现任何病名**", () => {
+    const NAMES = ["癌", "肿瘤", "结石", "中风", "梗塞", "糖尿病", "高血压",
+      "肝炎", "肾炎", "胃炎", "炎症", "哮喘", "癫痫", "风湿", "痛风", "溃疡"];
+    for (const b of bases) {
+      const r = buildReport(b, { now: { year: 2026, month: 9, day: 1 } });
+      for (const { text, where } of collectReportText(r)) {
+        for (const nm of NAMES) {
+          expect(text.includes(nm), `${where} 出现病名「${nm}」`).toBe(false);
+        }
+      }
+    }
   });
 });

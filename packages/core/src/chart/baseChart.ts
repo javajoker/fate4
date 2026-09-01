@@ -106,7 +106,8 @@ export function buildBaseChart(chart: NatalChart, params: Params = DEFAULT_PARAM
 
   const persona = personaOf({
     carriers: pr.carriers, events: st.events, flows: pr.flows, shensha,
-    conclusions, silingStem: chart.siling.stem, params: params.persona,
+    conclusions, silingStem: chart.siling.stem, monthBranch: chart.month.branch,
+    params: params.persona,
   });
 
   return Object.freeze({

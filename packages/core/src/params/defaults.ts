@@ -203,6 +203,14 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
     excessShare: 0.35,        // [校准]
     deficientShare: 0.05,     // [校准]
     dominantMargin: 0.05,     // [校准] 与置信度公式由构造对齐，见 types.ts
+    neijingSource: "conventional",       // [流派] ⚠️ 待校准 #15
+    wuqiaoSource: "yinyangYingxiang",    // [流派] ⚠️ 待校准 #16，内经内部两篇不一致
+    bodyCorrespondence: true,
+    excessBand: 0.30,         // [校准]
+    deficientBand: 0.30,      // [校准]
+    attackedBand: 0.25,       // [校准]
+    seasonAdjust: 0.15,       // [校准]
+    axisBand: 0.12,           // [校准]
   }),
   report: Object.freeze({
     locale: "zh-Hans",

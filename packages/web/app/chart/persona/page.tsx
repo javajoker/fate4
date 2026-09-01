@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 import {
-  buildReport, ELEMENT_TRAITS, GOD_TRAITS, label, PILLAR_LABEL, TEN_GODS,
+  buildReport, ELEMENT_TRAITS, GOD_TRAITS, label, NEIJING, PILLAR_LABEL,
+  TEN_GODS, wuqiaoOf,
 } from "@fate/core";
 import { useChart } from "../../../lib/chartContext";
 import { Narrative } from "../../../components/Narrative";
@@ -184,6 +185,100 @@ export default function PersonaPage() {
       </div>
 
       <Narrative lines={r.persona.narrative} />
+
+      {r.body !== null && <BodySection body={r.body.body} lines={r.body.narrative} />}
+    </>
+  );
+}
+
+/**
+ * §2.6 形体与脏腑。
+ *
+ * 界面上的措辞与报告层同源（`r.body.narrative`），此处只加表格与图例。
+ * 表格里出现的全是器官名与配属，**没有一个病名** —— 这条由 core 的
+ * `zh.medical.diseaseName` 规则无条件保证，界面不另设一套。
+ */
+function BodySection({ body, lines }: {
+  body: NonNullable<ReturnType<typeof buildReport>["body"]>["body"];
+  lines: NonNullable<ReturnType<typeof buildReport>["body"]>["narrative"];
+}) {
+  const els = Object.keys(body.details) as (keyof typeof body.details)[];
+  return (
+    <>
+      <h2>形体与脏腑对照</h2>
+      <p className="sub">
+        以下是<b>传统对照</b>与<b>本盘数值</b>的并列陈述，不构成任何关于身体状况的判断，
+        亦不指向任何具体病症。健康相关的决定请咨询持证专业人士。
+      </p>
+
+      <div className="grid2">
+        <div className="card">
+          <h3>寒热</h3>
+          <p style={{ fontSize: 26, fontFamily: "var(--serif)", margin: 0 }}>
+            {body.axes.heatLabel}
+            <span className="mono dim" style={{ fontSize: 14, marginLeft: 10 }}>
+              {num(body.axes.heat, 3)}
+            </span>
+          </p>
+          <p className="dim" style={{ fontSize: 12 }}>热势（火 + ½木）− 寒势（水 + ½金），含月令修正。</p>
+        </div>
+        <div className="card">
+          <h3>燥湿</h3>
+          <p style={{ fontSize: 26, fontFamily: "var(--serif)", margin: 0 }}>
+            {body.axes.drynessLabel}
+            <span className="mono dim" style={{ fontSize: 14, marginLeft: 10 }}>
+              {num(body.axes.dryness, 3)}
+            </span>
+          </p>
+          <p className="dim" style={{ fontSize: 12 }}>
+            燥势（火 + 燥土）− 湿势（水 + 湿土）。燥土藏于未戌，湿土藏于辰丑。
+          </p>
+        </div>
+      </div>
+
+      <div className="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>五行</th><th className="num">占比</th><th>虚实</th>
+              <th className="num">受克份额偏离</th><th className="num">阳干份额</th>
+              <th>脏</th><th>腑</th><th>窍</th><th>体</th><th>华</th><th>液</th><th>志</th><th>气</th>
+            </tr>
+          </thead>
+          <tbody>
+            {els.map((e) => {
+              const d = body.details[e];
+              const row = NEIJING[e];
+              const focus = body.focus.includes(e);
+              return (
+                <tr key={e} style={{ background: focus ? "var(--accent-soft)" : undefined }}>
+                  <td>{e}{focus && <span className="pill">详述</span>}</td>
+                  <td className="num">{pct(d.share)}</td>
+                  <td>{d.state}</td>
+                  <td className="num">{num(d.attackDeviation, 2)}</td>
+                  <td className="num">{pct(d.yangShare, 0)}</td>
+                  <td>{row.zang}</td><td>{row.fu}</td>
+                  <td>{wuqiaoOf(e, body.wuqiaoSource)}</td>
+                  <td>{row.ti}</td><td>{row.hua}</td><td>{row.ye}</td>
+                  <td>{row.zhi}</td><td>{row.qi}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="sub">
+        五窍取
+        <span className="mono"> {body.wuqiaoSource === "yinyangYingxiang"
+          ? "《素问·阴阳应象大论》" : "《素问·金匮真言论》"} </span>
+        一系。这是内经内部的<b>真实分歧</b>，非转录疏漏 ——
+        阴阳应象大论作「心在窍为舌、肾在窍为耳」，金匮真言论作「心开窍于耳、肾开窍于二阴」。
+        默认取前者（亦即后世主流），另一派可经参数切换，且随盘声明。
+        配属表底本 <span className="mono">{body.neijingSource}</span>。
+      </p>
+
+      <Narrative lines={lines} />
     </>
   );
 }

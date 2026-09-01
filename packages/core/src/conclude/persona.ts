@@ -19,7 +19,9 @@
  * - 不给价值判断 —— 「偏枯」不是缺陷，偏枯而成格成局者不在少数
  */
 
-import { ELEMENTS, TEN_GODS, type Element, type Stem, type TenGod } from "../types/ganzhi.js";
+import {
+  ELEMENTS, TEN_GODS, type Branch, type Element, type Stem, type TenGod,
+} from "../types/ganzhi.js";
 import { elementOf, polarityOf } from "../ganzhi/algebra.js";
 import type { PersonaParams } from "../params/types.js";
 import type { Carrier, PillarKind } from "../weights/carrier.js";
@@ -79,6 +81,65 @@ export interface ElementProfile {
   readonly attack: Readonly<Record<Element, number>>;
 }
 
+/**
+ * 虚实六档。
+ *
+ * 规格初稿只列五档，「平」那一档不看受克 —— 于是一个占比适中、
+ * 却承担了全盘 2.6 倍份额克流量的五行，会被报成一个干净的「平」。
+ * 那恰恰是这张盘最值得说的一件事，却被埋掉了。故补「平而受制」。
+ *
+ * 「虚而被伐」与「平而受制」是需要单独措辞的两档：前者量已不足又持续受克，
+ * 后者看似无恙而实为众矢之的。
+ */
+export type ElementState =
+  | "实" | "实而受制" | "平" | "平而受制" | "虚" | "虚而被伐";
+
+export interface ElementDetail {
+  readonly element: Element;
+  readonly share: number;
+  /** 相对五行均分（0.20）的偏离。 */
+  readonly deviation: number;
+  readonly attack: number;
+  /** 受克流量 / 自身权重 —— 「被削掉了自身的几成」。作明细呈现。 */
+  readonly attackRatio: number;
+  /**
+   * 全盘克流量中落在本五行头上的份额，相对均分（0.20）的偏离。
+   *
+   * **判「被伐」用这个，不用 `attackRatio`。**后者等于「受克 / 自身权重」，
+   * 而低权重必然高比值 —— 虚与被伐会由构造耦合，「虚而被伐」只是在复述「虚」。
+   * 实测按 attackRatio 判时该档占 32%，成了最常见的一档，与「值得单独措辞」相悖。
+   */
+  readonly attackDeviation: number;
+  readonly state: ElementState;
+  /**
+   * 该五行中阳干所占的份额。
+   *
+   * ⚠️ **这是天干的形式阴阳，不是中医的阴阳。**
+   * 甲阳乙阴是干支系统里的奇偶，中医的阴阳是阴液与阳气 —— 同名而异指。
+   * 故报告措辞为「以阳干为主」，**不为**「阳虚」。
+   * 「阴阳虚实」四字的意思由本字段与 `state` **并列**给出，不合成中医证型名。
+   */
+  readonly yangShare: number;
+}
+
+export interface BodyAxes {
+  /** 寒热轴 = 热势 − 寒势，含月令修正。正为偏热。 */
+  readonly heat: number;
+  /** 燥湿轴 = 燥势 − 湿势。正为偏燥。 */
+  readonly dryness: number;
+  readonly heatLabel: "偏热" | "平" | "偏寒";
+  readonly drynessLabel: "偏燥" | "平" | "偏湿";
+}
+
+export interface BodyCorrespondence {
+  readonly axes: BodyAxes;
+  readonly details: Readonly<Record<Element, ElementDetail>>;
+  /** 入选的五行：最旺、最弱、受克最重，去重后至多三个。不逐一罗列 —— 全说等于没说。 */
+  readonly focus: readonly Element[];
+  readonly wuqiaoSource: PersonaParams["wuqiaoSource"];
+  readonly neijingSource: PersonaParams["neijingSource"];
+}
+
 export interface Persona {
   /** 归一化后的内在十神分布（藏干）。日主自身不计入。 */
   readonly inner: Readonly<Record<TenGod, number>>;
@@ -122,6 +183,11 @@ export interface Persona {
   readonly elements: ElementProfile;
   readonly palaces: readonly PalaceState[];
   readonly source: PersonaParams["source"];
+  /**
+   * 形体与脏腑的传统对照。`bodyCorrespondence` 关闭或 `subject: other` 时为 null ——
+   * 这两项都是对一个人身体的描述，结构性略去，不靠措辞扫描兜底。
+   */
+  readonly body: BodyCorrespondence | null;
 }
 
 export interface PersonaInput {
@@ -131,6 +197,7 @@ export interface PersonaInput {
   readonly shensha: readonly ShenshaHit[];
   readonly conclusions: Conclusions;
   readonly silingStem: Stem;
+  readonly monthBranch: Branch;
   readonly params: PersonaParams;
 }
 
@@ -181,6 +248,86 @@ function dominantOf(
   return {
     value: tied ? [first, second] : [first],
     confidence, derivation, alternatives,
+  };
+}
+
+/** 燥土藏于未、戌；湿土藏于辰、丑。命理的通行划分。 */
+const DRY_EARTH: ReadonlySet<string> = new Set(["未", "戌"]);
+const WET_EARTH: ReadonlySet<string> = new Set(["辰", "丑"]);
+const WINTER: ReadonlySet<string> = new Set(["亥", "子", "丑"]);
+const SUMMER: ReadonlySet<string> = new Set(["巳", "午", "未"]);
+
+/**
+ * 三条可算的轴。
+ *
+ * 不直接输出「阴虚」「阳虚」这类中医证型 —— 那需要一次未经声明的概念跳跃
+ * （见 `ElementDetail.yangShare` 的注释）。此处只给三个能回溯到具体权重的量：
+ *
+ * - **虚实**：占比相对五行均分的偏离，叠加受克强度。五档
+ * - **阴阳**：该五行内阳干的份额。**形式阴阳**
+ * - **寒热燥湿**：命理自有的轴，与内经五气对接
+ *
+ * 燥土（未戌）与湿土（辰丑）的划分本项目已有 `hostBranch` 可直接分；
+ * 天干之土与生地之土（寅申巳中的戊）不计入任一侧 —— 它们本就不偏。
+ */
+function bodyOf(
+  carriers: readonly Carrier[], share: Readonly<Record<Element, number>>,
+  byElement: Readonly<Record<Element, number>>,
+  attack: Readonly<Record<Element, number>>,
+  monthBranch: Branch, p: PersonaParams,
+): BodyCorrespondence {
+  const yangWeight = Object.fromEntries(ELEMENTS.map((e) => [e, 0])) as Record<Element, number>;
+  let dryEarth = 0; let wetEarth = 0;
+  for (const c of carriers) {
+    if (c.polarity === "阳") yangWeight[c.element] += c.weight;
+    if (c.element === "土" && c.hostBranch !== null) {
+      if (DRY_EARTH.has(c.hostBranch)) dryEarth += c.weight;
+      else if (WET_EARTH.has(c.hostBranch)) wetEarth += c.weight;
+    }
+  }
+  const total = ELEMENTS.reduce((a, e) => a + byElement[e], 0);
+  const norm = (x: number) => (total > 0 ? x / total : 0);
+
+  const heatRaw = (share["火"] + 0.5 * share["木"]) - (share["水"] + 0.5 * share["金"]);
+  const seasonal = WINTER.has(monthBranch) ? -p.seasonAdjust
+    : SUMMER.has(monthBranch) ? p.seasonAdjust : 0;
+  const heat = heatRaw + seasonal;
+  const dryness = (share["火"] + norm(dryEarth)) - (share["水"] + norm(wetEarth));
+
+  const totalAttack = ELEMENTS.reduce((a, e) => a + attack[e], 0);
+  const details = Object.fromEntries(ELEMENTS.map((e) => {
+    const deviation = (share[e] - 0.2) / 0.2;
+    const attackRatio = byElement[e] > 0 ? attack[e] / byElement[e] : 0;
+    const attackShare = totalAttack > 0 ? attack[e] / totalAttack : 0.2;
+    const attackDeviation = (attackShare - 0.2) / 0.2;
+    const struck = attackDeviation > p.attackedBand;
+    const state: ElementState =
+      deviation >= p.excessBand ? (struck ? "实而受制" : "实")
+      : deviation <= -p.deficientBand ? (struck ? "虚而被伐" : "虚")
+      : (struck ? "平而受制" : "平");
+    return [e, {
+      element: e, share: share[e], deviation,
+      attack: attack[e], attackRatio, attackDeviation, state,
+      yangShare: byElement[e] > 0 ? yangWeight[e] / byElement[e] : 0,
+    } satisfies ElementDetail];
+  })) as Record<Element, ElementDetail>;
+
+  const ranked = [...ELEMENTS].sort((a, b) => share[b] - share[a]);
+  const mostAttacked = [...ELEMENTS].sort((a, b) => attack[b] - attack[a])[0]!;
+  const focus = [...new Set([ranked[0]!, ranked[ranked.length - 1]!, mostAttacked])];
+
+  const lab = <H extends string, L extends string>(v: number, hi: H, lo: L): H | L | "平" =>
+    (v > p.axisBand ? hi : v < -p.axisBand ? lo : "平");
+
+  return {
+    axes: {
+      heat, dryness,
+      heatLabel: lab(heat, "偏热", "偏寒"),
+      drynessLabel: lab(dryness, "偏燥", "偏湿"),
+    },
+    details, focus,
+    wuqiaoSource: p.wuqiaoSource,
+    neijingSource: p.neijingSource,
   };
 }
 
@@ -304,5 +451,8 @@ export function personaOf(input: PersonaInput): Persona {
     silingStem: input.silingStem, silingGod,
     excess, absent, deficient, elements, palaces,
     source: params.source,
+    body: params.bodyCorrespondence
+      ? bodyOf(carriers, share, byElement, attack, input.monthBranch, params)
+      : null,
   };
 }

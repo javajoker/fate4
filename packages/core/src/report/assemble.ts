@@ -31,6 +31,7 @@ import type { Carrier, PillarKind } from "../weights/carrier.js";
 import { tenGodOf } from "../conclude/tenGods.js";
 import type { KinReading, Verdict } from "../conclude/types.js";
 import { ELEMENT_TRAITS, GOD_TRAITS } from "../conclude/traits.js";
+import { NEIJING, wuqiaoOf } from "../conclude/neijing.js";
 import { PALACE, type PalaceName, type ShenshaHit } from "../shensha/scan.js";
 import { toBaseChart, type BaseChart } from "../chart/baseChart.js";
 import { dayView, luckTimeline, monthView, yearView } from "../temporal/views.js";
@@ -48,7 +49,7 @@ import {
 import type {
   ChartSection, CurrentSection, ForceSection, GuardReport, HiddenCell, KinSection,
   LuckSection, MethodSection, PillarCell, Report, StrengthSection, YearCard,
-  PersonaSection, YearCurvePoint, YearsSection,
+  BodySection, PersonaSection, YearCurvePoint, YearsSection,
 } from "./types.js";
 
 export const ENGINE_VERSION = "0.1.0";
@@ -387,6 +388,52 @@ export function buildReport(
     personaSection = { persona: P, narrative: LP.items };
   }
 
+  // ── §2.6 形体与脏腑对照 ──
+  //
+  // subject 为 other 时整节不生成 —— 形体与脏腑都是对一个人身体的描述。
+  let bodySection: BodySection | null = null;
+  const B = subject === "self" ? base.persona.body : null;
+  if (B !== null) {
+    const LB = new Lines(locale);
+    const src = B.wuqiaoSource;
+
+    const strongest = base.persona.elements.strongest;
+    LB.add("body.form", {
+      element: strongest,
+      share: fmtPct(B.details[strongest].share),
+      xingti: NEIJING[strongest].xingti,
+    });
+
+    LB.add("body.axes", {
+      heat: B.axes.heatLabel, heatValue: fmtNum(B.axes.heat, 3),
+      dryness: B.axes.drynessLabel, drynessValue: fmtNum(B.axes.dryness, 3),
+    });
+
+    // 只讲入选的三个五行 —— 逐一罗列五行等于什么也没说
+    for (const e of B.focus) {
+      const d = B.details[e];
+      const row = NEIJING[e];
+      const attackers = ELEMENTS.filter((x) => x !== e)
+        .map((x) => ({ x, v: keOnto(base, e, x) }))
+        .filter((x) => x.v > 0).sort((a, c) => c.v - a.v).slice(0, 2);
+      LB.add("body.organ", {
+        element: e,
+        state: d.state,
+        share: fmtPct(d.share),
+        attackNote: d.state.endsWith("受制") || d.state.endsWith("被伐")
+          ? `，受${attackers.map((a) => a.x).join("、")}克 ${fmtNum(d.attack)}`
+          : "",
+        yang: d.yangShare > 0.6 ? "以阳干为主"
+          : d.yangShare < 0.4 ? "以阴干为主" : "阴阳干相当",
+        heat: B.axes.heatLabel, dryness: B.axes.drynessLabel,
+        zang: row.zang, fu: row.fu, qiao: wuqiaoOf(e, src),
+        ti: row.ti, zhi: row.zhi, qi: row.qi,
+      });
+    }
+    LB.add("body.yangNote", {});
+    bodySection = { body: B, narrative: LB.items };
+  }
+
   // ── §3 旺衰与取用 ──
   const L3 = new Lines(locale);
   const bandTpl: Readonly<Record<string, string>> = {
@@ -645,7 +692,7 @@ export function buildReport(
       warnings: chart.warnings,
     },
     disclaimerTop: disclaimerText(locale),
-    chart: chartSection, force, persona: personaSection,
+    chart: chartSection, force, persona: personaSection, body: bodySection,
     strength: strengthSection, kin: kinSection,
     luck: luckSection, years: yearsSection, current, method,
     disclaimerBottom: disclaimerText(locale),
@@ -709,6 +756,7 @@ export function collectReportText(r: Report): { text: string; where: string }[] 
     ["chart", r.chart], ["force", r.force], ["strength", r.strength],
     ["kin", r.kin], ["luck", r.luck], ["years", r.years], ["method", r.method],
     ...(r.persona === null ? [] : [["persona", r.persona] as const]),
+    ...(r.body === null ? [] : [["body", r.body] as const]),
     ...(r.current === null ? [] : [["current", r.current] as const]),
   ];
   for (const [name, s] of sections) {
@@ -746,6 +794,7 @@ export function guardReport(r: Report): GuardReport {
   const sections: readonly { narrative: readonly NarrativeLine[] }[] = [
     r.chart, r.force, r.strength, r.kin, r.luck, r.years, r.method,
     ...(r.persona === null ? [] : [r.persona]),
+    ...(r.body === null ? [] : [r.body]),
     ...(r.current === null ? [] : [r.current]),
   ];
   for (const s of sections) {

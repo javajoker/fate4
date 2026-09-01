@@ -122,6 +122,23 @@ export function renderMarkdown(r: Report): string {
     p(nl(r.persona.narrative));
   }
 
+  // ── §2.6 ──
+  if (r.body !== null) {
+    const B = r.body.body;
+    h(2, "§2.6 形体与脏腑对照");
+    out.push("| 五行 | 占比 | 虚实 | 受克份额偏离 | 阳干份额 |");
+    out.push("| --- | --- | --- | --- | --- |");
+    for (const e of Object.keys(B.details) as (keyof typeof B.details)[]) {
+      const d = B.details[e];
+      out.push(`| ${e}${B.focus.includes(e) ? " ●" : ""} | ${(d.share * 100).toFixed(1)}% | `
+        + `${d.state} | ${d.attackDeviation.toFixed(2)} | ${(d.yangShare * 100).toFixed(0)}% |`);
+    }
+    out.push("");
+    p(`● 为入选详述者（最旺、最弱、受克最重）。`
+      + `五窍取 \`${B.wuqiaoSource}\`，配属表底本 \`${B.neijingSource}\`。`);
+    p(nl(r.body.narrative));
+  }
+
   // ── §3 ──
   h(2, "§3 旺衰与取用");
   p(nl(r.strength.narrative));
