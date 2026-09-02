@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!--
-  四柱推演管线 —— L1 配重与大运摆动系数的交互式校准页。
+  推演管线 —— 四台引擎总览，兼 L1 配重与大运摆动系数的交互式校准页。
   已发布为 Artifact: https://claude.ai/code/artifact/f1eeac0e-1aa2-4242-b12f-4e31338e5bd7
 
   本文件是可独立打开的完整文档。重新发布到 Artifact 时，须先剥掉本文件的文档外壳
   （doctype、html、head、body 四类标签及本注释），只提交 title 元素起、script 元素止
   的那段内容 —— Artifact 宿主会自行套上骨架，重复套壳会产生嵌套文档。
 -->
-<title>四柱推演管线</title>
+<title>推演管线</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;700&display=swap">
@@ -265,9 +265,9 @@ footer{border-top:1px solid var(--rule); margin-top:52px; padding-top:24px; disp
 
 <header>
   <div class="hstack">
-    <p class="eyebrow">Fate Engine · 规格 v0.1 · 参数快照 default.yaml</p>
-    <h1>四柱推演管线</h1>
-    <p class="lede">确定性管线，从干支排盘到应期规则与统计节点。这一页把 L1 配重与 L3 传导的自由系数暴露成可拖动的控件——参数怎么动、盘面怎么变，一眼看到。全页只有一种饱和色，且只用来表示五行。</p>
+    <p class="eyebrow">Fate Engine · 规格 v0.1 · 参数快照 default.yaml · 四台引擎</p>
+    <h1>推演管线</h1>
+    <p class="lede">四台确定性引擎：四柱（L0–L6）、六爻（Q0–Q6）、六壬、奇门。四柱算「这个人是什么结构」，与提问无关；后三台算「此刻问这件事，象是什么结构」。它们共用干支代数、天文历算、报告层与措辞守卫，但推演管线彼此独立。这一页把 L1 配重与 L3 传导的自由系数暴露成可拖动的控件——参数怎么动、盘面怎么变，一眼看到。全页只有一种饱和色，且只用来表示五行。</p>
   </div>
 </header>
 
@@ -281,8 +281,8 @@ footer{border-top:1px solid var(--rule); margin-top:52px; padding-top:24px; disp
 
 <section id="sec-rail">
   <div class="shead">
-    <div class="row"><span class="tag">L0 → L6</span><h2>管线</h2></div>
-    <p class="note">层间单向，下游不得回写上游。力量层是纯函数，同一输入永远同一输出；报告层只组织语言，不产生新的命理判断。<strong>基础盘只取四柱，算一次即冻结</strong>，是一切时点偏离的分母。灰底的两层<strong>不进权重引擎</strong>——月与日是引动的扳机，不是力量的来源。</p>
+    <div class="row"><span class="tag">第一台 · L0 → L6</span><h2>四柱管线</h2></div>
+    <p class="note">层间单向，下游不得回写上游。力量层是纯函数，同一输入永远同一输出；报告层只组织语言，不产生新的命理判断。<strong>基础盘只取四柱，算一次即冻结</strong>，是一切时点偏离的分母。灰底的三层<strong>不进权重引擎</strong>——月与日是引动的扳机，不是力量的来源；节点层跑在曲线之上，本身不改一分权重。</p>
   </div>
   <div class="rail">
     <div class="step"><span class="lv">L0</span><span class="nm">排盘</span><span class="ds">节气 VSOP87、真太阳时、四柱、胎元、命宫、精确起运</span></div>
@@ -290,11 +290,38 @@ footer{border-top:1px solid var(--rule); margin-top:52px; padding-top:24px; disp
     <div class="step"><span class="lv">L2</span><span class="nm">结构</span><span class="ds">会 &gt; 合 &gt; 冲 &gt; 刑 &gt; 害 &gt; 破；合化转五行、冲损、刑冲开库</span></div>
     <div class="step"><span class="lv">L3</span><span class="nm">传导</span><span class="ds">生克核 × 阴阳 × 距离 × 活性，同步迭代；<strong>轮数是交互深度，不是收敛控制</strong></span></div>
     <div class="step"><span class="lv">L4</span><span class="nm">断论</span><span class="ds">十神 → 旺衰 → 从格 → 用神 → 格局 → 宫位六亲</span></div>
-    <div class="step"><span class="lv">L4p</span><span class="nm">人格</span><span class="ds">内外十神（透显藏隐）、五行偏枯、形体与《内经》配属　<em>规划中</em></span></div>
+    <div class="step"><span class="lv">L4p</span><span class="nm">人格</span><span class="ds">内外十神（透显藏隐）、五行偏枯、形体与《内经》配属；<strong>阴阳只作天干形式之分，不是中医的阴阳</strong></span></div>
     <div class="step soft"><span class="lv">L5</span><span class="nm">时间</span><span class="ds">基础盘冻结为基准；大运流年重跑结构与传导；<strong>流月流日仅事件匹配</strong></span></div>
-    <div class="step soft"><span class="lv">L5n</span><span class="nm">节点</span><span class="ds">月度曲线 → 2σ 穿越区间 → 神煞作为理由　<em>规划中</em></span></div>
-    <div class="step soft"><span class="lv">L6</span><span class="nm">报告</span><span class="ds">分层组装 + 措辞约束扫描，不做新判断</span></div>
+    <div class="step soft"><span class="lv">L5c</span><span class="nm">曲线</span><span class="ds">按月采样六十年，55 条序列；<strong>权重类的 delta 含大运流年的新质量，不是净增长</strong></span></div>
+    <div class="step soft"><span class="lv">L5n</span><span class="nm">节点</span><span class="ds">θσ 穿越区间（默认 2σ）+ 同比变化率；<strong>是排序工具，不是概率陈述</strong></span></div>
+    <div class="step soft"><span class="lv">L6</span><span class="nm">报告</span><span class="ds">分层组装 + 措辞约束扫描 + 简繁转换，不做新判断</span></div>
   </div>
+</section>
+
+<section id="sec-engines">
+  <div class="shead">
+    <div class="row"><span class="tag">四台引擎</span><h2>四柱 · 六爻 · 六壬 · 奇门</h2></div>
+    <p class="note">四柱要生辰，后三台只要时刻。六爻的卦可掷钱、可报数，故需防重掷（<strong>一事不二占</strong>）；六壬与奇门完全由时刻决定，同一时刻任何人起出同一课同一局，防无可防也无需防。四台共用 <span class="mono">ganzhi</span> 干支代数、<span class="mono">astro</span> 天文历算、<span class="mono">report</span> 模板与措辞守卫。</p>
+  </div>
+  <div class="rail">
+    <div class="step"><span class="lv">四柱</span><span class="nm">L0 → L6</span><span class="ds">出生时刻 → 权重向量 → 旺衰取用 → 曲线与节点。<strong>与提问无关</strong></span></div>
+    <div class="step"><span class="lv">六爻</span><span class="nm">Q0 → Q6</span><span class="ds">起卦（时／数／钱）→ 装卦 → 取用神（32 类占事）→ 力量阶梯 → 断论 → 应期区间</span></div>
+    <div class="step"><span class="lv">六壬</span><span class="nm">月将加时</span><span class="ds">中气定月将 → 天地盘 → 四课 → 十二天将 → 三传九宗门。<strong>九宗门是阶梯不是选项</strong></span></div>
+    <div class="step"><span class="lv">奇门</span><span class="nm">时家转盘</span><span class="ds">节气三元定局 → 地盘三奇六仪 → 值符值使 → 转天盘 → 八门八神</span></div>
+  </div>
+</section>
+
+<section id="sec-crossref">
+  <div class="shead">
+    <div class="row"><span class="tag">合参</span><h2>只报一致与分歧，不合成</h2></div>
+    <p class="note">四家都是<strong>同一时刻干支的确定性函数</strong>。没有抽样，就没有独立性；没有独立性，一致就不是证据的叠加。故合参层只对齐轴、报一致、报分歧——不加权、不裁决、不排座次，也不给「今日总体如何」的合成判断：那个数没有任何一家典籍为它背书。</p>
+  </div>
+  <div class="rail" style="grid-template-columns:repeat(3,1fr)">
+    <div class="step"><span class="lv">轴</span><span class="nm">五条</span><span class="ds">我方位置 · 阻碍来源 · 事之动静 · 时间窗 · 方位。<strong>说得上话的才说</strong>——方位一轴只有奇门有判据，六壬不出时间窗</span></div>
+    <div class="step"><span class="lv">类目</span><span class="nm">六种</span><span class="ds">一致 · 分歧 · <strong>单侧表态</strong>（一方有向、其余中性，<em>这不是一致</em>）· 无从比对 · 并列（该轴不判方向）· 单侧</span></div>
+    <div class="step"><span class="lv">实测</span><span class="nm">45 : 66</span><span class="ds">120 个时刻的「我方位置」轴：一致 45、分歧 66。家数越多全体同向越难——<strong>一致率压倒性地高，反说明四家在算同一件事</strong></span></div>
+  </div>
+  <p class="fine" style="margin-top:18px">两条写进测试的不变量：一致率须落在区间之内（两家 25–75%、四家低于 60%）；断言的注记里不得出现比数与百分比——「四家有三家判顺」不是七成五的把握，那是把计数当概率。</p>
 </section>
 
 <section id="sec-weights">
@@ -481,19 +508,25 @@ W金 −= D · 0.30</div>
     <div class="kitem human"><span class="kn">02</span><span class="kt"><b>十二长生流派</b> <em>— 阳顺阴逆 还是 阴阳同生同死。直接改变通根与旺衰</em></span><span class="kd">默认 阳顺阴逆</span></div>
     <div class="kitem human"><span class="kn">03</span><span class="kt"><b>土的长生</b> <em>— 火土同宫 还是 水土同宫</em></span><span class="kd">默认 火土</span></div>
     <div class="kitem human"><span class="kn">04</span><span class="kt"><b>子时规则</b> <em>— 晚子换日 / 早子不换 / 折衷。须在报告显式标注</em></span><span class="kd">默认 晚子换日</span></div>
-    <div class="kitem"><span class="kn">05</span><span class="kt"><b>《穷通宝鉴》调候表</b> <em>— 120 格待逐格转录、双源校对。当前用可计算的极端气候规则降级</em></span><span class="kd">heuristic</span></div>
+    <div class="kitem"><span class="kn">05</span><span class="kt"><b>《穷通宝鉴》调候表</b> <em>— 通行本 120 格已转录并设为默认。⚠️ 凭记忆转录，31 格标为版本有出入，待实体书逐格核对</em></span><span class="kd">table · 待核</span></div>
     <div class="kitem"><span class="kn">06</span><span class="kt"><b>藏干变体</b> <em>— 申三藏／二藏，亥二藏／三藏</em></span><span class="kd">默认 standard</span></div>
     <div class="kitem"><span class="kn">07</span><span class="kt"><b>女命子女星分配</b> <em>— 食神为儿／伤官为女，或反向</em></span><span class="kd">默认 standard</span></div>
     <div class="kitem"><span class="kn">08</span><span class="kt"><b>元辰起例</b> <em>— 记载不一，待择底本</em></span><span class="kd">关闭</span></div>
     <div class="kitem"><span class="kn">09</span><span class="kt"><b>福星／天厨／词馆起例</b> <em>— 文献差异较大</em></span><span class="kd">关闭</span></div>
     <div class="kitem"><span class="kn">10</span><span class="kt"><b>阴干羊刃</b> <em>— 取乙辰丁未己未辛戌癸丑，或不取</em></span><span class="kd">关闭</span></div>
     <div class="kitem"><span class="kn">11</span><span class="kt"><b>化气格</b> <em>— 实务误判率高，当前 confidence 上限锁 0.60</em></span><span class="kd">开启 · 受限</span></div>
+    <div class="kitem human"><span class="kn">12</span><span class="kt"><b>六爻起卦法</b> <em>— 按时（借梅花，需农历）／报数／掷钱（六爻本法）。混用梅花起卦与京房装断，随卦声明</em></span><span class="kd">默认 time</span></div>
+    <div class="kitem"><span class="kn">13</span><span class="kt"><b>六壬别责与八专课</b> <em>— 取法各家不一，尤其中末传；伏吟的中末传取刑亦有异说。三者标 disputed，置信度下调</em></span><span class="kd">通行本 · 待核</span></div>
+    <div class="kitem"><span class="kn">14</span><span class="kt"><b>奇门定局法与盘式</b> <em>— 置闰法（超神接气）与飞盘法未实现，取之即在构建期报错。拿拆补冒充置闰等于让 paramsHash 说谎</em></span><span class="kd">拆补 · 转盘</span></div>
+    <div class="kitem"><span class="kn">15</span><span class="kt"><b>奇门节气三元局数表</b> <em>— 24 气 × 3 元 = 72 个数字，与调候表同为凭记忆转录，待核</em></span><span class="kd">待核</span></div>
+    <div class="kitem human"><span class="kn">16</span><span class="kt"><b>健康类占事</b> <em>— 开启但受限：不给病名、不给预后、<b>不给时间窗</b>。「病在某月」是本系统绝不输出的句式</em></span><span class="kd">开启 · 硬约束</span></div>
   </div>
 </section>
 
 <footer>
   <p class="fine">L4 判定的目标一致率定在 75%，不是 95%。古籍注家对同一命例的旺衰都会打架，追到 95% 就是过拟合到某一家之言。剩下的 25% 中有相当一部分是真实的流派分歧，应由 confidence 与 alternatives 如实呈现，而不是靠调参硬掰过去。</p>
-  <p class="fine">本页为四柱命理的计算实现之设计文档，属传统文化研究与自我省思的工具。其中的判定基于传统命理典籍的规则与本系统的量化模型，不具备预测未来事件的能力，不构成医疗、法律、财务或任何专业建议。</p>
+  <p class="fine">四台引擎共一条纪律：<strong>确定性层只出结构，叙述层只描述结构</strong>。六爻典籍的断语是赤裸的结果预言（「用神旺相，主求财必得」），故断论层一句成败都不许有，由四条专有禁令与模板扫描共同强制；应期只报到月建，报到日、到时辰即伪精度。</p>
+  <p class="fine">本页为四柱、六爻、六壬、奇门之计算实现的设计文档，属传统文化研究与自我省思的工具。其中的判定基于传统典籍的规则与本系统的量化模型，不具备预测未来事件的能力，不构成医疗、法律、财务或任何专业建议。</p>
 </footer>
 
 </div>
