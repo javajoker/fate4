@@ -830,12 +830,39 @@ const liuyaoTemplates: NarrativeTemplate[] = [
   }),
 ];
 
+// ═══════════════════════════════════════════════════════════
+// 当日运程 —— 四柱流日 ∥ 六爻日卦，并列不合并
+// ═══════════════════════════════════════════════════════════
+
+const dailyTemplates: NarrativeTemplate[] = [
+  T("daily.header", "data", "daily", ["date", "pillar", "gua"], {
+    zhHans: "{date}，流日{pillar}。该日日卦为 {gua}。",
+    en: "{date}, day pillar {pillar}. The day's hexagram is {gua}.",
+  }),
+  T("daily.caveat", "data", "daily", [], {
+    zhHans: "以下两侧并列陈述，不作合并。四柱流日与六爻日卦都是当日干支的确定性函数 —— 二者方向一致不构成互相印证，方向相反也不代表哪一侧有误。",
+    en: "The two readings below are presented side by side and are not merged. Both the four-pillar day view and the day's hexagram are deterministic functions of the same day's stem and branch: agreement between them is not mutual corroboration, and disagreement does not mean either side is wrong.",
+  }),
+  T("daily.axis", "data", "daily", ["axis", "kind", "bazi", "liuyao", "note"], {
+    zhHans: "「{axis}」{kind}。四柱侧：{bazi}。六爻侧：{liuyao}。{note}",
+    en: "On the axis of {axis}: {kind}. Four-pillar side: {bazi}. Liu Yao side: {liuyao}. {note}",
+  }),
+  T("daily.axis.one", "data", "daily", ["axis", "system", "evidence", "note"], {
+    zhHans: "「{axis}」仅{system}一侧有判据：{evidence}。{note}",
+    en: "On the axis of {axis}, only the {system} side offers grounds: {evidence}. {note}",
+  }),
+  T("daily.summary", "data", "daily", ["summary"], {
+    zhHans: "逐轴对照：{summary}此处不给出「今日总体如何」的合成判断 —— 那个数没有任何一家典籍为它背书。",
+    en: "Axis by axis: {summary} No composite verdict on the day as a whole is given: such a number has no basis in any of the traditions involved.",
+  }),
+];
+
 export const NARRATIVE_TEMPLATES: readonly NarrativeTemplate[] = Object.freeze([
   ...strengthTemplates, ...rootTemplates, ...patternTemplates, ...yongshenTemplates,
   ...gejuTemplates, ...metricsTemplates, ...kinTemplates, ...shenshaTemplates,
   ...personaTemplates, ...bodyTemplates,
   ...timelineTemplates, ...currentTemplates, ...methodTemplates,
-  ...nodeTemplates, ...liuyaoTemplates,
+  ...nodeTemplates, ...liuyaoTemplates, ...dailyTemplates,
 ]);
 
 export const TEMPLATES_BY_ID: ReadonlyMap<string, NarrativeTemplate> = new Map(

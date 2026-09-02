@@ -7,3 +7,4 @@ export * from "./strength.js";
 export * from "./judge.js";
 export * from "./yingqi.js";
 export * from "./report.js";
+export * from "./daily.js";

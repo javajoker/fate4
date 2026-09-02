@@ -94,9 +94,10 @@ L6 报告   汇总为分层报告
 | **P18** | `liuyao/` Q0 起卦（三法）+ Q1 装卦 | ✅ 完成 —— 掷钱 4096 种组合全可装 |
 | **P19** | Q2 用神（32 类占事）+ Q3 力量 + Q4 断论 | ✅ 完成 —— 断论层不出成败字眼 |
 | **P20** | Q5 应期区间 + Q6 问事报告 + 四条新禁令 | ✅ 完成 —— 32 类占事 × 多卦，守卫零命中 |
-| P21– | 当日运程（四柱 ∥ 六爻并列）、Web、CLI、六壬、奇门 | 📋 规格已定案，待实现 |
+| **P21** | 当日运程 —— 四柱流日 ∥ 六爻日卦，五类目对照 | ✅ 完成 —— 实测一致 110 / 分歧 116 |
+| P22– | Web 问事页、CLI `ask`、Skill、六壬、奇门 | 📋 规格已定案，待实现 |
 
-全部 804 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
+全部 821 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
 
 ```bash
 pnpm install && pnpm test && pnpm typecheck
