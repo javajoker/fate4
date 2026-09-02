@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildChart } from "../src/chart/buildChart.js";
+import { buildBaseChart } from "../src/chart/baseChart.js";
+import { plainYear } from "../src/plain/year.js";
 import { buildReport } from "../src/report/assemble.js";
 import { plainCards, type PlainCard } from "../src/plain/cards.js";
 import { scanPlain, PLAIN_RULES } from "../src/plain/guard.js";
@@ -426,6 +428,43 @@ describe("**时间卡片带神煞指事**", () => {
   it("指事只说类别，不出可照做的指定", () => {
     for (const c of allCards()) {
       expect(scanPlain(c.body, c.id), `${c.id}`).toEqual([]);
+    }
+  });
+});
+
+describe("**回看用的逐年人话**", () => {
+  const BASE = buildBaseChart(buildChart(CHARTS[0]!));
+
+  it("说法里不含年份 —— 回看时年份是折叠的", () => {
+    for (const y of [2008, 2015, 2020, 2024]) {
+      const p = plainYear(BASE, y);
+      expect(p.headline, `${y} 的说法里漏出了年份`).not.toMatch(/\d{4}/);
+      for (const d of p.domains) {
+        expect(d.text).not.toMatch(/\d{4}/);
+      }
+    }
+  });
+
+  it("只说「哪一类事」与推阻方向，不说会发生什么", () => {
+    for (let y = 2005; y <= 2035; y++) {
+      const p = plainYear(BASE, y);
+      const text = p.headline + p.domains.map((d) => d.label + d.text).join("");
+      expect(scanPlain(text, `year.${y}`), `${y}`).toEqual([]);
+      for (const w of ["升官", "破财", "离婚", "生病", "会有", "将有", "必"]) {
+        expect(text.includes(w), `${y} 出现事件预言「${w}」`).toBe(false);
+      }
+    }
+  });
+
+  it("**置信度如实取自用神判定** —— 不另立一个数", () => {
+    for (const y of [2010, 2030]) {
+      expect(plainYear(BASE, y).confidence).toBe(BASE.conclusions.yongshen.confidence);
+    }
+  });
+
+  it("张力小的域不入选 —— 全说等于没说", () => {
+    for (let y = 2005; y <= 2035; y++) {
+      expect(plainYear(BASE, y).domains.length).toBeLessThanOrEqual(3);
     }
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   buildQuestionReport, cast, castMomentOf, dress, judge, loadParams,
   pickYongshen, plainQuestion, TOPICS, TOPIC_CATEGORIES,
@@ -8,7 +8,7 @@ import {
 } from "@fate/core";
 import { Card } from "../Card";
 import { Disclaimer } from "../page";
-import { CITIES } from "../store";
+import { CITIES, loadMarks, saveMark, type Mark, type Verdict } from "../store";
 
 /**
  * 「问事」页 —— 就一件具体的事起一卦。
@@ -44,6 +44,10 @@ export default function AskPage() {
     report: ReturnType<typeof buildQuestionReport>; replayed: boolean;
   } | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // 复盘：问过的事，事后回来记结果。与「回看」共用同一本账。
+  const [askedKey, setAskedKey] = useState<string | null>(null);
+  const [marks, setMarks] = useState<Mark[]>([]);
+  useEffect(() => { setMarks(loadMarks()); }, []);
   const [why, setWhy] = useState(false);
 
   const topics = TOPICS.filter((t) => t.category === cat);
@@ -77,6 +81,7 @@ export default function AskPage() {
         ]));
       }
       setOut({ report, replayed: prior !== undefined });
+      setAskedKey(key);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
       setOut(null);
@@ -144,6 +149,20 @@ export default function AskPage() {
               <p className="dim">这个问题今天已经问过一次，这里显示的是当时的结果。</p>
             </div>
           )}
+          <Followup
+            askedKey={askedKey} marks={marks}
+            onMark={(v) => {
+              if (askedKey === null) return;
+              setMarks(saveMark({
+                key: `q${askedKey}`, kind: "question", verdict: v,
+                // 问事的置信度取报告里最低的那一条 —— 一份判断的可靠程度
+                // 由它最弱的一环决定，取平均会把那一环藏起来
+                confidence: Math.min(...[...out.report.judgement.narrative,
+                  ...out.report.topic.narrative].map((l) => l.confidence), 1),
+                at: new Date().toISOString(),
+              }));
+            }}
+          />
           <div className="m-sec">结果</div>
           <p className="m-lede">{plainQuestion(out.report).framing}</p>
           {plainQuestion(out.report).cards.map((c) => <Card key={c.id} card={c} />)}
@@ -172,5 +191,48 @@ export default function AskPage() {
         </>
       )}
     </>
+  );
+}
+
+/**
+ * 复盘 —— 问过的事，事后回来记结果。
+ *
+ * 与「回看」共用同一本账，故两处的标注汇总在一起。
+ * 只存指纹不存原文：一份能被翻出来的问卜日记，泄露的东西比生辰多得多。
+ *
+ * 「还没结果」是默认的一档，且**不计入命中**。没有它，用户会被逼着
+ * 在事情还没落定时先表个态 —— 那个态度事后多半会被自己的记忆改写。
+ */
+function Followup({ askedKey, marks, onMark }: {
+  askedKey: string | null;
+  marks: readonly Mark[];
+  onMark: (v: Verdict) => void;
+}) {
+  if (askedKey === null) return null;
+  const cur = marks.find((m) => m.key === `q${askedKey}`);
+  const LABEL: Readonly<Record<Verdict, string>> = {
+    hit: "后来应验了", miss: "后来没应验", unclear: "说不清",
+  };
+  return (
+    <div className="m-card">
+      <h3>过些天回来记一笔</h3>
+      <p className="dim">
+        事情有结果之后再回到这一页、问同一个问题（当天会取出原来那一卦），
+        然后标一下。标注只存在这台设备上，也不会回流去调整模型。
+      </p>
+      <div className="m-chips" style={{ marginTop: 10, marginBottom: 0 }}>
+        {(["hit", "miss", "unclear"] as const).map((v) => (
+          <button key={v} className={`m-chip${cur?.verdict === v ? " on" : ""}`}
+            onClick={() => onMark(v)}>
+            {LABEL[v]}
+          </button>
+        ))}
+      </div>
+      {cur === undefined && (
+        <p className="dim" style={{ marginTop: 8 }}>
+          事情还没落定就别急着标 —— 现在表的态，事后多半会被自己的记忆改写。
+        </p>
+      )}
+    </div>
   );
 }

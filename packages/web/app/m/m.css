@@ -62,3 +62,13 @@
 .m-chip { padding: 6px 12px; font-size: 12.5px; border-radius: 999px;
   border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); cursor: pointer; }
 .m-chip.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+/* ── 回看 ──────────────────────────────── */
+.m-h2 { font-family: var(--serif); font-size: 17px; font-weight: 600; margin-bottom: 8px; color: var(--ink); }
+.m-dim { color: var(--ink-3); font-size: 12.5px; line-height: 1.65; }
+.m-list { margin: 10px 0 0; padding-left: 17px; }
+.m-list li { font-size: 13.5px; line-height: 1.7; color: var(--ink-2); margin-bottom: 5px; }
+.m-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+.m-table th, .m-table td { padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: right; }
+.m-table th:first-child, .m-table td:first-child { text-align: left; color: var(--ink-2); }
+.m-table thead th { color: var(--ink-3); font-weight: 500; font-size: 12px; }

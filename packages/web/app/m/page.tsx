@@ -6,6 +6,7 @@ import { Card } from "./Card";
 import { CITIES, clearBirth, loadBirth, loadPlainSource, savePlainSource, saveBirth,
   type PlainSource } from "./store";
 import { AiHandoff } from "./AiHandoff";
+import { Share } from "./Share";
 
 /**
  * 「我」页 —— 采集出生信息，给出性格、身心、亲近的人、人生轨迹、起伏。
@@ -73,6 +74,10 @@ export default function MePage() {
       )}
 
       {src === "code" && shown.map((c) => <Card key={c.id} card={c} />)}
+
+      {src === "code" && shown.length > 0 && (
+        <Share title={`关于我 · ${sec}`} lines={shown.map((c) => `${c.title}：${c.body}`)} />
+      )}
 
       <Disclaimer plain={plain.disclaimer} technical={plain.disclaimerTechnical} />
       <button className="m-btn ghost" onClick={() => { clearBirth(); setBirth(null); }}>

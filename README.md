@@ -82,6 +82,7 @@ Web 应用全部计算在浏览器内完成，**生辰数据不出本机**：记
 | [11-validation](docs/11-validation.md) | 验证方案、测试向量、待校准清单 |
 | [12-persona-curves-nodes](docs/12-persona-curves-nodes.md) | L4p 人格层、L5c 生命曲线、L5n 统计节点、两层结论 |
 | [13-liuyao](docs/13-liuyao.md) | **第二至四台引擎** —— 即时问事与当日运程：六爻、六壬、奇门，四家合参 |
+| [15-engagement](docs/15-engagement.md) | 移动版的留存设计 —— 让用户自己检验它准不准 |
 | [14-plain](docs/14-plain.md) | **人话层与移动版** —— 去掉术语恰恰去掉了天然的对冲 |
 | [pipeline.html](docs/pipeline.html) | **交互页** —— 管线总览 + L1 配重与大运摆动系数的实时校准（[在线版](https://claude.ai/code/artifact/f1eeac0e-1aa2-4242-b12f-4e31338e5bd7)） |
 

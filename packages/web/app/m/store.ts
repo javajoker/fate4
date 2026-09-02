@@ -60,3 +60,47 @@ export function loadPlainSource(): PlainSource {
 export function savePlainSource(v: PlainSource): void {
   try { localStorage.setItem(SRC_KEY, v); } catch { /* 同上 */ }
 }
+
+// ─────────────────────────────────────────────────────────
+// 回看的标注 —— 见 docs/15-engagement.md
+// ─────────────────────────────────────────────────────────
+
+export type Verdict = "hit" | "miss" | "unclear";
+
+export interface Mark {
+  /** 标的是哪一年，或哪一次问事的指纹。 */
+  readonly key: string;
+  readonly kind: "year" | "question";
+  readonly verdict: Verdict;
+  /** 模型当时给的置信度。汇总时按它分栏 —— 合成一个总数会抹掉最有意思的差别。 */
+  readonly confidence: number;
+  readonly at: string;
+}
+
+const MARK_KEY = "fate.m.marks.v1";
+
+export function loadMarks(): Mark[] {
+  try {
+    const raw = localStorage.getItem(MARK_KEY);
+    return raw === null ? [] : (JSON.parse(raw) as Mark[]);
+  } catch { return []; }
+}
+
+/** 同一个 key 只留最后一次标注 —— 允许改主意，但不重复计数。 */
+export function saveMark(m: Mark): Mark[] {
+  const next = [...loadMarks().filter((x) => x.key !== m.key), m];
+  try { localStorage.setItem(MARK_KEY, JSON.stringify(next)); } catch { /* 同上 */ }
+  return next;
+}
+
+export function clearMarks(): void {
+  try { localStorage.removeItem(MARK_KEY); } catch { /* 同上 */ }
+}
+
+/**
+ * 样本量的门槛。
+ *
+ * 低于此数**不出百分数** —— 七次里中四次，在完全随机时也一点都不稀奇，
+ * 把它写成 57% 会让一个说明不了什么的数字看起来像统计量。
+ */
+export const ENOUGH = 30;
