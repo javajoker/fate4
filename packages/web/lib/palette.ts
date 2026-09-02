@@ -53,3 +53,20 @@ export const POLARITY_MARK = Object.freeze({
   "0": { glyph: "○", label: "中性", color: "#7d7d7d" },
   "-1": { glyph: "－", label: "逆向", color: "#8a6f5c" },
 });
+
+/**
+ * 多条曲线并置时的分类色。
+ *
+ * **曲线的身份是分类量**（十神哪一位、五行哪一行），故可用色相区分 ——
+ * 这与「有序量禁色相」不冲突：那条禁的是拿色相去编码大小与吉凶。
+ *
+ * 十个色相刻意避开纯红与纯绿的对立，也不按「吉凶」排序：
+ * 相邻两条曲线的颜色差别只为分辨，不含高下。
+ */
+export const SERIES_COLORS: readonly string[] = Object.freeze([
+  "#3f5d78", "#b5654a", "#4a7c6f", "#8c7a95", "#a8874e",
+  "#5b8ca8", "#96604e", "#5f8f79", "#7c6f9c", "#8a7a52",
+]);
+
+export const seriesColor = (i: number): string =>
+  SERIES_COLORS[i % SERIES_COLORS.length]!;

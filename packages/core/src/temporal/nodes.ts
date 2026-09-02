@@ -539,6 +539,21 @@ function indexOfFrame(S: SeriesSet, f: SeriesFrame): number {
   return i >= 0 ? i : 0;
 }
 
+/**
+ * 一条序列在统计窗内的中心与散布 —— **与大尺度节点检出用的是同一个估计量**。
+ *
+ * 供绘图：曲线上画的 ±θσ 界线若与节点层算的不是同一个 σ，
+ * 图上看到的穿越点就对不上报告里列的节点 —— 那比不画还糟。
+ */
+export function curveStats(
+  S: SeriesSet, s: Series,
+): { readonly center: number; readonly sigma: number; readonly inWindow: readonly number[] } {
+  const vs = S.frames.map((f, i) => ({ f, i }))
+    .filter((x) => x.f.inStatsWindow)
+    .map((x) => s.values[x.i]!);
+  return { center: mean(vs), sigma: stdev(vs), inWindow: vs };
+}
+
 /** 三个尺度一次算齐。`override` 同 {@link findNodes}。 */
 export function allNodes(
   S: SeriesSet, override?: Partial<NodesParams>,

@@ -9,7 +9,7 @@
  */
 
 import { ELEMENTS, type Element } from "@fate/core";
-import { ELEMENT_COLOR, FLOW_COLOR, PARTY_COLOR, sequential } from "../lib/palette";
+import { seriesColor, ELEMENT_COLOR, FLOW_COLOR, PARTY_COLOR, sequential } from "../lib/palette";
 
 // ─────────────────────────────────────────────────────────
 // 五行雷达 —— 可叠加「本命 / 大运 / 流年」三层
@@ -401,28 +401,100 @@ export interface CurveSeries {
  *
  * 换运处画竖线：那是曲线上唯一的真实断点，其余起伏都是连续的。
  */
-export function LifeCurves({ series, years, luckBreaks, mark, onPick }: {
-  series: readonly CurveSeries[];
+/**
+ * 生命曲线。
+ *
+ * ## 两种对齐，各回答一个不同的问题
+ *
+ * | 模式 | 纵轴 | 回答的问题 |
+ * | `sigma` | z = (v − μ) / σ | 「这个量此刻偏离它自己的常态多远」 |
+ * | `weight` | 原始值 | 「这几个量之间，谁大谁小」 |
+ *
+ * σ 对齐时全部曲线共用同一条 ±θ 界线，穿越点一眼可读；
+ * 权重对齐时界线不画 —— 各条的 σ 不同，画出来会是十条不同高度的横线，
+ * 除了糊成一片没有别的作用。
+ *
+ * μ 与 σ 取自 `curveStats`，与节点层检出用的是同一个估计量 ——
+ * 否则图上看到的穿越点对不上报告里列的节点。
+ *
+ * ## 为什么是平滑曲线
+ *
+ * 采样是月度的，而底下的量（大运份额的推移）本就连续。折线把每个采样点
+ * 画成拐点，看上去像是每月都有一次转折，那是采样的伪影不是数据的性质。
+ * 用 Catmull-Rom 转三次贝塞尔：过每一个采样点，点之间平滑。
+ */
+export interface CurveSpec {
+  readonly id: string;
+  readonly label: string;
+  readonly values: readonly number[];
+  /** 统计窗内的中心与散布。σ 模式用它换算 z。 */
+  readonly center: number;
+  readonly sigma: number;
+}
+
+/** Catmull-Rom → 三次贝塞尔。张力 0.5 为通行取值。 */
+function smoothPath(pts: readonly (readonly [number, number])[]): string {
+  if (pts.length === 0) return "";
+  if (pts.length < 3) {
+    return pts.map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+  }
+  const out: string[] = [`M${pts[0]![0].toFixed(1)},${pts[0]![1].toFixed(1)}`];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i === 0 ? 0 : i - 1]!;
+    const p1 = pts[i]!;
+    const p2 = pts[i + 1]!;
+    const p3 = pts[i + 2 < pts.length ? i + 2 : pts.length - 1]!;
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    out.push(`C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} `
+      + `${p2[0].toFixed(1)},${p2[1].toFixed(1)}`);
+  }
+  return out.join(" ");
+}
+
+export function LifeCurves({
+  series, years, luckBreaks, mark, onPick, mode = "sigma", threshold = 2,
+}: {
+  series: readonly CurveSpec[];
   years: readonly number[];
   luckBreaks: readonly number[];
   mark?: number;
   onPick?: (index: number) => void;
+  mode?: "sigma" | "weight";
+  threshold?: number;
 }) {
   const n = years.length;
   if (n === 0 || series.length === 0) return null;
-  const W = 860; const H = 240; const padL = 8; const padB = 22; const padT = 8;
+  const W = 860; const H = 300; const padL = 34; const padB = 22; const padT = 10;
   const X = (i: number) => padL + (i / Math.max(1, n - 1)) * (W - padL - 8);
-  const Y = (v: number) => padT + (1 - v) * (H - padT - padB);
 
-  const norm = (vs: readonly number[]) => {
-    const lo = Math.min(...vs); const hi = Math.max(...vs);
-    return hi - lo < 1e-9 ? vs.map(() => 0.5) : vs.map((v) => (v - lo) / (hi - lo));
-  };
+  // σ 模式：纵轴是 z，范围取 ±max(threshold+1, 实际极值)，两模式都不裁剪数据
+  const zOf = (s: CurveSpec, v: number) => (s.sigma <= 0 ? 0 : (v - s.center) / s.sigma);
+  let lo: number; let hi: number;
+  if (mode === "sigma") {
+    let m = threshold + 0.6;
+    for (const s of series) for (const v of s.values) m = Math.max(m, Math.abs(zOf(s, v)));
+    lo = -m; hi = m;
+  } else {
+    lo = Infinity; hi = -Infinity;
+    for (const s of series) for (const v of s.values) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    if (!(hi > lo)) { lo -= 1; hi += 1; }
+    const pad = (hi - lo) * 0.06;
+    lo -= pad; hi += pad;
+  }
+  const Y = (v: number) => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
+  const val = (s: CurveSpec, i: number) =>
+    mode === "sigma" ? zOf(s, s.values[i]!) : s.values[i]!;
 
-  // 每年有十二个采样点，故先取该年的首点再过滤 —— 否则一个年份会画十二次
   const ticks = years
     .map((y, i) => ({ y, i }))
     .filter(({ y, i }) => y % 10 === 0 && (i === 0 || years[i - 1] !== y));
+
+  const axisLabels = mode === "sigma"
+    ? [threshold, 0, -threshold]
+    : [hi - (hi - lo) * 0.06, (lo + hi) / 2, lo + (hi - lo) * 0.06];
 
   return (
     <div className="scroll">
@@ -431,11 +503,32 @@ export function LifeCurves({ series, years, luckBreaks, mark, onPick }: {
         onClick={(e) => {
           if (onPick === undefined) return;
           const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
-          onPick(Math.round(((e.clientX - r.left) / r.width) * (n - 1)));
+          const i = Math.round((((e.clientX - r.left) / r.width) * W - padL)
+            / (W - padL - 8) * (n - 1));
+          onPick(Math.min(n - 1, Math.max(0, i)));
         }}>
+        {/* ±θσ 界线。只在 σ 模式画 —— 权重模式下各条 σ 不同，画出来是十条横线 */}
+        {mode === "sigma" && [threshold, -threshold].map((t) => (
+          <g key={`s${t}`}>
+            <line x1={padL} y1={Y(t)} x2={W - 8} y2={Y(t)}
+              stroke="var(--line-strong)" strokeWidth={1} strokeDasharray="5 4" />
+            <text x={padL - 4} y={Y(t) + 3} textAnchor="end" fontSize={9.5} fill="var(--ink-3)">
+              {t > 0 ? `+${t}σ` : `−${threshold}σ`}
+            </text>
+          </g>
+        ))}
+        {mode === "sigma" && (
+          <line x1={padL} y1={Y(0)} x2={W - 8} y2={Y(0)}
+            stroke="var(--line)" strokeWidth={1} />
+        )}
+        {mode === "weight" && axisLabels.map((v, k) => (
+          <text key={`a${k}`} x={padL - 4} y={Y(v) + 3} textAnchor="end"
+            fontSize={9.5} fill="var(--ink-3)">{v.toFixed(0)}</text>
+        ))}
+
         {luckBreaks.map((i) => (
           <line key={`b${i}`} x1={X(i)} y1={padT} x2={X(i)} y2={H - padB}
-            stroke="var(--line-strong)" strokeWidth={1} strokeDasharray="2 4" />
+            stroke="var(--line)" strokeWidth={1} strokeDasharray="2 4" />
         ))}
         {ticks.map(({ y, i }) => (
           <text key={y} x={X(i)} y={H - 6} textAnchor="middle" fontSize={10} fill="var(--ink-3)">
@@ -446,23 +539,20 @@ export function LifeCurves({ series, years, luckBreaks, mark, onPick }: {
           <line x1={X(mark)} y1={padT} x2={X(mark)} y2={H - padB}
             stroke="var(--accent)" strokeWidth={1.5} />
         )}
-        {series.map((s, si) => {
-          const vs = norm(s.values);
-          const d = vs.map((v, i) => `${i === 0 ? "M" : "L"}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
-          return (
-            <path key={s.id} d={d} fill="none" stroke="var(--accent)"
-              strokeOpacity={Math.max(0.28, 1 - si * 0.22)} strokeWidth={si === 0 ? 1.8 : 1.1} />
-          );
-        })}
+        {series.map((s, si) => (
+          <path key={s.id}
+            d={smoothPath(s.values.map((_, i) => [X(i), Y(val(s, i))] as const))}
+            fill="none" stroke={seriesColor(si)} strokeWidth={1.4}
+            strokeLinecap="round" strokeLinejoin="round" />
+        ))}
       </svg>
       <div className="legend">
         {series.map((s, i) => (
           <span key={s.id}>
-            <i style={{ background: "var(--accent)", opacity: Math.max(0.28, 1 - i * 0.22) }} />
+            <i style={{ background: seriesColor(i) }} />
             {s.label}
           </span>
         ))}
-        <span className="dim">虚线为换运处 —— 曲线上唯一的真实断点</span>
       </div>
     </div>
   );

@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { buildSeries } from "@fate/core";
+import { buildSeries, curveStats, evaluateAt } from "@fate/core";
 import { useChart } from "../../../lib/chartContext";
 import { LifeCurves } from "../../../components/charts";
-import { num, pillarText } from "../../../lib/format";
+import { pillarText } from "../../../lib/format";
 
 const GROUPS: readonly [string, string][] = [
   ["tenGod", "十神"], ["element", "五行"], ["palace", "宫位"],
@@ -15,18 +15,62 @@ const GROUPS: readonly [string, string][] = [
 export default function CurvesPage() {
   const { base } = useChart();
   const [group, setGroup] = useState("tenGod");
+  const [sel, setSel] = useState<readonly string[] | null>(null); // null = 全部
   const [picked, setPicked] = useState<number | null>(null);
+  const [mode, setMode] = useState<"sigma" | "weight">("sigma");
+  const [threshold, setThreshold] = useState(2);
+  const [density, setDensity] = useState<"year" | "month">("year");
 
   const S = useMemo(() => (base === null ? null : buildSeries(base)), [base]);
+
+  // 取点处的即时盘 —— 神煞与结构事件由它来，解释曲线为何在此处变化
+  const atFrame = useMemo(() => {
+    if (base === null || S === null || picked === null) return null;
+    const f = S.frames[picked];
+    if (f === undefined) return null;
+    return {
+      f,
+      ev: evaluateAt(base, {
+        luck: f.luckPillar === null ? null
+          : { pillar: f.luckPillar, elapsedYears: f.elapsedYears },
+        annual: f.annual, fleetingMonth: f.fleetingMonth,
+      }),
+    };
+  }, [base, S, picked]);
+
   if (base === null || S === null) return <p className="sub">曲线计算中…</p>;
 
-  const shown = S.series.filter((s) => s.kind === group).slice(0, 4);
-  const years = S.frames.map((f) => f.year);
-  const breaks = S.frames
-    .map((f, i) => ({ f, i }))
-    .filter(({ f, i }) => i > 0 && f.luckIndex !== S.frames[i - 1]!.luckIndex)
-    .map(({ i }) => i);
-  const at = picked === null ? null : S.frames[picked] ?? null;
+  const inGroup = S.series.filter((s) => s.kind === group);
+  const shown = sel === null ? inGroup : inGroup.filter((s) => sel.includes(s.id));
+
+  // 采样密度。月度 720 点压在 860px 上是一把梳子 —— 那些锯齿是立春换柱的真实阶跃
+  // （权重类序列在立春年内近乎恒定），数据没错，可读性却没了。
+  // 故默认按年抽首点；要看年内的推移再切回月度。
+  const keep = density === "year"
+    ? S.frames.map((f, i) => ({ f, i }))
+      .filter(({ f, i }) => i === 0 || S.frames[i - 1]!.year !== f.year)
+      .map(({ i }) => i)
+    : S.frames.map((_, i) => i);
+
+  const specs = shown.map((s) => {
+    const st = curveStats(S, s);
+    return {
+      id: s.id, label: s.label,
+      values: keep.map((i) => s.values[i]!),
+      center: st.center, sigma: st.sigma,
+    };
+  });
+  const years = keep.map((i) => S.frames[i]!.year);
+  const breaks = keep
+    .map((i, k) => ({ i, k }))
+    .filter(({ i, k }) => k > 0 && S.frames[i]!.luckIndex !== S.frames[keep[k - 1]!]!.luckIndex)
+    .map(({ k }) => k);
+
+  const toggle = (id: string) => {
+    const cur = sel ?? inGroup.map((s) => s.id);
+    const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+    setSel(next.length === inGroup.length ? null : next);
+  };
 
   return (
     <>
@@ -44,88 +88,131 @@ export default function CurvesPage() {
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "14px 0" }}>
         {GROUPS.map(([k, name]) => (
-          <button key={k} className={group === k ? undefined : "ghost"} onClick={() => setGroup(k)}>
-            {name}
+          <button key={k} className={group === k ? undefined : "ghost"}
+            onClick={() => { setGroup(k); setSel(null); }}>
+            {name}（{S.series.filter((s) => s.kind === k).length}）
           </button>
         ))}
       </div>
 
-      <LifeCurves
-        series={shown.map((s) => ({ id: s.id, label: s.label, values: s.values }))}
-        years={years} luckBreaks={breaks}
-        {...(picked === null ? {} : { mark: picked })}
-        onPick={setPicked}
-      />
-      <p className="sub" style={{ fontSize: 12 }}>
-        每条各自归一到 [0,1] 再画 —— 十神权重与域张力量纲差着两个数量级，同轴直接画
-        会让后者变成一条贴底的直线。归一之后比的是<b>形状</b>：哪一段在动、哪几条一起动。
-        具体数值见下表；图上不标纵轴刻度，因为归一后的纵轴没有单位。
-      </p>
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+          <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
+            纵轴
+            <select value={mode} onChange={(e) => setMode(e.target.value as "sigma" | "weight")}>
+              <option value="sigma">σ 对齐（各条各按自己的常态换算）</option>
+              <option value="weight">权重对齐（同一把尺，看谁大谁小）</option>
+            </select>
+          </label>
+          <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
+            采样
+            <select value={density}
+              onChange={(e) => setDensity(e.target.value as "year" | "month")}>
+              <option value="year">按年（60 点，看形状）</option>
+              <option value="month">按月（{S.frames.length} 点，看年内推移）</option>
+            </select>
+          </label>
+          <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
+            门槛
+            <select value={threshold} disabled={mode !== "sigma"}
+              onChange={(e) => setThreshold(Number(e.target.value))}>
+              <option value={1.5}>±1.5σ</option>
+              <option value={2}>±2σ</option>
+              <option value={2.5}>±2.5σ</option>
+              <option value={3}>±3σ</option>
+            </select>
+          </label>
+          <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+            <button className="ghost" onClick={() => setSel(null)}>全选</button>
+            <button className="ghost" onClick={() => setSel([])}>清空</button>
+          </span>
+        </div>
+        <p className="sub" style={{ fontSize: 12, marginTop: 8 }}>
+          σ 对齐时全部曲线共用同一条 ±θσ 界线，穿越点一眼可读；
+          权重对齐时不画界线 —— 各条的 σ 不同，画出来是若干条不同高度的横线，
+          除了糊成一片没有别的作用。
+          μ 与 σ 取自与<b>节点层同一个估计量</b>（按<b>月度全样本</b>算，
+          与采样密度无关），故图上的穿越点与 §6.5 列出的节点对得上。
+          按年采样只是抽稀了画的点，没有换一把尺子。
+          月度视图里那些锯齿是<b>立春换柱的真实阶跃</b> —— 权重类序列在一个立春年内
+          近乎恒定，跳变都发生在换柱那一刻。
+        </p>
+      </div>
 
-      {at !== null && (
-        <div className="card">
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+        {inGroup.map((s) => {
+          const on = sel === null || sel.includes(s.id);
+          return (
+            <button key={s.id} className={on ? undefined : "ghost"}
+              style={{ fontSize: 12, padding: "3px 9px" }}
+              onClick={() => toggle(s.id)}>
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {specs.length === 0 ? <p className="sub">未选中任何曲线。</p> : (
+        <LifeCurves
+          series={specs} years={years} luckBreaks={breaks}
+          mode={mode} threshold={threshold}
+          {...(picked === null ? {} : { mark: picked })}
+          onPick={setPicked}
+        />
+      )}
+
+      {atFrame !== null && (
+        <div className="card" style={{ marginTop: 14 }}>
           <h3>
-            {at.year} 年 {at.fleetingMonth.branch}月
-            <span className="dim" style={{ fontSize: 13, marginLeft: 10 }}>
-              流年 {pillarText(at.annual)}　
-              大运 {at.luckPillar === null ? "未交运" : pillarText(at.luckPillar)}
-              {at.luckPillar !== null && `（已行 ${num(at.elapsedYears, 2)} 年）`}　
-              流月 {pillarText(at.fleetingMonth)}
+            {atFrame.f.year} 年 · {"寅卯辰巳午未申酉戌亥子丑"[atFrame.f.monthIndex]}月
+            　<span className="sub" style={{ fontSize: 12 }}>
+              流年 {pillarText(atFrame.f.annual)}
+              {atFrame.f.luckPillar === null ? "" : `　大运 ${pillarText(atFrame.f.luckPillar)}`}
+              　流月 {pillarText(atFrame.f.fleetingMonth)}
             </span>
           </h3>
-          <div className="scroll">
-            <table>
-              <thead><tr><th>序列</th><th className="num">此刻</th><th className="num">基础盘</th><th className="num">差</th></tr></thead>
-              <tbody>
-                {S.series.filter((s) => s.kind === group).map((s) => (
-                  <tr key={s.id}>
-                    <td>{s.label}</td>
-                    <td className="num">{num(s.values[picked!]!, 2)}</td>
-                    <td className="num">{num(s.baseValue, 2)}</td>
-                    <td className="num">{num(s.deltas[picked!]!, 2)}</td>
-                  </tr>
+          <p className="sub" style={{ fontSize: 12 }}>
+            曲线为何在此处变化 —— 神煞与结构事件是<b>解释</b>，不参与检出：
+            曲线说「这里变了」，它们说「大概是因为这个」。
+          </p>
+
+          <h4 style={{ fontSize: 13, margin: "10px 0 4px" }}>此刻被引动的神煞</h4>
+          {atFrame.ev.shensha.filter((h) => h.tone === "activated").length === 0
+            ? <p className="sub">无。</p>
+            : (
+              <ul className="tight">
+                {atFrame.ev.shensha.filter((h) => h.tone === "activated").map((h) => (
+                  <li key={`${h.name}-${h.palace}-${h.basis}`}>
+                    <b>{h.name}</b> 落{h.palace}　{h.toneReason}
+                    {h.narrativeTags.length === 0 ? ""
+                      : `　—— 传统上与「${h.narrativeTags.join("、")}」一类的事相联系`}
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          </div>
-          {(group === "tenGod" || group === "element" || group === "palace") && (
-            <p className="dim" style={{ fontSize: 12 }}>
-              ⚠️ 「差」这一列里大半是大运流年带来的<b>新质量</b>，不是净增长：
-              基础盘总量约 435，加上大运流年约 696，涨了六成。
-              要说「较本命高出多少」，得看去过稀释的份额偏离，不是这一列。
-            </p>
-          )}
+              </ul>
+            )}
+
+          <h4 style={{ fontSize: 13, margin: "12px 0 4px" }}>牵动大运流年的结构事件</h4>
+          {atFrame.ev.events.filter(
+            (e) => e.pillars.includes("luck") || e.pillars.includes("annual")).length === 0
+            ? <p className="sub">无。</p>
+            : (
+              <ul className="tight">
+                {atFrame.ev.events
+                  .filter((e) => e.pillars.includes("luck") || e.pillars.includes("annual"))
+                  .map((e, i) => (
+                    <li key={`${e.narrativeTag}-${i}`}>
+                      {e.narrativeTag}　<span className="sub">（{e.pillars.join("、")}）</span>
+                    </li>
+                  ))}
+              </ul>
+            )}
         </div>
       )}
 
-      <h2>全部序列</h2>
-      <div className="scroll">
-        <table>
-          <thead><tr><th>组</th><th>序列</th><th className="num">基础盘</th><th className="num">最小</th><th className="num">中位</th><th className="num">最大</th><th>用忌</th></tr></thead>
-          <tbody>
-            {S.series.map((s) => {
-              const sorted = [...s.values].sort((a, b) => a - b);
-              return (
-                <tr key={s.id}>
-                  <td className="dim">{GROUPS.find(([k]) => k === s.kind)?.[1] ?? s.kind}</td>
-                  <td>{s.label}</td>
-                  <td className="num">{num(s.baseValue, 2)}</td>
-                  <td className="num">{num(sorted[0]!, 2)}</td>
-                  <td className="num">{num(sorted[Math.floor(sorted.length / 2)]!, 2)}</td>
-                  <td className="num">{num(sorted[sorted.length - 1]!, 2)}</td>
-                  <td className="dim">
-                    {s.polarity === "favorable" ? "用神向"
-                      : s.polarity === "adverse" ? "忌神向" : "不判方向"}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <p className="sub">
-        域张力<b>恒不判方向</b> —— 张力本身就是「顺逆并存」的度量，给它定吉凶
-        等于把已经拆开的东西又合回去。宫位权重同理，只报「该宫变动」。
+      <p className="sub" style={{ fontSize: 12, marginTop: 14 }}>
+        点击图上任意位置可取该时点，下方随即列出当时的神煞与结构事件。
+        曲线用 Catmull-Rom 平滑 —— 采样是月度的，而底下的量本就连续，
+        折线会把每个采样点画成拐点，那是采样的伪影，不是数据的性质。
       </p>
     </>
   );

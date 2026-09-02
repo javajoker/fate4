@@ -54,8 +54,16 @@ export default function KinPage() {
                 <td>{label(QUADRANT_LABEL, k.quadrant)}</td>
                 <td className="num">{num(k.confidence, 2)}</td>
                 <td>
-                  {[...k.palaceFlags, ...k.starFlags].map((f) => (
-                    <span key={f} className="pill">{f}</span>
+                  {/* 宫与星各有自己的标记，同一个标记（REVEALED、TOMB_OPENED…）
+                      两边都可能出现。合并后不去重会撞 React 的 key，
+                      而且读者也分不清这一条是宫的还是星的 —— 故带上来源。 */}
+                  {[
+                    ...k.palaceFlags.map((f) => [`palace:${f}`, f, "宫"] as const),
+                    ...k.starFlags.map((f) => [`star:${f}`, f, "星"] as const),
+                  ].map(([key, f, from]) => (
+                    <span key={key} className="pill" title={`${from}的标记`}>
+                      {from}·{f}
+                    </span>
                   ))}
                 </td>
               </tr>
