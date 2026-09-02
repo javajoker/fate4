@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { buildSeries, curveStats, evaluateAt } from "@fate/core";
 import { useChart } from "../../../lib/chartContext";
 import { LifeCurves } from "../../../components/charts";
-import { pillarText } from "../../../lib/format";
+import { num, pillarText } from "../../../lib/format";
 
 const GROUPS: readonly [string, string][] = [
   ["tenGod", "十神"], ["element", "五行"], ["palace", "宫位"],
@@ -40,6 +40,8 @@ export default function CurvesPage() {
 
   if (base === null || S === null) return <p className="sub">曲线计算中…</p>;
 
+  // 本命日主 —— 五行曲线里哪一条是「自己」，不标出来就得靠读者自己数
+  const dm = base.conclusions.dayMaster;
   const inGroup = S.series.filter((s) => s.kind === group);
   const shown = sel === null ? inGroup : inGroup.filter((s) => sel.includes(s.id));
 
@@ -60,6 +62,10 @@ export default function CurvesPage() {
       center: st.center, sigma: st.sigma,
     };
   });
+  // picked 是**帧下标**（S.frames 里的位置），而图上的横坐标是抽稀之后的下标 ——
+  // 按年采样时两者差十二倍。两处都要经 keep 换算，否则标记线画错位置、
+  // 取点面板干脆出不来。
+  const markIndex = picked === null ? -1 : keep.indexOf(picked);
   const years = keep.map((i) => S.frames[i]!.year);
   const breaks = keep
     .map((i, k) => ({ i, k }))
@@ -80,6 +86,13 @@ export default function CurvesPage() {
         曲线本来就是连续的：流年是阶跃、大运是斜坡（天干占比自 0.70 线性降到 0.30），
         而结构的结局也在运内变化 —— 实测 528 步运里 191 次出现
         「冲而拔根 ⇄ 相冲」「合解冲 ⇄ 相冲」这类翻转。年度采样会把它们整个抹掉。
+      </p>
+      <p className="sub">
+        <b>本命日主 {dm.stem}</b> —— {dm.polarity}{dm.element}，
+        基础盘权重 {num(dm.weight, 1)}。五行一组里，
+        <b>{dm.element}</b> 那一条就是「自己」这一路；
+        其余四行相对它才有生我、我生、克我、我克之分。
+        十神一组里的<b>比肩</b>与<b>劫财</b>同属{dm.element}，是同一路的两个面。
       </p>
       <p className="sub">
         <b>流月不参与权重。</b>月度上之所以有变化，是大运份额在推移，不是流月加了分。
@@ -142,11 +155,13 @@ export default function CurvesPage() {
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
         {inGroup.map((s) => {
           const on = sel === null || sel.includes(s.id);
+          const isSelf = s.id === `element.${dm.element}`;
           return (
             <button key={s.id} className={on ? undefined : "ghost"}
               style={{ fontSize: 12, padding: "3px 9px" }}
+              title={isSelf ? "日主所属五行 —— 这一条就是「自己」" : undefined}
               onClick={() => toggle(s.id)}>
-              {s.label}
+              {s.label}{isSelf ? "（本命）" : ""}
             </button>
           );
         })}
@@ -156,8 +171,8 @@ export default function CurvesPage() {
         <LifeCurves
           series={specs} years={years} luckBreaks={breaks}
           mode={mode} threshold={threshold}
-          {...(picked === null ? {} : { mark: picked })}
-          onPick={setPicked}
+          {...(markIndex < 0 ? {} : { mark: markIndex })}
+          onPick={(k) => setPicked(keep[k] ?? null)}
         />
       )}
 
@@ -208,6 +223,78 @@ export default function CurvesPage() {
             )}
         </div>
       )}
+
+      {atFrame !== null && (
+        <div className="card" style={{ marginTop: 14 }}>
+          <h3>此刻的权重　<span className="sub" style={{ fontSize: 12 }}>
+            {atFrame.f.year} 年 {atFrame.f.fleetingMonth.branch}月
+          </span></h3>
+          <div className="scroll">
+            <table>
+              <thead><tr>
+                <th>序列</th><th className="num">此刻</th>
+                <th className="num">基础盘</th><th className="num">差</th>
+              </tr></thead>
+              <tbody>
+                {inGroup.map((s) => (
+                  <tr key={s.id}>
+                    <td>{s.label}</td>
+                    <td className="num">{num(s.values[picked!]!, 2)}</td>
+                    <td className="num">{num(s.baseValue, 2)}</td>
+                    <td className="num">{num(s.deltas[picked!]!, 2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {(group === "tenGod" || group === "element" || group === "palace") && (
+            <p className="sub" style={{ fontSize: 12 }}>
+              ⚠️ 「差」这一列里大半是大运流年带来的<b>新质量</b>，不是净增长：
+              基础盘总量约 435，加上大运流年约 696，涨了六成。
+              要说「较本命高出多少」，得看去过稀释的份额偏离，不是这一列。
+            </p>
+          )}
+        </div>
+      )}
+
+      <h2 style={{ marginTop: 20 }}>
+        {GROUPS.find(([k]) => k === group)?.[1] ?? group}的全部序列
+      </h2>
+      <div className="scroll">
+        <table>
+          <thead><tr>
+            <th>序列</th><th className="num">基础盘</th><th className="num">最小</th>
+            <th className="num">中位</th><th className="num">最大</th>
+            <th className="num">μ</th><th className="num">σ</th><th>用忌</th>
+          </tr></thead>
+          <tbody>
+            {inGroup.map((s) => {
+              const sorted = [...s.values].sort((a, b) => a - b);
+              const st = curveStats(S, s);
+              return (
+                <tr key={s.id}>
+                  <td>{s.label}</td>
+                  <td className="num">{num(s.baseValue, 2)}</td>
+                  <td className="num">{num(sorted[0]!, 2)}</td>
+                  <td className="num">{num(sorted[Math.floor(sorted.length / 2)]!, 2)}</td>
+                  <td className="num">{num(sorted[sorted.length - 1]!, 2)}</td>
+                  <td className="num">{num(st.center, 2)}</td>
+                  <td className="num">{num(st.sigma, 2)}</td>
+                  <td className="sub">
+                    {s.polarity === "favorable" ? "用神向"
+                      : s.polarity === "adverse" ? "忌神向" : "不判方向"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="sub" style={{ fontSize: 12 }}>
+        μ 与 σ 即图上 ±θσ 界线所依的那两个量，按<b>统计窗内的月度全样本</b>算。
+        域张力<b>恒不判方向</b> —— 张力本身就是「顺逆并存」的度量，给它定吉凶
+        等于把已经拆开的东西又合回去。宫位权重同理，只报「该宫变动」。
+      </p>
 
       <p className="sub" style={{ fontSize: 12, marginTop: 14 }}>
         点击图上任意位置可取该时点，下方随即列出当时的神煞与结构事件。

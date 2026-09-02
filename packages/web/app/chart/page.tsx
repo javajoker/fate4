@@ -96,6 +96,11 @@ export default function ChartPage() {
         <div className="card">
           <h3>五行权重</h3>
           <ElementRadar layers={[{ name: "本命", values: r.force.byElement }]} />
+          <p className="sub" style={{ fontSize: 12 }}>
+            日主 <b>{base.conclusions.dayMaster.stem}</b> 属{base.conclusions.dayMaster.polarity}
+            <b>{base.conclusions.dayMaster.element}</b> —— 这一角就是「自己」，
+            其余四角相对它才有生我、我生、克我、我克之分。
+          </p>
         </div>
         <div className="card">
           <h3>十神权重</h3>

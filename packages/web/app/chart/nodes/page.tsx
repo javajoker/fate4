@@ -38,6 +38,12 @@ export default function NodesPage() {
     <>
       <h1>统计节点</h1>
       <p className="sub">
+        本命日主 <b>{base.conclusions.dayMaster.stem}</b>（{base.conclusions.dayMaster.polarity}
+        {base.conclusions.dayMaster.element}）。下列节点里，
+        十神与五行的顺逆方向都是<b>相对它</b>定的 —— 同一条曲线换个日主，
+        用忌就反过来了。
+      </p>
+      <p className="sub">
         每条曲线越过 ±{threshold.toFixed(1)} 个标准差的<b>时段</b>，基准取
         {" "}{S.statsFrom}–{S.statsTo} 年这一段本身的散布。
       </p>
