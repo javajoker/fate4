@@ -43,7 +43,7 @@ describe("**对照层只报一致与分歧，不合成**", () => {
     ])[0]!;
     expect(c.kind).toBe("单侧表态");
     expect(c.kind).not.toBe("一致");
-    expect(c.note).toContain("不等于它同意");
+    expect(c.note).toContain("未表态不等于同意");
   });
 
   it("**不判方向的轴走「并列」，不走「无从比对」** —— 两件事不该共用一个名目", () => {

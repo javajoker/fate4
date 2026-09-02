@@ -13,6 +13,8 @@ import { dailyNarrative } from "./daily.js";
 import type { NarrativeLine } from "../report/render.js";
 import type { Locale } from "../report/templates.js";
 import { monthLabel } from "./yingqi.js";
+import type { CrossReading } from "../divination/reading.js";
+import { AXIS_DIRECTIONAL, SYSTEM_LABEL } from "../divination/claim.js";
 
 const nl = (lines: readonly NarrativeLine[]): string =>
   lines.map((l) => (l.hedged
@@ -127,6 +129,52 @@ export function renderDailyMarkdown(o: DailyOutlook, locale: Locale = "zh-Hans")
       + `| ${y.moving ? "○ 动" : y.chongState === "暗动" ? "暗动" : ""} |`);
   }
   out.push("");
+
+  const md = out.join("\n");
+  return locale === "zh-Hant" ? toHant(md) : md;
+}
+
+/** 四家合参的 Markdown。与 Web 共用 —— 两处结论逐字一致是构造保证。 */
+export function renderCrossMarkdown(r: CrossReading, locale: Locale = "zh-Hans"): string {
+  const out: string[] = [];
+  const h = (n: number, t: string) => out.push(`${"#".repeat(n)} ${t}\n`);
+  const p = (t: string) => out.push(`${t}\n`);
+  const row = (t: string) => out.push(t);
+
+  h(1, `${r.systems} 家合参`);
+  p("以下各家并列陈述，**不作合并**。四柱流日、六爻、六壬、奇门都是同一时刻干支的"
+    + "确定性函数 —— 方向一致不构成互相印证，方向相反也不代表哪一家有误。"
+    + "此处不给出综合取向，也不排「哪一家更准」。");
+
+  h(2, "各家所起");
+  row("| 体系 | 所起 |");
+  row("| --- | --- |");
+  if (r.bazi !== null) {
+    row(`| 四柱 | 流日 ${r.bazi.pillar.stem}${r.bazi.pillar.branch} |`);
+  }
+  const g = r.liuyao.judgement.gua;
+  row(`| 六爻 | ${g.ben.name}${g.bian === null ? "（六爻皆静）" : ` → ${g.bian.name}`} |`);
+  row(`| 六壬 | ${r.liuren.sanchuan.keti}课，三传 ${r.liuren.sanchuan.chu} → `
+    + `${r.liuren.sanchuan.zhong} → ${r.liuren.sanchuan.mo} |`);
+  row(`| 奇门 | ${r.qimen.term}${r.qimen.yuan}，${r.qimen.yin ? "阴" : "阳"}遁 ${r.qimen.ju} 局，`
+    + `值符${r.qimen.zhifu}、值使${r.qimen.zhishi} |`);
+  out.push("");
+
+  h(2, "逐轴对照");
+  for (const c of r.comparisons) {
+    h(3, `${c.axis} —— ${c.kind}`);
+    row("| 体系 | 取向 | 依据 |");
+    row("| --- | --- | --- |");
+    for (const x of c.claims) {
+      row(`| ${SYSTEM_LABEL[x.system]} | ${AXIS_DIRECTIONAL[c.axis]
+        ? (x.polarity === "中性" ? "未表态" : x.polarity) : "—"} | ${x.evidence} |`);
+    }
+    out.push("");
+    p(`_${c.note}_`);
+  }
+
+  h(2, "小结");
+  p(`逐轴对照：${r.summary}`);
 
   const md = out.join("\n");
   return locale === "zh-Hant" ? toHant(md) : md;

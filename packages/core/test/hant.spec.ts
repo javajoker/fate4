@@ -20,6 +20,10 @@ import { TRIGRAMS } from "../src/yijing/trigrams.js";
 import { LIUQIN_SCOPE, LIUSHEN_IMAGE } from "../src/yijing/najia.js";
 import { YAO_POSITION_IMAGE } from "../src/liuyao/dress.js";
 import { TIAOHOU_PRINCIPLE } from "../src/conclude/tiaohou.js";
+import { KE_TI_NOTE, YUEJIANG, TIANJIANG } from "../src/liuren/index.js";
+import {
+  PALACE_NAME, PALACE_DIRECTION, STAR_HOME, DOOR_IMAGE, GODS,
+} from "../src/qimen/index.js";
 import { DEFAULT_PARAMS } from "../src/params/defaults.js";
 import type { BirthInput } from "../src/chart/types.js";
 
@@ -79,6 +83,14 @@ const liuyaoCorpus = (() => {
   out.push(Object.values(LIUSHEN_IMAGE).join(" "));
   out.push(YAO_POSITION_IMAGE.join(" "));
   out.push(Object.values(TIAOHOU_PRINCIPLE).join(" "));
+  // 六壬与奇门的静态词表 —— 同样穷举。P25 接上四家合参时，
+  // 「发用」「体系」两处又漏了，正是因为这两台引擎的语汇当时不在语料里。
+  out.push(Object.values(KE_TI_NOTE).join(" "));
+  out.push(YUEJIANG.map((y) => `${y.branch}${y.name}${y.fromZhongqi}`).join(" "));
+  out.push(TIANJIANG.join(" "));
+  out.push(Object.values(PALACE_NAME).join(" "), Object.values(PALACE_DIRECTION).join(" "));
+  out.push(Object.values(STAR_HOME).join(" "), Object.values(DOOR_IMAGE).join(" "));
+  out.push(GODS.join(" "));
   return out.join("\n");
 })();
 

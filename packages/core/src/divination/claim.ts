@@ -91,10 +91,35 @@ export interface AxisComparison {
   readonly note: string;
 }
 
+const names = (cs: readonly StructuralClaim[]) =>
+  cs.map((c) => SYSTEM_LABEL[c.system]).join("、");
+
+/** 表了态的分组，写成「六爻、奇门判顺；六壬判逆」。中性者不入此句。 */
+function voicedSplit(cs: readonly StructuralClaim[]): string {
+  const by = new Map<ClaimPolarity, DivinationSystem[]>();
+  for (const c of cs) {
+    if (c.polarity === "中性") continue;
+    by.set(c.polarity, [...(by.get(c.polarity) ?? []), c.system]);
+  }
+  return (["顺", "逆"] as const).filter((p) => by.has(p))
+    .map((p) => `${by.get(p)!.map((s) => SYSTEM_LABEL[s]).join("、")}判${p}`)
+    .join("；");
+}
+
+/** 未表态者的一句补充。没有则为空串 —— 沉默必须写出来，不能默认它同意。 */
+function silentNote(cs: readonly StructuralClaim[]): string {
+  const silent = cs.filter((c) => c.polarity === "中性");
+  return silent.length === 0 ? "" : `；${names(silent)}未表态`;
+}
+
 /**
  * 逐轴对照。**不合成、不裁决、不打分。**
  *
  * 轴的次序按 {@link AXIS_ORDER} 固定，免得同一份数据两次调用给出两种排列。
+ *
+ * 体系可以是两个，也可以是四个（四柱流日、六爻、六壬、奇门）。
+ * 注记里写明**谁判什么** —— 四家里三家判顺一家判逆，与两家对分，
+ * 是很不一样的局面，只说一句「分歧」等于把这个差别抹掉。
  */
 export function crossref(claims: readonly StructuralClaim[]): AxisComparison[] {
   const out: AxisComparison[] = [];
@@ -105,15 +130,15 @@ export function crossref(claims: readonly StructuralClaim[]): AxisComparison[] {
     if (systems.size === 1) {
       out.push({
         axis, kind: "单侧", claims: on,
-        note: `此轴只有${SYSTEM_LABEL[on[0]!.system]}一侧说得上话。`
-          + "另一侧未表态，不等于默认同意。",
+        note: `此轴只有${SYSTEM_LABEL[on[0]!.system]}说得上话。`
+          + "其余体系未表态，不等于默认同意。",
       });
       continue;
     }
     if (!AXIS_DIRECTIONAL[axis]) {
       out.push({
         axis, kind: "并列", claims: on,
-        note: "此轴不判顺逆 —— 动不等于好，静也不等于坏。两侧各述所见，并列陈述。",
+        note: "此轴不判顺逆 —— 动不等于好，静也不等于坏。各家各述所见，并列陈述。",
       });
       continue;
     }
@@ -121,7 +146,7 @@ export function crossref(claims: readonly StructuralClaim[]): AxisComparison[] {
     if (voiced.length === 0) {
       out.push({
         axis, kind: "无从比对", claims: on,
-        note: "两侧皆判中性 —— 这是两边都没话说，不是两边说到一处去了。",
+        note: `${systems.size} 家皆判中性 —— 这是都没话说，不是说到一处去了。`,
       });
       continue;
     }
@@ -129,22 +154,23 @@ export function crossref(claims: readonly StructuralClaim[]): AxisComparison[] {
     if (voicedSystems.size === 1) {
       out.push({
         axis, kind: "单侧表态", claims: on,
-        note: `此轴只有${SYSTEM_LABEL[voiced[0]!.system]}给出了方向，另一侧判中性。`
-          + "这不是一致 —— 另一侧没有表态，不等于它同意。",
+        note: `${voicedSplit(on)}${silentNote(on)}。只有${SYSTEM_LABEL[voiced[0]!.system]}`
+          + "给出了方向 —— 这不是一致，未表态不等于同意。",
       });
       continue;
     }
     if (new Set(voiced.map((c) => c.polarity)).size > 1) {
       out.push({
         axis, kind: "分歧", claims: on,
-        note: "两侧方向相反。此处并列两说，不作裁决 —— "
-          + "两个体系本就各有其判据，取一舍一等于替读者做了选择。",
+        note: `${voicedSplit(on)}${silentNote(on)}。此处并列诸说，不作裁决 —— `
+          + "各家本就各有其判据，取一舍一等于替读者做了选择。"
+          + "⚠️ 也不要把「多数判顺」读成某成把握：那是把计数当概率。",
       });
     } else {
       out.push({
         axis, kind: "一致", claims: on,
-        note: "两侧方向相同。⚠️ 两者都是同一日干支的确定性函数，"
-          + "方向一致不构成互相印证。",
+        note: `${voicedSplit(on)}，方向相同${silentNote(on)}。`
+          + "⚠️ 诸家都是同一时刻干支的确定性函数，方向一致不构成互相印证。",
       });
     }
   }
@@ -161,10 +187,10 @@ export function summarizeCrossref(cs: readonly AxisComparison[]): string {
   const parts = [
     n("一致") > 0 ? `${n("一致")} 轴方向相同` : "",
     n("分歧") > 0 ? `${n("分歧")} 轴方向相反` : "",
-    n("单侧表态") > 0 ? `${n("单侧表态")} 轴仅一侧给出方向` : "",
-    n("无从比对") > 0 ? `${n("无从比对")} 轴两侧皆无话可说` : "",
+    n("单侧表态") > 0 ? `${n("单侧表态")} 轴仅一家给出方向` : "",
+    n("无从比对") > 0 ? `${n("无从比对")} 轴各家皆无话可说` : "",
     n("并列") > 0 ? `${n("并列")} 轴不判方向、只作并列陈述` : "",
-    n("单侧") > 0 ? `${n("单侧")} 轴仅一侧有判据` : "",
+    n("单侧") > 0 ? `${n("单侧")} 轴仅一家有判据` : "",
   ].filter((x) => x !== "");
   return parts.length === 0 ? "两侧均未产出可比对的结构判断。" : parts.join("，") + "。";
 }

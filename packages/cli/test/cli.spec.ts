@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildChart, buildQuestionReport, buildReport, cast, castMomentOf, chartOptionsOf,
   dailyOutlook, dress, judge, loadParams, pickYongshen, renderDailyMarkdown,
-  renderMarkdown, renderQuestionMarkdown, scanText,
+  renderCrossMarkdown, renderMarkdown, renderQuestionMarkdown, crossReading, scanText,
   formatViolations, type BirthInput,
 } from "@fate/core";
 import { run, guardOutput } from "../src/index.js";
@@ -245,6 +245,7 @@ describe("输出经措辞扫描", () => {
       ["ask", "--topic", "wealth.seek", "--city", "上海", "--at", "2026-09-02 14:30"],
       ["ask", "--topic", "health.body", "--city", "上海", "--at", "2026-09-02 14:30"],
       ["daily", "--chart", "c.json", "--date", "2026-09-02"],
+      ["cross", "--city", "上海", "--at", "2026-09-02 14:30", "--chart", "c.json"],
       ["topics"],
       ["cities"],
     ];
@@ -563,5 +564,54 @@ describe("fate daily", () => {
     const tree = JSON.parse(j.out);
     expect(tree.comparisons.length).toBeGreaterThan(0);
     expect(tree.claims.length).toBe(6);
+  });
+});
+
+describe("fate cross —— 四家合参", () => {
+  const files = withChart();
+  const AT = ["--city", "上海", "--at", "2026-09-02 14:30"];
+
+  it("给了命盘是四家，不给是三家", () => {
+    const four = cli(["cross", ...AT, "--chart", "c.json"], files);
+    expect(four.code).toBe(0);
+    expect(four.out).toContain("4 家合参");
+    expect(four.out).toContain("| 四柱 |");
+
+    const three = cli(["cross", ...AT], files);
+    expect(three.code).toBe(0);
+    expect(three.out).toContain("3 家合参");
+    expect(three.out).not.toContain("| 四柱 |");
+  });
+
+  it("**明写不作合并、不排座次**", () => {
+    const r = cli(["cross", ...AT, "--chart", "c.json"], files);
+    expect(r.out).toContain("不作合并");
+    expect(r.out).toContain("不构成互相印证");
+    expect(r.out).toContain("不给出综合取向");
+    expect(r.out).toContain("哪一家更准");   // 出现在「不排」这句里
+  });
+
+  it("**与内核直调逐字节相同**", () => {
+    const r = cli(["cross", ...AT, "--chart", "c.json"], files);
+    const params = loadParams({});
+    const direct = renderCrossMarkdown(crossReading({
+      year: 2026, month: 9, day: 2, hour: 14, minute: 30,
+      timeZone: "Asia/Shanghai", longitude: 121.47,
+    }, params, buildChart(EXAMPLE)));
+    expect(r.out.trim()).toBe(direct.trim());
+  });
+
+  it("可指定六爻的占事", () => {
+    const a = cli(["cross", ...AT, "--topic", "wealth.seek"], files);
+    const b = cli(["cross", ...AT, "--topic", "career.job"], files);
+    expect(a.code).toBe(0);
+    expect(a.out).not.toBe(b.out);
+  });
+
+  it("JSON 与 Markdown 出自同一次合参", () => {
+    const j = cli(["cross", ...AT, "--chart", "c.json", "--json"], files);
+    const tree = JSON.parse(j.out);
+    expect(tree.systems).toBe(4);
+    expect(new Set(tree.claims.map((c: { system: string }) => c.system)).size).toBe(4);
   });
 });

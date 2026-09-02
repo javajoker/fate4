@@ -20,7 +20,8 @@ import {
   buildQuestionReport, buildReport, cast, castMomentOf, dailyOutlook, dayView,
   disclaimerText, dress, evaluate, formatViolations, judge, luckTimeline,
   monthView, MONTH_BRANCH_ORDER, pickYongshen, renderDailyMarkdown, renderMarkdown,
-  renderQuestionMarkdown, scanText, TOPICS, TOPIC_BY_ID, yearView,
+  renderCrossMarkdown, renderQuestionMarkdown, crossReading,
+  scanText, TOPICS, TOPIC_BY_ID, yearView,
   loadParams,
   type BirthInput, type CastInput, type CoinThrow, type Liuqin, type PartialParams,
 } from "@fate/core";
@@ -59,6 +60,10 @@ const USAGE = `fate —— 四柱推演命令行
               [--journal f.json] [--locale …] [--json]
 
   fate daily  --chart c.json [--date YYYY-MM-DD] [--locale …] [--json]
+
+  fate cross  (--city 城市 | --tz 时区 --lon 经度) [--at "YYYY-MM-DD HH:MM"]
+              [--chart c.json] [--topic 占事id] [--locale …] [--json]
+              四家合参：四柱流日 ∥ 六爻 ∥ 六壬 ∥ 奇门。不给 --chart 则三家。
 
   fate topics             列出 32 类占事
   fate cities             列出内置城市表
@@ -424,6 +429,35 @@ function cmdDaily(argv: readonly string[], io: Io): void {
   emit(io, renderDailyMarkdown(o, locale), false, v["out"] as string | undefined);
 }
 
+function cmdCross(argv: readonly string[], io: Io): void {
+  const v = parse(argv, {
+    at: { type: "string" }, topic: { type: "string" }, locale: { type: "string" },
+    chart: { type: "string" },
+    tz: { type: "string" }, lon: { type: "string" }, city: { type: "string" },
+    params: { type: "string" }, json: { type: "boolean" }, out: { type: "string", short: "o" },
+  });
+  // 不给 --chart 就是三家合参 —— 少一家就少一家，不用别的顶上
+  const withChart = typeof v["chart"] === "string";
+  const params = withChart
+    ? loadChart(io, v).params
+    : loadParams(loadOverrides(io, v["params"] as string | undefined));
+  const chart = withChart ? loadChart(io, v).chart : undefined;
+  const locale = oneOf(v, "locale", ["zh-Hans", "zh-Hant", "en"] as const, params.report.locale);
+  const { timeZone, longitude } = placeOf(v);
+  const now = typeof v["at"] === "string" ? parseAt(v["at"]) : nowOf(io);
+
+  const r = crossReading({
+    ...now, timeZone, longitude,
+    ...(typeof v["topic"] === "string" ? { topicId: v["topic"] } : {}),
+  }, params, chart);
+
+  if (v["json"] === true) {
+    emit(io, r as unknown as Record<string, unknown>, true, v["out"] as string | undefined);
+    return;
+  }
+  emit(io, renderCrossMarkdown(r, locale), false, v["out"] as string | undefined);
+}
+
 /** `--at "YYYY-MM-DD HH:MM"`。问事必须精确到分 —— 时辰由真太阳时定。 */
 function parseAt(raw: string): {
   year: number; month: number; day: number; hour: number; minute: number;
@@ -469,7 +503,7 @@ function castInputOf(
 const COMMANDS: Readonly<Record<string, (a: readonly string[], io: Io) => void>> = {
   chart: cmdChart, luck: cmdLuck, year: cmdYear,
   month: cmdMonth, day: cmdDay, report: cmdReport, cities: cmdCities,
-  ask: cmdAsk, daily: cmdDaily, topics: cmdTopics,
+  ask: cmdAsk, daily: cmdDaily, topics: cmdTopics, cross: cmdCross,
 };
 
 export function run(argv: readonly string[], io: Io): number {

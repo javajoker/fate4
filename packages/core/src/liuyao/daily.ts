@@ -30,7 +30,7 @@ import { cast } from "./cast.js";
 import { dress, type DressedGua } from "./dress.js";
 import { pickYongshen } from "./yongshen.js";
 import { judge, type Judgement } from "./judge.js";
-import { strengthOf } from "./strength.js";
+import { liuyaoClaims } from "./claims.js";
 import { renderTemplate, type NarrativeLine } from "../report/render.js";
 import type { Locale } from "../report/templates.js";
 import { SYSTEM_LABEL, AXIS_DIRECTIONAL } from "../divination/claim.js";
@@ -95,46 +95,6 @@ function baziClaims(base: BaseChart, dv: DayView): StructuralClaim[] {
   return out;
 }
 
-/** 六爻侧的结构断言。日卦以自身运势为题，用神取世爻。 */
-function liuyaoClaims(gua: DressedGua, j: Judgement, params: Params): StructuralClaim[] {
-  const shi = gua.yaos[gua.shi - 1]!;
-  const st = strengthOf(gua, shi, params.liuyao);
-  const out: StructuralClaim[] = [{
-    system: "liuyao", axis: "我方位置",
-    polarity: st.value.band === "有力" || st.value.band === "偏有力" ? "顺"
-      : st.value.band === "无力" || st.value.band === "偏无力" ? "逆" : "中性",
-    evidence: `世爻在第${gua.shi}爻（${shi.liuqin}${shi.branch}），力量为${st.value.band}，`
-      + `判据为「${st.value.rung}」`,
-    confidence: st.confidence,
-  }];
-
-  // 阻碍：动爻（含暗动）克世者
-  const attackers = gua.yaos.filter(
-    (o) => (o.moving || o.chongState === "暗动") && o.pos !== gua.shi
-      && st.value.fromDong.some((d) => d.from.pos === o.pos && d.kind === "克"));
-  out.push({
-    system: "liuyao", axis: "阻碍来源",
-    polarity: attackers.length > 0 ? "逆" : "中性",
-    evidence: attackers.length > 0
-      ? attackers.map((o) => `第${o.pos}爻${o.liuqin}${o.branch}${
-        o.moving ? "发动" : "暗动"}克世`).join("；")
-      : "卦中无动爻克世",
-    confidence: 0.75,
-  });
-
-  const dong = gua.yaos.filter((o) => o.moving).length;
-  out.push({
-    system: "liuyao", axis: "事之动静",
-    polarity: "中性",
-    evidence: dong === 0
-      ? `${gua.ben.name}，六爻皆静，传统视为事在酝酿`
-      : `${gua.ben.name} → ${gua.bian!.name}，${dong} 爻发动`
-        + (gua.flags.length > 0 ? `，${gua.flags.join("、")}` : ""),
-    confidence: 0.85,
-  });
-  void j;
-  return out;
-}
 
 // ─────────────────────────────────────────────────────────
 
