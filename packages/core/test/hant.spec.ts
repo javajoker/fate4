@@ -1,13 +1,26 @@
 import { describe, expect, it } from "vitest";
 import {
   AMBIGUOUS, IDENTICAL, SIMPLIFIED_ONLY, TERMS,
-  toHant, unclassifiedOf, UncoveredAmbiguityError,
+  toHant, unclassifiedOf, unconvertedOf, UncoveredAmbiguityError,
 } from "../src/report/hant.js";
 import { buildChart } from "../src/chart/buildChart.js";
 import { buildReport, collectReportText } from "../src/report/assemble.js";
 import { renderMarkdown } from "../src/report/markdown.js";
 import { NEIJING } from "../src/conclude/neijing.js";
 import { GUARD_RULES, scanText } from "../src/report/guard.js";
+import { castMomentOf } from "../src/liuyao/moment.js";
+import { cast, type CoinThrow } from "../src/liuyao/cast.js";
+import { dress } from "../src/liuyao/dress.js";
+import { pickYongshen } from "../src/liuyao/yongshen.js";
+import { judge } from "../src/liuyao/judge.js";
+import { buildQuestionReport, collectQuestionText } from "../src/liuyao/report.js";
+import { TOPICS } from "../src/liuyao/topics.js";
+import { HEXAGRAMS } from "../src/yijing/hexagrams.js";
+import { TRIGRAMS } from "../src/yijing/trigrams.js";
+import { LIUQIN_SCOPE, LIUSHEN_IMAGE } from "../src/yijing/najia.js";
+import { YAO_POSITION_IMAGE } from "../src/liuyao/dress.js";
+import { TIAOHOU_PRINCIPLE } from "../src/conclude/tiaohou.js";
+import { DEFAULT_PARAMS } from "../src/params/defaults.js";
 import type { BirthInput } from "../src/chart/types.js";
 
 const CHARTS: readonly BirthInput[] = [
@@ -27,6 +40,48 @@ const hansCorpus = CHARTS.map((b) => {
   return [...collectReportText(r).map((x) => x.text), renderMarkdown(r)].join("\n");
 }).join("\n");
 
+/**
+ * 问事报告也要进语料 —— **完整性保证只到语料所及之处**。
+ *
+ * 第二台引擎接上来时，`安静` 的「静」就没转（它在四柱报告里从未出现），
+ * 繁体正文里赫然留着一个简体字，而当时的完整性测试全绿。
+ * 语料漏一块，保证就少一块。
+ */
+const liuyaoCorpus = (() => {
+  const P = DEFAULT_PARAMS.liuyao;
+  const out: string[] = [];
+  for (const [y, mo, d, h] of [[2026, 9, 2, 14], [2026, 3, 15, 10], [2025, 12, 5, 8]] as const) {
+    const M = castMomentOf({
+      year: y, month: mo, day: d, hour: h, minute: 30,
+      timeZone: "Asia/Shanghai", longitude: 121.47,
+    });
+    for (let n = 0; n < 4096; n += 397) {
+      const t = Array.from({ length: 6 }, (_, i) => ((n >> (i * 2)) & 3) as CoinThrow);
+      const CP = { ...P, castMethod: "coin" as const };
+      const g = dress(cast(M, { method: "coin", throws: t as never }, CP), CP);
+      for (const topic of TOPICS) {
+        const j = judge(g, pickYongshen(g, topic.id, "父母").value, P);
+        const r = buildQuestionReport(j, DEFAULT_PARAMS);
+        out.push(...collectQuestionText(r).map((c) => c.text));
+        for (const f of j.findings) {
+          out.push(f.value, ...f.derivation.map((x) => x.step + x.detail));
+        }
+      }
+    }
+  }
+  // 静态词表穷举 —— 卦名、六亲、六神、爻位象、占事标签。
+  // 抽样会漏：步长从 97 改到 397，立刻冒出「丰」「谦」「复」三个没归类的卦名字。
+  // 静态的东西该穷举，不该抽样。
+  out.push(HEXAGRAMS.map((h) => h.name).join(" "));
+  out.push(TRIGRAMS.map((t) => `${t.name}${t.image}`).join(" "));
+  out.push(TOPICS.map((t) => `${t.category}${t.label}`).join(" "));
+  out.push(Object.values(LIUQIN_SCOPE).join(" "));
+  out.push(Object.values(LIUSHEN_IMAGE).join(" "));
+  out.push(YAO_POSITION_IMAGE.join(" "));
+  out.push(Object.values(TIAOHOU_PRINCIPLE).join(" "));
+  return out.join("\n");
+})();
+
 // ═══════════════════════════════════════════════════════════
 
 describe("三个桶必须不重不漏", () => {
@@ -45,10 +100,22 @@ describe("三个桶必须不重不漏", () => {
   });
 
   it("**报告里的每一个汉字都已归类** —— 新字出现时这里会指名道姓", () => {
-    const unknown = unclassifiedOf(hansCorpus);
+    const unknown = unclassifiedOf(hansCorpus + "\n" + liuyaoCorpus);
     expect(unknown,
       `以下汉字未归入三个桶，请在 hant.ts 里明确它属于哪一类：${unknown.join("")}`)
       .toEqual([]);
+  });
+
+  it("**派生出的繁体规则里没有一个没转过去的字**", () => {
+    // 繁体规则由简体机械派生（见 guard.ts）。漏归类的字会原样留在简体，
+    // 于是那条繁体规则永远匹配不上繁体正文 —— 一个不报错的洞。实测漏过一个「险」。
+    //
+    // 这里不能用「不含简体字」来查：一个没归类的简体字既不在单字表的键里，
+    // 也就不会被 SIMPLIFIED_ONLY 逮到。故改查输出侧的白名单。
+    const src = GUARD_RULES["zh-Hant"]
+      .map((r) => [r.pattern.source, r.why, r.fix].join("")).join("");
+    const bad = unconvertedOf(src);
+    expect(bad, `繁体规则里未转换的汉字：${bad.join("")}`).toEqual([]);
   });
 
   it("词条的键必含歧义字，否则它是多余的", () => {
@@ -152,8 +219,16 @@ describe("拒绝猜测", () => {
   });
 
   it("转换是幂等的 —— 转过的文本再转一次不变", () => {
-    const once = toHant(hansCorpus);
-    expect(toHant(once)).toBe(once);
+    for (const corpus of [hansCorpus, liuyaoCorpus]) {
+      const once = toHant(corpus);
+      expect(toHant(once)).toBe(once);
+    }
+  });
+
+  it("**问事报告的繁体里没有一个简体字**", () => {
+    const out = toHant(liuyaoCorpus);
+    const leaked = SIMPLIFIED_ONLY.filter((c) => out.includes(c));
+    expect(leaked, `繁体问事报告残留简体：${leaked.join("")}`).toEqual([]);
   });
 });
 
@@ -225,6 +300,11 @@ describe("**守卫的简繁对等 —— 是构造保证，不是维护约定**"
       "建议投资买房。",
       "会有官司缠身。",
       "肝不好，需要调理。",
+      // 六爻专有的四条
+      "用神旺相，主得财。",
+      "用神临日辰，此事可成。",
+      "应期在申日，届时必有消息。",
+      "官鬼持世，病难愈。",
     ];
     for (const bad of PLANTED) {
       const h = scanText(bad, "test.hans");

@@ -158,7 +158,7 @@ export function strengthOf(
     },
     {
       id: "得令得生", hit: wang && (dayGen || sheng > 0), band: "有力",
-      why: "月建得令，日辰或动爻复生之。",
+      why: "月建得令，日辰或动爻再生之。",
     },
     {
       id: "回头生", hit: yao.bian?.shengke === "回头生" && !ruo, band: "有力",

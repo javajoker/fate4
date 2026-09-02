@@ -756,17 +756,103 @@ const nodeTemplates: readonly NarrativeTemplate[] = [
   }),
 ];
 
+// ═══════════════════════════════════════════════════════════
+// 六爻问事（第二台引擎，docs/13-liuyao.md §8）
+//
+// 六爻典籍的断语是赤裸的结果预言（「用神旺相，主求财必得」）。
+// 此处的模板**一句成败都不许有** —— 只描述卦象结构，成败留给读者。
+// 由 zh.liuyao.* 四条禁令与 report.spec 的模板扫描共同强制。
+// ═══════════════════════════════════════════════════════════
+
+const liuyaoTemplates: NarrativeTemplate[] = [
+  T("liuyao.cast", "data", "casting", ["method", "gua", "moving", "pillars"], {
+    zhHans: "{method}。起卦时刻四柱为 {pillars}。所得 {gua}，{moving}。",
+    en: "{method}. The four pillars at the moment of casting are {pillars}. The result is {gua}, {moving}.",
+  }),
+  T("liuyao.mix", "data", "casting", [], {
+    zhHans: "本卦以梅花易数的时间法起，以京房纳甲法装断 —— 两家混用，随卦声明。断语一律只述卦象结构。",
+    en: "The hexagram is cast by the Meihua time method and read by the Jingfang najia method: two traditions combined, declared with the reading. All statements describe structure only.",
+  }),
+  T("liuyao.topic", "data", "topic", ["topic", "yong", "yuan", "ji"], {
+    zhHans: "所占为「{topic}」，取{yong}为用神；原神{yuan}、忌神{ji}由用神按生克推出。",
+    en: "The question is \"{topic}\"; the {yong} line is taken as the subject, with {yuan} as its source and {ji} as its restraint, both derived from the five-phase cycle.",
+  }),
+  T("liuyao.topic.shiying", "data", "topic", ["topic", "pos"], {
+    zhHans: "所占为「{topic}」，以{pos}为用 —— 此类占事无六亲用神。",
+    en: "The question is \"{topic}\"; the {pos} line serves as the subject, as this class of question has no kin-line subject.",
+  }),
+  T("liuyao.yong.strength", "verdict", "liuyaoStrength", ["yong", "pos", "band", "rung"], {
+    zhHans: "用神{yong}在第{pos}爻，力量为{band}，判据为「{rung}」。",
+    en: "The subject line {yong} sits in position {pos} with strength {band}, decided by the rule \"{rung}\".",
+  }, 0.6, {
+    zhHans: "用神{yong}在第{pos}爻，力量偏向{band}（判据「{rung}」）。卦中扰动较多，此判尚可两说。",
+    en: "The subject line {yong} sits in position {pos}, leaning {band} (rule \"{rung}\"). The hexagram carries several competing influences, so this reading is borderline and the neighbouring band is arguable.",
+  }),
+  T("liuyao.yong.fu", "verdict", "liuyaoStrength", ["yong", "pos", "fei"], {
+    zhHans: "用神{yong}不上卦，伏于第{pos}爻{fei}之下。传统称伏神 —— 此为结构上找不到对应位置，非成败之论。",
+    en: "The subject line {yong} does not appear in the hexagram; it lies hidden beneath position {pos} ({fei}). This describes a structure with no matching position, not an outcome.",
+  }),
+  T("liuyao.yong.moving", "data", "liuyaoDynamics", ["pos", "bian", "shengke"], {
+    zhHans: "用神发动，第{pos}爻变出{bian}，为{shengke}。",
+    en: "The subject line is active: position {pos} changes into {bian}, a relation of {shengke}.",
+  }),
+  T("liuyao.yong.still", "data", "liuyaoDynamics", ["pos"], {
+    zhHans: "用神在第{pos}爻安静。安静之爻不生克他爻，须待日辰或动爻引发。",
+    en: "The subject line at position {pos} is still. A still line neither generates nor restrains others until the day branch or an active line rouses it.",
+  }),
+  T("liuyao.yong.andong", "data", "liuyaoDynamics", ["pos"], {
+    zhHans: "用神在第{pos}爻，卦面上安静，然旺相而逢日辰冲，传统称暗动 —— 与发动同论其能生克他爻。",
+    en: "The subject line at position {pos} appears still, yet it is seasonally strong and clashed by the day branch: the tradition calls this hidden activity, and treats it as able to act on other lines.",
+  }),
+  T("liuyao.shiying", "data", "liuyaoShiYing", ["shi", "ying", "rel"], {
+    zhHans: "世在第{shi}爻、应在第{ying}爻，{rel}。世为我方，应为他方。",
+    en: "The self line is at {shi} and the other line at {ying}: {rel}. The self line stands for one's own side, the other line for the counterpart.",
+  }),
+  T("liuyao.gua.flags", "data", "liuyaoGua", ["gua", "flags"], {
+    zhHans: "{gua}。{flags}",
+    en: "{gua}. {flags}",
+  }),
+  T("liuyao.gua.still", "data", "liuyaoGua", ["gua"], {
+    zhHans: "{gua}，六爻皆静，无变卦。传统视为事在酝酿，须待日月引发。",
+    en: "{gua}, with all six lines still and no derived hexagram. The tradition reads this as a matter still forming, awaiting the month or day to rouse it.",
+  }),
+  T("liuyao.yingqi", "data", "liuyaoYingqi", ["windows"], {
+    zhHans: "传统取候之法指向以下时段：{windows}。这是卦象结构给出的候选时段，按距今远近排列 —— 规则本身给不出可能性高低，故不作此排序。",
+    en: "The traditional timing methods point to these periods: {windows}. These are candidate windows given by the structure, ordered by nearness in time; the rules themselves offer no ranking of likelihood.",
+  }),
+  T("liuyao.yingqi.none", "data", "liuyaoYingqi", ["why"], {
+    zhHans: "未产出候选时段：{why}",
+    en: "No candidate window is produced: {why}",
+  }),
+  T("liuyao.disclaimer.question", "data", "disclaimer", [], {
+    zhHans: "以上为对卦象结构的描述，不构成对结果的预言，也不构成医疗、法律、财务或任何专业建议。同一时辰内所有问事得到同一个卦 —— 卦属于时刻，区分不同的事靠取不同的用神。",
+    en: "The above describes the structure of the hexagram. It is not a prediction of outcomes, nor medical, legal, financial, or any other professional advice. All questions asked within the same two-hour period yield the same hexagram: the hexagram belongs to the moment, and different questions are distinguished by which line is taken as the subject.",
+  }),
+];
+
 export const NARRATIVE_TEMPLATES: readonly NarrativeTemplate[] = Object.freeze([
   ...strengthTemplates, ...rootTemplates, ...patternTemplates, ...yongshenTemplates,
   ...gejuTemplates, ...metricsTemplates, ...kinTemplates, ...shenshaTemplates,
   ...personaTemplates, ...bodyTemplates,
   ...timelineTemplates, ...currentTemplates, ...methodTemplates,
-  ...nodeTemplates,
+  ...nodeTemplates, ...liuyaoTemplates,
 ]);
 
 export const TEMPLATES_BY_ID: ReadonlyMap<string, NarrativeTemplate> = new Map(
   NARRATIVE_TEMPLATES.map((t) => [t.id, t]),
 );
+
+/**
+ * 问事报告的强制声明 —— 与四柱那份分开。
+ *
+ * 四柱说的是「这个人的结构」，六爻说的是「此事」，后者更容易被当作对结果的承诺。
+ * 且有一件四柱没有的事必须讲明：**同一时辰内所有问事得到同一个卦** ——
+ * 不说清楚，用户会以为卦是为他这一问单独起的。
+ */
+export const QUESTION_DISCLAIMER: LocalizedText = {
+  zhHans: "本报告为六爻问事的计算实现，属传统文化研究与自我省思的工具。所述皆为对卦象结构的描述，不构成对结果的预言，不具备预测未来事件的能力，也不构成医疗、法律、财务或任何专业建议。按时起卦的卦象属于起卦的时刻本身 —— 同一时辰内的所有问事得到同一个卦，区分不同的事靠取不同的用神。涉及健康、法律、财务的决策，请咨询相应领域的持证专业人士。",
+  en: "This report is a computational implementation of Liu Yao divination, offered as a tool for cultural study and self-reflection. Everything stated describes the structure of the hexagram; it is not a prediction of outcomes, has no capacity to foretell future events, and is not medical, legal, financial, or any other professional advice. A time-cast hexagram belongs to the moment of casting: every question asked within the same two-hour period yields the same hexagram, and different questions are distinguished only by which line is taken as the subject. For decisions touching health, law, or finance, consult a licensed professional in the relevant field.",
+};
 
 /** §6.3 强制声明 —— 每份报告首尾各一次，逐字固定。 */
 export const DISCLAIMER: LocalizedText = Object.freeze({

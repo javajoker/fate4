@@ -11,6 +11,9 @@ import { judge, OUTCOME_WORDS } from "../src/liuyao/judge.js";
 import { liuqinOf, type Liuqin } from "../src/yijing/najia.js";
 import { ELEMENTS } from "../src/types/ganzhi.js";
 import { generatedBy, controlledBy } from "../src/ganzhi/algebra.js";
+import { buildQuestionReport, collectQuestionText } from "../src/liuyao/report.js";
+import { scanText } from "../src/report/guard.js";
+import { toHant, SIMPLIFIED_ONLY } from "../src/report/hant.js";
 import { DEFAULT_PARAMS } from "../src/params/defaults.js";
 import { loadParams } from "../src/params/load.js";
 
@@ -314,5 +317,134 @@ describe("**Q4 断论只出结构，不出结果**", () => {
       checked++;
     }
     expect(checked, "一个反吟伏吟卦都没遇到").toBeGreaterThan(10);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+
+describe("**四条新禁令 —— 没有反向对照，「全绿」可能只是没接进扫描面**", () => {
+  const PLANTED: readonly (readonly [string, string])[] = [
+    ["用神旺相得日辰生扶，主得财。", "zh.liuyao.verbZhu"],
+    ["官鬼发动克世，主失。", "zh.liuyao.verbZhu"],
+    ["用神临日辰，此事可成。", "zh.liuyao.outcomeVerb"],
+    ["忌神发动，难成。", "zh.liuyao.outcomeVerb"],
+    ["原神生扶有力，消息立至。", "zh.liuyao.outcomeVerb"],
+    ["应期在申日，届时自有分晓。", "zh.liuyao.yingqiPoint"],
+    ["应在午时，不必远求。", "zh.liuyao.yingqiPoint"],
+    ["官鬼持世而月破，病难愈。", "zh.liuyao.divineMedical"],
+    ["子孙旺相，病愈可期。", "zh.liuyao.divineMedical"],
+    ["用神入墓，凶险。", "zh.liuyao.divineMedical"],
+  ];
+
+  it("每一句典籍式断语都被对应的规则逮到", () => {
+    for (const [text, ruleId] of PLANTED) {
+      const v = scanText(text, "test.planted");
+      expect(v.length, `未被拦下：${text}`).toBeGreaterThan(0);
+      expect(v.map((x) => x.ruleId), `${text} 未命中 ${ruleId}`).toContain(ruleId);
+    }
+  });
+
+  it("**繁体的同一句也要被逮到** —— 繁体规则由简体派生，不能只在简体生效", () => {
+    for (const [text, ruleId] of PLANTED) {
+      const v = scanText(toHant(text), "test.planted.hant");
+      expect(v.length, `繁体未被拦下：${toHant(text)}`).toBeGreaterThan(0);
+      expect(v.map((x) => x.ruleId)).toContain(ruleId.replace(/^zh\./, "zht."));
+    }
+  });
+
+  it("**合规的结构描述必须放行** —— 否则新规则只是在拦一切", () => {
+    const OK: readonly string[] = [
+      "用神妻财酉在第4爻，力量为偏有力，判据为「得一助」。",
+      "用神在第4爻，卦面上安静，然旺相而逢日辰冲，传统称暗动 —— 与发动同论其能生克他爻。",
+      "世在第6爻、应在第3爻，应克世。世为我方，应为他方。",
+      "离为火 → 火山旅。三对爻支全冲，传统将此形态归入离散、变动一类。",
+      "传统取候之法指向以下时段：2027 年辰月（8 个月后）。",
+      "病药：{bing}为病。但该病的权重刚过门槛，是否成病尚可两说。",
+    ];
+    for (const t of OK) {
+      expect(scanText(t, "test.ok"), `合规文本被误拦：${t}`).toEqual([]);
+      expect(scanText(toHant(t), "test.ok.hant"), `繁体合规文本被误拦：${t}`).toEqual([]);
+    }
+  });
+
+  it("**「主」的合法用法一律放行** —— 日主、主体、卦主、主要", () => {
+    for (const t of ["日主丙火", "主体与情态", "卦主为世爻", "主要判据", "主张两存", "主宰"]) {
+      expect(scanText(t, "test.zhu"), `误拦：${t}`).toEqual([]);
+    }
+  });
+
+  it("**应期报到月建是允许的，报到日、到时辰才拦** —— 分界线画在这里", () => {
+    expect(scanText("应期指向申、酉两个月建。", "t")).toEqual([]);
+    expect(scanText("传统取候之法指向 2027 年辰月。", "t")).toEqual([]);
+    expect(scanText("应期在申日。", "t").length).toBeGreaterThan(0);
+    expect(scanText("应在申时。", "t").length).toBeGreaterThan(0);
+  });
+});
+
+describe("Q6 问事报告", () => {
+  it("**整份报告过措辞守卫，零命中** —— 32 类占事 × 多个卦", () => {
+    let n = 0;
+    for (const g of allGua(512)) {
+      for (const t of TOPICS) {
+        const j = judge(g, pickYongshen(g, t.id, "父母").value, COIN);
+        const r = buildQuestionReport(j, loadParams({ liuyao: { castMethod: "coin" } }));
+        expect(r.guard.violations.map((v) => `${v.ruleId}@${v.where}: ${v.match}`),
+          `${g.ben.name} / ${t.label}`).toEqual([]);
+        expect(r.guard.scanned).toBeGreaterThan(5);
+        n++;
+      }
+    }
+    expect(n).toBeGreaterThan(100);
+  });
+
+  it("免责声明首尾各一次，且说明「同一时辰同卦」", () => {
+    const j = judge(G, pickYongshen(G, "wealth.seek").value, P);
+    const r = buildQuestionReport(j, DEFAULT_PARAMS);
+    expect(r.disclaimerTop).toBe(r.disclaimerBottom);
+    expect(r.disclaimerTop).toContain("同一时辰");
+    expect(r.disclaimerTop).toContain("不构成对结果的预言");
+    // 四柱那份说的是「四柱命理」，问事这份不能照抄
+    expect(r.disclaimerTop).toContain("六爻");
+  });
+
+  it("**只存问题的哈希，不存原文**", () => {
+    const j = judge(G, pickYongshen(G, "wealth.seek").value, P);
+    const r = buildQuestionReport(j, DEFAULT_PARAMS, { questionFingerprint: "ab12cd34" });
+    expect(r.meta.questionFingerprint).toBe("ab12cd34");
+    // meta 里与「问题」相关的字段**只有指纹一个** —— 没有放得下原文的地方
+    expect(Object.keys(r.meta).filter((k) => /question/i.test(k)))
+      .toEqual(["questionFingerprint"]);
+    expect(r.meta.questionFingerprint).toMatch(/^[0-9a-f]+$/);
+  });
+
+  it("健康类不产出时间窗，且写明为什么", () => {
+    const j = judge(G, pickYongshen(G, "health.body").value, P);
+    const r = buildQuestionReport(j, DEFAULT_PARAMS);
+    expect(r.yingqi.result.windows).toEqual([]);
+    expect(r.yingqi.result.suppressed).toContain("不产出时间窗");
+    const text = r.yingqi.narrative.map((l) => l.text).join("");
+    expect(text).not.toMatch(/月（\d+ 个月后）/);
+  });
+
+  it("繁体问事报告同样零命中，且没有简体残留", () => {
+    const HANT = loadParams({ report: { locale: "zh-Hant" } });
+    for (const t of ["wealth.seek", "career.job", "health.body", "self.fortune"]) {
+      const j = judge(G, pickYongshen(G, t).value, HANT.liuyao);
+      const r = buildQuestionReport(j, HANT);
+      expect(r.guard.violations, t).toEqual([]);
+      const text = collectQuestionText(r).map((c) => c.text).join("");
+      expect(SIMPLIFIED_ONLY.filter((c) => text.includes(c)), t).toEqual([]);
+    }
+  });
+
+  it("每一句都指回来源 —— 报告层不做新判断", () => {
+    const j = judge(G, pickYongshen(G, "career.job").value, P);
+    const r = buildQuestionReport(j, DEFAULT_PARAMS);
+    for (const sec of [r.casting, r.topic, r.judgement, r.yingqi]) {
+      for (const l of sec.narrative) {
+        expect(l.source.ref.length, l.templateId).toBeGreaterThan(0);
+        expect(l.text).not.toMatch(/[{}]/);
+      }
+    }
   });
 });

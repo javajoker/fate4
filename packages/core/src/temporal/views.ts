@@ -222,7 +222,8 @@ export function lichunJdOf(year: number): number {
   return solveSolarTerm(315, asTT(utToTT(guess))).jdUT as number;
 }
 
-function jieMonthBounds(
+/** 节气月的起讫（UT 儒略日）。六爻应期也用它 —— 不另写一份。 */
+export function jieMonthBounds(
   year: number, monthIndex: number,
 ): { openJd: number; closeJd: number; openName: string } {
   const i = mod(monthIndex, 12);

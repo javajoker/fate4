@@ -5,3 +5,5 @@ export * from "./topics.js";
 export * from "./yongshen.js";
 export * from "./strength.js";
 export * from "./judge.js";
+export * from "./yingqi.js";
+export * from "./report.js";
