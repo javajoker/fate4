@@ -90,6 +90,8 @@ const RANGES: readonly RangeRule[] = [
   { path: "nodes.minRelativeSwing", min: 0, max: 1 },
   { path: "nodes.bridgeGapMonths", min: 0, max: 24 },
   { path: "nodes.maxShown", min: 1, max: 200 },
+
+  { path: "liuyao.yingqi.horizonMonths", min: 1, max: 120 },
 ];
 
 const ENUMS: readonly EnumRule[] = [
@@ -111,6 +113,12 @@ const ENUMS: readonly EnumRule[] = [
   { path: "persona.wuqiaoSource", values: ["yinyangYingxiang", "jinguiZhenyan"] },
   { path: "nodes.mediumEstimator", values: ["robustMAD"] },
   { path: "nodes.interpolateTo", values: ["month"] },
+  { path: "liuyao.castMethod", values: ["time", "number", "coin"] },
+  { path: "liuyao.timeCast.calendar", values: ["lunar"] },
+  { path: "liuyao.timeCast.yearBoundary", values: ["lunarNewYear", "lichun"] },
+  { path: "liuyao.coin.yangFace", values: ["back", "face"] },
+  { path: "liuyao.fushen.rules", values: ["conventional"] },
+  { path: "liuyao.yingqi.granularity", values: ["month"] },
 ];
 
 function at(obj: unknown, path: string): unknown {

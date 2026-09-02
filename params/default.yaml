@@ -367,6 +367,37 @@ nodes:
   maxShown: 12
 
 # ═══════════════════════════════════════════════════════════
+# 第二台引擎 · 六爻问事（docs/13-liuyao.md）
+# ═══════════════════════════════════════════════════════════
+liuyao:
+  castMethod: time                 # ⚠️[流派] time | number | coin
+                                   #   coin 是六爻本法；time 借梅花易数的时间起卦，
+                                   #   与京房纳甲断卦是混用，随卦声明
+  timeCast:
+    calendar: lunar                # [硬约束] 按时起卦须用农历月日
+    yearBoundary: lunarNewYear     # ⚠️[流派] lunarNewYear | lichun
+                                   #   公式其余部分全在农历口径，故默认农历年
+  coin:
+    yangFace: back                 # ⚠️[流派] back | face —— 铜钱以哪面为阳
+  fushen:
+    rules: conventional            # ⚠️[流派] 伏神得出的判据，各家不一
+  guashen:
+    enabled: false                 # ⚠️ 卦身起法两大类且分歧大，默认关闭
+  xunkong:
+    dongBuKong: true               # 动而不空
+    chongKongZeShi: true           # 冲空则实
+  yuepo:
+    dongErBuPo: true               # 破而逢动，破而不破
+  topics:
+    health:
+      enabled: true                # 开启但受限，见 13-liuyao §5.4
+      emitYingqi: false            # [硬约束] 健康类不产出时间窗
+  yingqi:
+    horizonMonths: 12
+    granularity: month             # [硬约束] 只到月建，不到日时
+  oncePerQuestion: true            # [硬约束] 一事不二占 —— 允许重掷等于允许摇到满意为止
+
+# ═══════════════════════════════════════════════════════════
 # L6 · 报告
 # ═══════════════════════════════════════════════════════════
 report:

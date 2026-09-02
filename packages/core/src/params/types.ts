@@ -355,6 +355,63 @@ export interface SeriesParams {
 }
 
 /** L5n 统计节点。 */
+export interface LiuyaoParams {
+  /**
+   * ⚠️ [流派] 起卦法。
+   *
+   * `coin` 是六爻本法；`time` 借的是梅花易数的时间起卦，
+   * 与京房纳甲断卦是**混用**（见 docs/13-liuyao.md §1.3）。混用不静默，随卦声明。
+   */
+  readonly castMethod: "time" | "number" | "coin";
+  readonly timeCast: {
+    /** [硬约束] 按时起卦须用农历月日。改为其他即构建期报错 —— 那样得到的卦不属于任何传统排法。 */
+    readonly calendar: "lunar";
+    /**
+     * ⚠️ [流派] 起卦公式里的「年」取哪条年界。
+     *
+     * 公式其余部分全在农历口径，故默认取农历年（正月初一为界）；
+     * 另一说取立春年，与四柱同界。两者在正月初一与立春之间的那几周里不同。
+     */
+    readonly yearBoundary: "lunarNewYear" | "lichun";
+  };
+  readonly coin: {
+    /** ⚠️ [流派] 铜钱以哪一面为阳。背为阳是通行做法，字为阳亦有传。 */
+    readonly yangFace: "back" | "face";
+  };
+  readonly fushen: {
+    /** ⚠️ [流派] 伏神能否「得出」的判据，各家不一。 */
+    readonly rules: "conventional";
+  };
+  readonly guashen: {
+    /** ⚠️ 卦身起法两大类且分歧大，默认关闭。 */
+    readonly enabled: boolean;
+  };
+  readonly xunkong: {
+    /** 动而不空 —— 空爻若发动，不以空论。 */
+    readonly dongBuKong: boolean;
+    /** 冲空则实 —— 空爻逢日辰冲，不以空论。 */
+    readonly chongKongZeShi: boolean;
+  };
+  readonly yuepo: {
+    /** 破而逢动，破而不破。 */
+    readonly dongErBuPo: boolean;
+  };
+  readonly topics: {
+    readonly health: {
+      readonly enabled: boolean;
+      /** [硬约束] 健康类不产出时间窗。「病在某月」是本系统绝不输出的句式。 */
+      readonly emitYingqi: false;
+    };
+  };
+  readonly yingqi: {
+    readonly horizonMonths: number;
+    /** [硬约束] 应期只到月建，不到日时 —— 与统计节点同一条纪律。 */
+    readonly granularity: "month";
+  };
+  /** [硬约束] 一事不二占。允许重掷等于允许摇到满意为止。 */
+  readonly oncePerQuestion: true;
+}
+
 export interface NodesParams {
   /** [校准] 主门槛。|z| 或 |ż| 超此值即进入穿越区间。 */
   readonly threshold: number;
@@ -413,6 +470,7 @@ export interface Params {
   readonly persona: PersonaParams;
   readonly series: SeriesParams;
   readonly nodes: NodesParams;
+  readonly liuyao: LiuyaoParams;
   readonly report: ReportParams;
 }
 

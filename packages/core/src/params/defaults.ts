@@ -232,6 +232,23 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
     bridgeGapMonths: 2,                // [校准]
     maxShown: 12,
   }),
+  liuyao: Object.freeze({
+    castMethod: "time" as const,                 // [流派] time | number | coin
+    timeCast: Object.freeze({
+      calendar: "lunar" as const,                // [硬约束]
+      yearBoundary: "lunarNewYear" as const,     // [流派] 另一说取立春年
+    }),
+    coin: Object.freeze({ yangFace: "back" as const }),   // [流派]
+    fushen: Object.freeze({ rules: "conventional" as const }), // [流派]
+    guashen: Object.freeze({ enabled: false }),  // ⚠️ 起法分歧大，默认关闭
+    xunkong: Object.freeze({ dongBuKong: true, chongKongZeShi: true }),
+    yuepo: Object.freeze({ dongErBuPo: true }),
+    topics: Object.freeze({
+      health: Object.freeze({ enabled: true, emitYingqi: false as const }),
+    }),
+    yingqi: Object.freeze({ horizonMonths: 12, granularity: "month" as const }),
+    oncePerQuestion: true as const,              // [硬约束]
+  }),
   report: Object.freeze({
     locale: "zh-Hans",
     showConvergenceHistory: false,
