@@ -4,20 +4,18 @@
  * 三条硬规则：
  * 1. 槽位缺值直接抛错，不静默留下 `{slot}`。报告里出现花括号是最难被发现的错误之一。
  * 2. `confidence < confidenceFloor` 自动切 hedged，调用方无从绕过。
- * 3. 语言缺失抛 `UnsupportedLocaleError`，不回落。
+ * 3. 繁体由 `toHant` 在**填槽之后**转换，遇到无法定夺的字抛错而非猜测。
+ *
+ * 第三条的顺序要紧。槽位值同样需要转换（十神名、神煞名、宫位名都是简体常量），
+ * 而有些词条恰好跨模板与槽位的接缝 —— 「其华在{hua}」填入「发」之后才成词，
+ * 那时才能判定它是「髮」不是「發」。先转模板再填槽，这个判断就永远做不出来。
  */
 
+import { toHant } from "./hant.js";
 import {
   DISCLAIMER, TEMPLATES_BY_ID,
   type LocalizedText, type Locale, type NarrativeTemplate,
 } from "./templates.js";
-
-export class UnsupportedLocaleError extends Error {
-  constructor(readonly locale: Locale, readonly templateId: string) {
-    super(`模板 ${templateId} 缺少 ${locale} 文本。本系统不做简繁自动转换，故不回落 —— 静默回落等于对外谎称支持了该语言。`);
-    this.name = "UnsupportedLocaleError";
-  }
-}
 
 export class MissingSlotError extends Error {
   constructor(readonly templateId: string, readonly slot: string) {
@@ -53,17 +51,23 @@ export function placeholdersOf(text: string): Set<string> {
   return out;
 }
 
-export function localeText(t: LocalizedText, locale: Locale, templateId: string): string {
+/**
+ * 取某语言的模板文本。
+ *
+ * 繁体优先用手写的 `zhHant`；缺席则取简体，由调用方在填槽后交给 `toHant`。
+ * 这**不是**静默回落 —— 转换器对一简对多繁的字要么有写明理由的定夺，要么抛错。
+ */
+export function localeText(t: LocalizedText, locale: Locale, _templateId: string): string {
   switch (locale) {
     case "zh-Hans": return t.zhHans;
     case "en": return t.en;
-    case "zh-Hant": {
-      const v = t.zhHant;
-      if (v === undefined) throw new UnsupportedLocaleError(locale, templateId);
-      return v;
-    }
+    case "zh-Hant": return t.zhHant ?? t.zhHans;
   }
 }
+
+/** 繁体时转换，其余语言原样。放在填槽之后 —— 理由见模块头。 */
+const localize = (text: string, locale: Locale): string =>
+  locale === "zh-Hant" ? toHant(text) : text;
 
 function fill(text: string, slots: Slots, templateId: string): string {
   return text.replace(PLACEHOLDER, (_m, name: string) => {
@@ -101,7 +105,7 @@ export function renderWith(
 
   return {
     templateId: tpl.id,
-    text: fill(localeText(body, locale, tpl.id), slots, tpl.id),
+    text: localize(fill(localeText(body, locale, tpl.id), slots, tpl.id), locale),
     hedged: useHedged,
     confidence,
     source: opts.source ?? { kind: tpl.appliesTo.source, ref: tpl.appliesTo.kind },
@@ -109,7 +113,7 @@ export function renderWith(
 }
 
 export function disclaimerText(locale: Locale): string {
-  return localeText(DISCLAIMER, locale, "DISCLAIMER");
+  return localize(localeText(DISCLAIMER, locale, "DISCLAIMER"), locale);
 }
 
 // ─────────────────────────────────────────────────────────

@@ -7,6 +7,12 @@
  *
  * 导出必产 `paramsHash` 与 `engineVersion`：半年后有人拿旧报告来问
  * 「为什么现在算出来不一样」，这两个字段是唯一能回答的依据。
+ *
+ * ## 繁体
+ *
+ * 章节标题与表头是本模块自己写的字面量，不经模板层，故不会被 `renderWith` 转换。
+ * 出口处整篇过一遍 `toHant` 即可 —— 叙述文本此时已是繁体，再转一次是恒等操作。
+ * 分散到每个标题去转，只会漏掉下一个新增的标题。
  */
 
 import { DOMAIN_LABEL } from "../yingqi/types.js";
@@ -18,6 +24,7 @@ import type { NarrativeLine } from "./render.js";
 import type { Report } from "./types.js";
 import { SCALE_LABEL } from "../temporal/nodes.js";
 import { formatEvidence } from "./finding.js";
+import { toHant } from "./hant.js";
 
 const nl = (lines: readonly NarrativeLine[]): string =>
   lines.map((l) => (l.hedged ? `- ${l.text}　_(低置信度，已改用留有余地的措辞)_` : `- ${l.text}`)).join("\n");
@@ -287,5 +294,6 @@ export function renderMarkdown(r: Report): string {
     + `因置信度不足降级 ${r.guard.hedged.length} 条。`);
 
   p(`> ${r.disclaimerBottom}`);
-  return out.join("\n");
+  const md = out.join("\n");
+  return r.meta.locale === "zh-Hant" ? toHant(md) : md;
 }

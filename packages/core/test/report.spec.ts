@@ -3,7 +3,7 @@ import {
   DISCLAIMER, NARRATIVE_TEMPLATES, TEMPLATES_BY_ID, type NarrativeTemplate,
 } from "../src/report/templates.js";
 import {
-  MissingSlotError, placeholdersOf, renderTemplate, UnsupportedLocaleError,
+  MissingSlotError, placeholdersOf, renderTemplate,
 } from "../src/report/render.js";
 import { formatViolations, scanText } from "../src/report/guard.js";
 import { YINGQI_RULES } from "../src/yingqi/rules.js";
@@ -90,12 +90,15 @@ describe("模板库的自洽性", () => {
     }
   });
 
-  it("繁体全缺席，且缺席是显式的", () => {
-    // 不做简转繁自动降级：余气→餘氣（非余氣）、历法→曆法（非歷法）、后天→後天。
-    // 机械转换会在术语上出错，而术语出错的报告比没有报告更糟。
-    const withHant = NARRATIVE_TEMPLATES.filter((t) => t.text.zhHant !== undefined);
-    expect(withHant.length, "若已补繁体，请同时删掉本断言并放开 renderTemplate 的抛错路径").toBe(0);
-    expect(DISCLAIMER.zhHant).toBeUndefined();
+  it("繁体由 toHant 生成，手写的 zhHant 优先", () => {
+    // 原先此处断言「繁体全缺席」。现由 hant.ts 转换 —— 那不是机械降级：
+    // 一简对多繁的字要么有写明理由的定夺，要么抛错。详见 hant.spec.ts。
+    for (const t of NARRATIVE_TEMPLATES) {
+      if (t.text.zhHant === undefined) continue;
+      expect(placeholdersOf(t.text.zhHant), `${t.id} 繁体的槽位与简体不一致`)
+        .toEqual(placeholdersOf(t.text.zhHans));
+    }
+    expect(DISCLAIMER.zhHant ?? DISCLAIMER.zhHans).toContain("四柱");
   });
 });
 
@@ -278,10 +281,11 @@ describe("模板求值", () => {
     expect(line.text).not.toMatch(/[{}]/);
   });
 
-  it("繁体缺失抛错，不静默回落到简体", () => {
-    // 静默回落等于对外谎称支持了繁体。
-    expect(() => renderTemplate("strength.weak", slots, { locale: "zh-Hant" }))
-      .toThrow(UnsupportedLocaleError);
+  it("繁体在**填槽之后**转换 —— 槽位值也得转", () => {
+    const hans = renderTemplate("strength.weak", slots, { locale: "zh-Hans" });
+    const hant = renderTemplate("strength.weak", slots, { locale: "zh-Hant" });
+    expect(hant.text).not.toBe(hans.text);
+    expect(hant.text).not.toMatch(/[为个说时无这运财权气数体传应过强当]/);
   });
 
   it("每条叙述都带来源指向 —— 报告不做新判断", () => {

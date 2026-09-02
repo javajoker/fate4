@@ -215,10 +215,16 @@ describe("**Skill 与 Web 结论逐字一致** —— P10 的验收判据", () =
     expect(tree.kin.readings).toHaveLength(5);
   });
 
-  it("繁体尚未就位，取之即报错而非静默回落简体", () => {
-    const r = cli(["report", "--chart", "c.json", "--locale", "zh-Hant"], files);
-    expect(r.code).toBe(1);
-    expect(r.err).toMatch(/zh-Hant|繁体/);
+  it("**繁体报告里没有一个简体字，且结构与简体逐条对齐**", () => {
+    const hant = cli(["report", "--chart", "c.json", "--locale", "zh-Hant"], files);
+    const hans = cli(["report", "--chart", "c.json", "--locale", "zh-Hans"], files);
+    expect(hant.code).toBe(0);
+    expect(hans.code).toBe(0);
+    expect(hant.out).not.toBe(hans.out);
+    // 逐字节相同的行数应当为零以外的少数（纯数字表格行），而汉字行必须全变
+    expect(hant.out.split("\n").length).toBe(hans.out.split("\n").length);
+    expect(hant.out).toContain("四柱推演報告");
+    expect(hant.out).not.toMatch(/[为个说时无这运财权气数体传应过强当报导华]/);
   });
 });
 

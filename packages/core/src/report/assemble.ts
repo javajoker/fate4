@@ -38,6 +38,7 @@ import { dayView, luckTimeline, monthView, yearView } from "../temporal/views.js
 import type { YearView } from "../temporal/types.js";
 import { DOMAIN_LABEL } from "../yingqi/types.js";
 import type { Locale } from "./templates.js";
+import { toHant } from "./hant.js";
 import { buildSeries } from "../temporal/series.js";
 import { allNodes } from "../temporal/nodes.js";
 import { buildFindings } from "./finding.js";
@@ -728,7 +729,7 @@ export function buildReport(
     narrative: L8.items,
   };
 
-  const report: Report = {
+  const raw: Report = {
     meta: {
       engineVersion, paramsHash: hash, locale, subject,
       warnings: chart.warnings,
@@ -741,6 +742,8 @@ export function buildReport(
     guard: { scanned: 0, violations: [], hedged: [] },
   };
 
+  // 模板文本在 renderWith 里就转过了；这一遍只补非模板来源的裸字符串。
+  const report = locale === "zh-Hant" ? mapPlainText(raw, toHant) : raw;
   return { ...report, guard: guardReport(report) };
 }
 
@@ -784,6 +787,31 @@ function godElementOf(D: Element, god: string): Element {
 // ─────────────────────────────────────────────────────────
 // §6.4.3 导出前的输出扫描
 // ─────────────────────────────────────────────────────────
+
+/**
+ * 非模板来源的文本 —— 这些字段直接把数据层的字符串放进树里，不经 `renderWith`，
+ * 因而也不会被那里的繁体转换碰到。
+ *
+ * 它与 `collectReportText` 末尾那一段是**同一份清单**，故两者紧挨着放：
+ * 往其中一处添字段而忘了另一处，`hant.spec.ts` 的
+ * 「报告树里的每一段文字都已转换」会当场指出是哪个字段。
+ */
+const PLAIN_TEXT_KEYS: ReadonlySet<string> = new Set([
+  "warnings", "stemPhaseSummary", "branchPhaseSummary", "toneReason",
+  "note", "detail", "evidence", "narrative", "indication", "narrativeTag",
+]);
+
+/** 按键名深度改写树里的裸字符串。只碰字符串叶子，对象与数组照结构走下去。 */
+function mapPlainText<T>(v: T, f: (s: string) => string, keyed = false): T {
+  if (typeof v === "string") return (keyed ? f(v) : v) as T;
+  if (Array.isArray(v)) return v.map((x) => mapPlainText(x, f, keyed)) as T;
+  if (v === null || typeof v !== "object") return v;
+  const out: Record<string, unknown> = {};
+  for (const [k, val] of Object.entries(v)) {
+    out[k] = mapPlainText(val, f, keyed || PLAIN_TEXT_KEYS.has(k));
+  }
+  return out as T;
+}
 
 /** 走遍报告树，把每一条会到达读者的字符串都扫一遍。 */
 export function collectReportText(r: Report): { text: string; where: string }[] {
