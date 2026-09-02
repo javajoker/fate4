@@ -6,8 +6,9 @@
  * 100% 验证，故必须先做到零误差，再谈上层。
  */
 
+import { lunarDateOf } from "./lunar.js";
 import { toTrueSolarTime } from "../time/trueSolarTime.js";
-import { fromJulianDay } from "../astro/julian.js";
+import { fromJulianDay, type JulianDay } from "../astro/julian.js";
 import { DEFAULT_SOLAR_PROVIDER } from "../astro/defaults.js";
 import { TOLERANCE_GUARANTEED_UNTIL_YEAR } from "../astro/deltaT.js";
 import {
@@ -163,6 +164,11 @@ export function buildChart(input: BirthInput, options: ChartOptions = {}): Natal
     hour: input.unknownHour ? null : dh.hour,
     taiyuan,
     mingGong,
+    // 农历。以出生的绝对时刻（UT）定，日界按农历自身的口径（默认东八区），
+    // 与真太阳时无关 —— 农历的日界是民用子夜，不是真太阳时子夜。
+    lunar: lunarDateOf(birthJdUT as JulianDay,
+      options.lunarTzOffsetHours === undefined ? {}
+        : { tzOffsetHours: options.lunarTzOffsetHours }),
     enclosingJie: {
       prevName: jie.prev.def.name, prevJd: jie.prev.jdUT,
       nextName: jie.next.def.name, nextJd: jie.next.jdUT,

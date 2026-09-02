@@ -276,6 +276,7 @@ export function buildReport(
     corrections: chart.corrections,
     siling: chart.siling,
     enclosingJie: chart.enclosingJie,
+    lunar: chart.lunar,
     shenshaByPalace: groupShenshaByPalace(natal.shensha),
     narrative: L1.items,
   };

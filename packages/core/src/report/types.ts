@@ -50,6 +50,7 @@ export interface ChartSection {
   readonly corrections: TimeCorrections;
   readonly siling: SilingInfo;
   readonly enclosingJie: NatalChart["enclosingJie"];
+  readonly lunar: NatalChart["lunar"];
   readonly shenshaByPalace: readonly {
     readonly palace: PalaceName;
     readonly hits: readonly ShenshaHit[];

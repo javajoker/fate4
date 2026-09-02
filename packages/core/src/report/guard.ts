@@ -34,6 +34,8 @@
  * 禁令类（forbid）规则对两者一视同仁。
  */
 
+import { toHant } from "./hant.js";
+
 export type GuardLocale = "zh-Hans" | "zh-Hant" | "en";
 
 export const GUARD_LOCALES: readonly GuardLocale[] = Object.freeze([
@@ -302,63 +304,60 @@ const ZH_HANS: readonly GuardRule[] = [
 ];
 
 // ═══════════════════════════════════════════════════════════
-// 繁体中文
+// 繁体中文 —— **由简体规则机械派生，不手写**
 //
-// 繁体模板尚未就位（见 templates.ts），但禁令表先行 —— 模型在
-// Skill 场景下可能直接产出繁体，守卫不能有语言盲区。
+// 初版是手写的七条，而简体有十九条。繁体从「调用即抛错」变成真会产出之后
+// （见 report/hant.ts），这十二条之差就成了实打实的守卫盲区 ——
+// 而我当时写的测试只查字面转换，没查两套规则是否对等，故没逮到。
+//
+// 现在派生：`toHant` 拒绝猜测，遇到无法定夺的字直接抛错，
+// 于是「往简体加一条规则却忘了繁体」这件事**在构建期就过不去**。
+// 与「Skill 与 Web 逐字一致是构造保证而非维护约定」同一条思路。
+//
+// 另一半问题在 `requireContext` 的先行断言：触发词多为简繁同形（肝、肺、癌），
+// 而框定语不是 —— 于是简体规则在繁体正文上必然误报「缺框定语」，实测已见。
+// 故先行断言一律**简繁双写**，两种写法都算数。
 // ═══════════════════════════════════════════════════════════
 
-const ZH_HANT: readonly GuardRule[] = [
-  {
-    id: "zht.prediction.absolute",
-    locale: "zh-Hant", category: "prediction", mode: "forbid",
-    pattern: /必然|必定|必將|肯定會|一定會|註定|鐵定|勢必|無疑會/g,
-    why: "絕對情態把結構描述變成預言。",
-    fix: "改用「傳統上常被解讀為」。",
-  },
-  {
-    id: "zht.prediction.lifeEvent",
-    locale: "zh-Hant", category: "prediction", mode: "forbid",
-    pattern: /(?:會|將|要|難免|免不了|逃不過)[^。；！？\n]{0,6}(?:離婚|離異|分手|喪偶|破財|破產|失業|坐牢|入獄|車禍|橫禍|出事|絕症|夭折)/g,
-    why: "對具體人生事件作時點預言。",
-    fix: "只描述結構。",
-  },
-  {
-    id: "zht.medical.warning",
-    locale: "zh-Hant", category: "medical", mode: "forbid",
-    pattern: /(?:注意|小心|謹防|當心|提防|防範|預防)[^。；！？\n]{0,8}(?:疾病|病症|病變|癌|炎症|心臟|肝病|腎病|中風|血壓|血糖|腫瘤)/g,
-    why: "醫療提醒即醫療判斷。",
-    fix: "刪除。",
-  },
-  {
-    id: "zht.financial.advice",
-    locale: "zh-Hant", category: "financial", mode: "forbid",
-    pattern: /(?:適合|應當|應該|建議|宜於|不宜|切勿|避免)[^。；！？\n]{0,6}(?:投資|買房|購房|置業|炒股|入市|創業|借貸|理財)/g,
-    why: "理財建議需持牌資格。",
-    fix: "刪除。",
-  },
-  {
-    id: "zht.legal.outcome",
-    locale: "zh-Hant", category: "legal", mode: "forbid",
-    pattern: /(?:會有|將有|必有|難免)[^。；！？\n]{0,4}(?:官司|訴訟|牢獄|刑罰|訟事)/g,
-    why: "法律後果的判斷。",
-    fix: "刪除。",
-  },
-  {
-    id: "zht.score.grade",
-    locale: "zh-Hant", category: "score", mode: "forbid",
-    pattern: /(?:命格|八字|命局|命盤|運勢|格局)[^。；！？\n]{0,4}(?:評分|得分|打分|分數|評級|等級)|(?:評分|得分)[：:]\s*\d/g,
-    why: "吉凶總分把多維描述壓成價值判斷。",
-    fix: "順逆指數須與「好壞」脫鉤表述。",
-  },
-  {
-    id: "zht.secondPerson.address",
-    locale: "zh-Hant", category: "secondPerson", mode: "forbid",
-    pattern: /你/g,
-    why: "第二人稱把結構描述變成對讀者的斷言。",
-    fix: "主語用「本盤」「命主」。",
-  },
-];
+/** 把一条正则扩成简繁双匹配。已是纯繁体或不含汉字时原样返回。 */
+function biscript(re: RegExp): RegExp {
+  const hant = toHant(re.source);
+  return hant === re.source ? re : new RegExp(`(?:${re.source})|(?:${hant})`, re.flags);
+}
+
+/**
+ * 由简体规则派生繁体规则。
+ *
+ * 主模式取**纯繁体**（简体那条由 ZH_HANS 自己负责，双写会把同一处报两遍）；
+ * `context` 的框定语与 `allow` 的豁免窗取简繁双写 —— 用哪种写法都该算数。
+ */
+function toHantRule(r: GuardRule): GuardRule {
+  return {
+    ...r,
+    id: r.id.replace(/^zh\./, "zht."),
+    locale: "zh-Hant",
+    pattern: new RegExp(toHant(r.pattern.source), r.pattern.flags),
+    why: toHant(r.why),
+    fix: toHant(r.fix),
+    ...(r.context === undefined ? {} : { context: biscript(r.context) }),
+    ...(r.allow === undefined ? {} : { allow: r.allow.map(biscript) }),
+  };
+}
+
+const ZH_HANT: readonly GuardRule[] = ZH_HANS.map(toHantRule);
+
+/**
+ * 简体规则的框定语同样双写。
+ *
+ * 这一条是真 bug 的修复，不是对称的装饰：`requireContext` 的**触发词**多为
+ * 简繁同形（肝、肺、癌、脾、胃），于是简体规则照样在繁体正文上命中；
+ * 而**框定语**不同形，于是必然报「缺框定语」。实测繁体报告被拦下两处，就是这个。
+ */
+const ZH_HANS_BI: readonly GuardRule[] = ZH_HANS.map((r) => ({
+  ...r,
+  ...(r.context === undefined ? {} : { context: biscript(r.context) }),
+  ...(r.allow === undefined ? {} : { allow: r.allow.map(biscript) }),
+}));
 
 // ═══════════════════════════════════════════════════════════
 // English
@@ -435,13 +434,13 @@ const EN: readonly GuardRule[] = [
 ];
 
 export const GUARD_RULES: Readonly<Record<GuardLocale, readonly GuardRule[]>> = Object.freeze({
-  "zh-Hans": Object.freeze(ZH_HANS),
+  "zh-Hans": Object.freeze(ZH_HANS_BI),
   "zh-Hant": Object.freeze(ZH_HANT),
   en: Object.freeze(EN),
 });
 
 export const ALL_GUARD_RULES: readonly GuardRule[] = Object.freeze([
-  ...ZH_HANS, ...ZH_HANT, ...EN,
+  ...ZH_HANS_BI, ...ZH_HANT, ...EN,
 ]);
 
 /**

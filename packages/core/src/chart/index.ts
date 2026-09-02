@@ -4,5 +4,6 @@ export * from "./taiyuan.js";
 export * from "./mingGong.js";
 export * from "./siling.js";
 export * from "./qiyun.js";
+export * from "./lunar.js";
 export * from "./buildChart.js";
 export * from "./baseChart.js";

@@ -7,6 +7,7 @@ import { buildChart } from "../src/chart/buildChart.js";
 import { buildReport, collectReportText } from "../src/report/assemble.js";
 import { renderMarkdown } from "../src/report/markdown.js";
 import { NEIJING } from "../src/conclude/neijing.js";
+import { GUARD_RULES, scanText } from "../src/report/guard.js";
 import type { BirthInput } from "../src/chart/types.js";
 
 const CHARTS: readonly BirthInput[] = [
@@ -59,7 +60,7 @@ describe("三个桶必须不重不漏", () => {
 
   it("pick 为 null 的字必须真的有词条兜着", () => {
     const nulls = Object.entries(AMBIGUOUS).filter(([, v]) => v.pick === null).map(([c]) => c);
-    expect(nulls.sort()).toEqual(["历", "发", "复", "系"].sort());
+    expect(nulls.sort()).toEqual(["历", "发", "复", "系", "汇"].sort());
     for (const c of nulls) {
       const covered = Object.keys(TERMS).filter((k) => k.includes(c));
       expect(covered.length, `「${c}」说无单一读法，却一条词条也没有`).toBeGreaterThan(2);
@@ -189,5 +190,56 @@ describe("端到端", () => {
     }
     expect(toHant(NEIJING.水.hua)).toBe("髮");
     expect(toHant(NEIJING.火.ti)).toBe("脈");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+
+describe("**守卫的简繁对等 —— 是构造保证，不是维护约定**", () => {
+  const hans = GUARD_RULES["zh-Hans"];
+  const hant = GUARD_RULES["zh-Hant"];
+
+  it("两套规则一一对应，条数相同", () => {
+    // 初版繁体只有手写的七条，简体十九条 —— 那十二条之差是实打实的守卫盲区。
+    expect(hant.length).toBe(hans.length);
+    expect(hant.map((r) => r.id)).toEqual(hans.map((r) => r.id.replace(/^zh\./, "zht.")));
+    for (const [i, r] of hant.entries()) {
+      expect(r.mode).toBe(hans[i]!.mode);
+      expect(r.category).toBe(hans[i]!.category);
+      expect(r.locale).toBe("zh-Hant");
+    }
+  });
+
+  it("繁体规则的模式确实是繁体 —— 不是照抄简体", () => {
+    let converted = 0;
+    for (const [i, r] of hant.entries()) {
+      if (r.pattern.source !== hans[i]!.pattern.source) converted++;
+    }
+    expect(converted, "两套模式逐条相同，说明转换根本没生效").toBeGreaterThan(hans.length / 2);
+  });
+
+  it("**植入违规必须两种字体都逮到** —— 反向对照", () => {
+    const PLANTED: readonly string[] = [
+      "此人必然在 2030 年离婚。",
+      "注意心脏疾病。",
+      "建议投资买房。",
+      "会有官司缠身。",
+      "肝不好，需要调理。",
+    ];
+    for (const bad of PLANTED) {
+      const h = scanText(bad, "test.hans");
+      expect(h.length, `简体未逮到：${bad}`).toBeGreaterThan(0);
+      const t = scanText(toHant(bad), "test.hant");
+      expect(t.length, `繁体未逮到：${toHant(bad)}`).toBeGreaterThan(0);
+    }
+  });
+
+  it("**合规文本两种字体都放行** —— 没有它，「全绿」可能只是因为什么都拦", () => {
+    const OK = "《内经》五行配属中，木应肝与胆，在窍为目。以上为传统对照与本盘数值的"
+      + "并列陈述，不构成任何关于身体状况的判断，亦不指向任何具体病症；"
+      + "健康相关的决定请咨询持证专业人士。";
+    expect(scanText(OK, "test.hans"), "简体合规文本被误拦").toEqual([]);
+    expect(scanText(toHant(OK), "test.hant"), "繁体合规文本被误拦 —— 框定语没有简繁双写")
+      .toEqual([]);
   });
 });

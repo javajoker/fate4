@@ -7,3 +7,4 @@ export * from "./vsop87.js";
 export * from "./defaults.js";
 export * from "./equationOfTime.js";
 export * from "./solarTerms.js";
+export * from "./moon.js";

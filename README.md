@@ -89,9 +89,10 @@ L6 报告   汇总为分层报告
 | **P16** | 报告 §6.5 节点入报告与网页 | ✅ 完成 |
 | **P17** | 繁体语言包 —— 拒绝猜测的转换器 | ✅ 完成 |
 | **P18** | 《穷通宝鉴》通行本 120 格调候表 | ✅ 完成 —— ⚠️ 凭记忆转录，待实体书核对 |
-| P19– | **六爻问事引擎**（[13-liuyao](docs/13-liuyao.md)） | 📋 规格草案，等待拍板 |
+| **P17a** | `astro/moon.ts` 定朔 + `chart/lunar.ts` 农历 | ✅ 完成 —— 11 个春节、10 个闰月逐一对上 |
+| P17b– | **六爻问事引擎**（[13-liuyao](docs/13-liuyao.md)） | 📋 规格已定案，待实现 |
 
-全部 699 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
+全部 717 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
 
 ```bash
 pnpm install && pnpm test && pnpm typecheck

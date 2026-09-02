@@ -67,6 +67,13 @@ export function renderMarkdown(r: Report): string {
     + `　均时差 ${co.equationOfTimeMinutes.toFixed(1)} 分`
     + `　合计相对民用钟表 ${co.netVsCivilMinutes.toFixed(1)} 分`);
   p(`节气区间：${r.chart.enclosingJie.prevName} → ${r.chart.enclosingJie.nextName}`);
+  const L = r.chart.lunar;
+  // 两条年界必须各自标名 —— 农历年以正月初一为界，年柱以立春为界，可差一个多月
+  p(`农历：${L.year} 年（正月初一为岁首）${L.isLeap ? "闰" : ""}${L.month} 月`
+    + ` ${L.day} 日，该月 ${L.monthDays} 天`
+    + `　｜　年柱 ${r.chart.pillars[0]?.stem ?? ""}${r.chart.pillars[0]?.branch ?? ""} 以立春为界，两者不同源`
+    + (L.boundaryUncertain
+      ? "　⚠️ 该月朔刻距日界不足级数精度，初一的归属存疑，整月日序可能差一天" : ""));
   const silingNote = { exact: "藏干中确有该干", sameElement: "落到同五行藏干",
     unresolvable: "月支藏干中无落点" }[r.chart.siling.resolution];
   p(`司令：${r.chart.siling.stem}（第 ${r.chart.siling.segment + 1} 段，入节 ${r.chart.siling.daysIntoJie.toFixed(2)} 日，${silingNote}）`);

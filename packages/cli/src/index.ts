@@ -45,7 +45,7 @@ const USAGE = `fate —— 四柱推演命令行
   fate month  --chart c.json --year 2026 --month 1..12 [--json]
   fate day    --chart c.json --date YYYY-MM-DD [--json]
   fate report --chart c.json [--format markdown|json] [--now YYYY-MM-DD]
-              [--subject self|other] [--locale zh-Hans|en]
+              [--subject self|other] [--locale zh-Hans|zh-Hant|en]
               [--nodes [--node-threshold 2.0]]
 
   fate cities             列出内置城市表

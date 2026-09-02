@@ -1,5 +1,6 @@
 /** L0 排盘的输入与输出类型。 */
 
+import type { LunarDate } from "./lunar.js";
 import type { Branch, Pillar, Stem } from "../types/ganzhi.js";
 import type { CalendarDateTime } from "../astro/julian.js";
 import type { OffsetResolution } from "../time/timezone.js";
@@ -25,6 +26,13 @@ export interface ChartOptions {
   readonly equationOfTime?: boolean;
   readonly qiyunMode?: "continuous" | "traditionalDiscrete";
   readonly luckPillarCount?: number;
+  /**
+   * 农历定朔与日界所用的时区偏移，小时。默认东八区（东经 120°）。
+   *
+   * 1929 年以前中国历法以北京地方时（约 UTC+7:46）推朔，换用哪个会改变
+   * 少数月份的朔日归属。处理彼时的日期应显式指定 —— 本系统不替调用方猜。
+   */
+  readonly lunarTzOffsetHours?: number;
 }
 
 export interface BirthInput {
@@ -104,6 +112,14 @@ export interface NatalChart {
 
   readonly taiyuan: Pillar;
   readonly mingGong: Pillar | null;
+
+  /**
+   * 出生日的农历日期。
+   *
+   * ⚠️ `lunar.year` 以正月初一为岁首，与 `year` 这根**立春为界**的年柱**不是同一条线**，
+   * 两者可差一个多月。凡同时展示，必须各自标名 —— 见 `chart/lunar.ts`。
+   */
+  readonly lunar: LunarDate;
 
   /** 出生所在的节气区间（UT 儒略日）。 */
   readonly enclosingJie: {
