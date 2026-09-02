@@ -412,6 +412,25 @@ export interface LiuyaoParams {
   readonly oncePerQuestion: true;
 }
 
+export interface QimenParams {
+  /**
+   * ⚠️ [流派] 定局法。
+   *
+   * `chaibu` 拆补法：符头定三元，节气不足十五日者拆补。
+   * `zhirun` 置闰法（超神接气）：另立闰奇。两法在部分日期给出不同的局，分歧不小。
+   * 目前只实现拆补，`zhirun` 会在构建期报错 —— 声明了却没实现，比不声明更糟。
+   */
+  readonly juMethod: "chaibu" | "zhirun";
+  /**
+   * ⚠️ [流派] 盘式。
+   *
+   * `zhuan` 转盘：九星沿洛书圆序整体旋转，天禽寄坤二。
+   * `fei` 飞盘：按宫数飞布，天禽入中不寄。两者是不同的流派，结论可以相反。
+   * 目前只实现转盘。
+   */
+  readonly plate: "zhuan" | "fei";
+}
+
 export interface NodesParams {
   /** [校准] 主门槛。|z| 或 |ż| 超此值即进入穿越区间。 */
   readonly threshold: number;
@@ -471,6 +490,7 @@ export interface Params {
   readonly series: SeriesParams;
   readonly nodes: NodesParams;
   readonly liuyao: LiuyaoParams;
+  readonly qimen: QimenParams;
   readonly report: ReportParams;
 }
 

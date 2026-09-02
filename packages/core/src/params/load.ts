@@ -119,6 +119,8 @@ const ENUMS: readonly EnumRule[] = [
   { path: "liuyao.coin.yangFace", values: ["back", "face"] },
   { path: "liuyao.fushen.rules", values: ["conventional"] },
   { path: "liuyao.yingqi.granularity", values: ["month"] },
+  { path: "qimen.juMethod", values: ["chaibu", "zhirun"] },
+  { path: "qimen.plate", values: ["zhuan", "fei"] },
 ];
 
 function at(obj: unknown, path: string): unknown {
@@ -269,6 +271,22 @@ function validateInvariants(p: Params): string[] {
     errors.push(
       `series.spanYears(${p.series.spanYears}) 不得大于 drawYears(${p.series.drawYears})，`
       + "否则统计窗内有一段没有采样点",
+    );
+  }
+
+  // 奇门的两个流派开关：枚举里有，实现里没有。
+  // 让它在构建期拦下，而不是悄悄按拆补/转盘算了却自称是置闰/飞盘 ——
+  // 一个说了谎的 paramsHash 比一个少一档的枚举坏得多。
+  if (p.qimen.juMethod !== "chaibu") {
+    errors.push(
+      `qimen.juMethod 只实现了 chaibu（拆补法）。置闰法（超神接气）与拆补法在部分日期`
+      + "给出不同的局，故不能拿拆补的结果冒充置闰的。",
+    );
+  }
+  if (p.qimen.plate !== "zhuan") {
+    errors.push(
+      "qimen.plate 只实现了 zhuan（转盘）。飞盘法天禽入中不寄、按宫数飞布，"
+      + "与转盘是不同的流派，结论可以相反。",
     );
   }
 

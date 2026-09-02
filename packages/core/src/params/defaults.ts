@@ -249,6 +249,10 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
     yingqi: Object.freeze({ horizonMonths: 12, granularity: "month" as const }),
     oncePerQuestion: true as const,              // [硬约束]
   }),
+  qimen: Object.freeze({
+    juMethod: "chaibu" as const,   // ⚠️[流派] 另有置闰法（超神接气），未实现
+    plate: "zhuan" as const,       // ⚠️[流派] 另有飞盘法，未实现
+  }),
   report: Object.freeze({
     locale: "zh-Hans",
     showConvergenceHistory: false,
