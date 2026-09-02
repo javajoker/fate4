@@ -384,3 +384,48 @@ describe("问事的人话", () => {
     }
   });
 });
+
+describe("**起伏卡片：时间段 + 指事**", () => {
+  const nodes = PLAINS[0]!.cards.filter((c) => c.section === "起伏");
+
+  it("每张都带年份区间", () => {
+    expect(nodes.length).toBeGreaterThan(0);
+    for (const c of nodes) {
+      expect(c.title, `${c.id} 的标题不是年份区间`).toMatch(/^\d{4}(–\d{4})? 年$/);
+    }
+  });
+
+  it("**说的是「哪一类事」，不是会发生什么事**", () => {
+    for (const c of nodes) {
+      expect(c.body).toMatch(/那一路|这一路/);
+      // 事件预言的字眼一个都不许有
+      for (const w of ["升官", "破财", "离婚", "生病", "出事", "会有", "将有"]) {
+        expect(c.body.includes(w), `${c.title} 出现事件预言「${w}」`).toBe(false);
+      }
+    }
+  });
+
+  it("那句「是排序不是概率」放在小节说一次，不在每张卡上重复", () => {
+    expect(PLAINS[0]!.sectionNotes["起伏"]).toContain("排序");
+    expect(PLAINS[0]!.sectionNotes["起伏"]).toContain("不是概率");
+    for (const c of nodes) expect(c.body).not.toContain("不是概率");
+  });
+});
+
+describe("**时间卡片带神煞指事**", () => {
+  it("今年那张若有被引动的神煞，须写出它指向哪一类事，并声明不是会发生", () => {
+    const y = PLAINS[0]!.cards.find((c) => c.id === "cur.year");
+    expect(y).toBeDefined();
+    if (y!.body.includes("被引动的传统符号")) {
+      expect(y!.body).toContain("指向");
+      expect(y!.body, "列了符号却没声明它不是预告")
+        .toContain("不是说这些事会发生");
+    }
+  });
+
+  it("指事只说类别，不出可照做的指定", () => {
+    for (const c of allCards()) {
+      expect(scanPlain(c.body, c.id), `${c.id}`).toEqual([]);
+    }
+  });
+});

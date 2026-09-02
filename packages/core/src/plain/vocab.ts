@@ -59,6 +59,43 @@ export const GOD_RELATION_PLAIN: Readonly<Record<TenGod, string>> = Object.freez
   正印: "长辈、照顾你的人", 偏印: "长辈、精神上的支持",
 });
 
+/**
+ * 十神 → **它指向哪一类事**。
+ *
+ * ⚠️ 与 `GOD_RELATION_PLAIN` 分工不同：那一张说「与之相关的是哪类人」，
+ * 这一张说「这一路的起伏落在生活的哪一块」。
+ *
+ * **只说是哪一类事，不说会发生什么。** 「与职位、规则相关的那一路张力偏大」
+ * 可以；「可能升官」不可以 —— 后者是事件预言，措辞守卫会拦，而且它本就
+ * 越过了这套模型能说的范围。
+ */
+export const GOD_DOMAIN_PLAIN: Readonly<Record<TenGod, string>> = Object.freeze({
+  比肩: "与同辈、合作、自己拿主意相关的那一路",
+  劫财: "与同辈、分摊、争抢同一件事相关的那一路",
+  食神: "与表达、创作、照顾人相关的那一路",
+  伤官: "与表达、不服框框、锋芒相关的那一路",
+  正财: "与钱、务实的往来、日常开销相关的那一路",
+  偏财: "与机会型收入、来去快的往来相关的那一路",
+  正官: "与职位、规则、名分相关的那一路",
+  七杀: "与压力、竞争、硬碰硬相关的那一路",
+  正印: "与长辈、学业、被照顾相关的那一路",
+  偏印: "与独处、冷门的钻研、精神支持相关的那一路",
+});
+
+/** 宫位 → 它指向哪一类事。同样只说类别。 */
+export const PALACE_DOMAIN_PLAIN: Readonly<Record<string, string>> = Object.freeze({
+  祖上宫: "与家世、早年环境相关的那一路",
+  根基宫: "与出身根底相关的那一路",
+  父母兄弟宫: "与父母、兄弟姐妹相关的那一路",
+  门户宫: "与家门、日常所处环境相关的那一路",
+  自身: "与你自己相关的那一路",
+  配偶宫: "与伴侣、亲密关系相关的那一路",
+  志向宫: "与志向、想做的事相关的那一路",
+  子女宫: "与子女、晚辈相关的那一路",
+  命宫: "与整体处境相关的那一路",
+  胎元: "与先天底子相关的那一路",
+});
+
 /** 五行 → 场合与状态的人话。**不出方位、不出颜色、不出属相。** */
 export const ELEMENT_PLAIN: Readonly<Record<Element, string>> = Object.freeze({
   木: "需要生长、需要往外伸展的场合",
@@ -148,6 +185,26 @@ export const PLAIN_DISCLAIMER =
   "这套东西是按一种传统的推演方法算出来的，属于文化研究和自我省思的工具。"
   + "它不具备预测未来事件的能力，也不构成医疗、法律、财务或任何专业方面的建议。"
   + "凡涉及健康、法律、财务的决定，请咨询相应领域的持证专业人士。";
+
+/**
+ * 序列 id → 它指向哪一类事。
+ *
+ * 序列 id 形如 `tenGod.正财`、`palace.配偶宫.branch`、`element.水`。
+ * 认不出的返回 null —— **不瞎猜**，认不出就不说这一句。
+ */
+export function domainOfSeries(seriesId: string): string | null {
+  const [kind, name] = seriesId.split(".");
+  if (kind === "tenGod" && name !== undefined) {
+    return GOD_DOMAIN_PLAIN[name as TenGod] ?? null;
+  }
+  if (kind === "palace" && name !== undefined) return PALACE_DOMAIN_PLAIN[name] ?? null;
+  if (kind === "element" && name !== undefined) {
+    return name in ELEMENT_PLAIN ? `${ELEMENT_PLAIN[name as Element]}这一路` : null;
+  }
+  if (kind === "dayMaster") return "与你自身状态相关的那一路";
+  if (kind === "domain") return "与外部事项相关的那一路";
+  return null;
+}
 
 /** 每张人话卡片都要挂的那句话。**不是可选装饰，是结构的一部分。** */
 export const PLAIN_FRAMING =

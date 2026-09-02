@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { buildChart, buildReport, plainCards, type BirthInput } from "@fate/core";
+import { buildChart, buildReport, plainCards, type BirthInput , type PlainSection } from "@fate/core";
 import { Card } from "./Card";
-import { CITIES, clearBirth, loadBirth, saveBirth } from "./store";
+import { CITIES, clearBirth, loadBirth, loadPlainSource, savePlainSource, saveBirth,
+  type PlainSource } from "./store";
+import { AiHandoff } from "./AiHandoff";
 
 /**
  * 「我」页 —— 采集出生信息，给出性格、身心、亲近的人、人生轨迹、起伏。
@@ -14,28 +16,32 @@ import { CITIES, clearBirth, loadBirth, saveBirth } from "./store";
 export default function MePage() {
   const [birth, setBirth] = useState<BirthInput | null>(null);
   const [ready, setReady] = useState(false);
-  const [sec, setSec] = useState<string>("性格");
+  const [sec, setSec] = useState<PlainSection>("性格");
+  const [src, setSrc] = useState<PlainSource>("code");
 
-  useEffect(() => { setBirth(loadBirth()); setReady(true); }, []);
+  useEffect(() => { setBirth(loadBirth()); setSrc(loadPlainSource()); setReady(true); }, []);
 
-  const plain = useMemo(() => {
+  // 报告只算一次，人话与 AI 交接共用 —— 算两遍不但慢，
+  // 两份报告的 now 还可能跨过午夜落在不同的一天上。
+  const report = useMemo(() => {
     if (birth === null) return null;
     try {
-      const r = buildReport(buildChart(birth), {
+      return buildReport(buildChart(birth), {
         includeNodes: true,
         now: (() => { const d = new Date();
           return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() }; })(),
       });
-      return plainCards(r);
     } catch { return null; }
   }, [birth]);
+
+  const plain = useMemo(() => (report === null ? null : plainCards(report)), [report]);
 
   if (!ready) return <p className="m-lede">载入中…</p>;
   if (birth === null) return <BirthForm onDone={(b) => { saveBirth(b); setBirth(b); }} />;
   if (plain === null) return <p className="m-lede">算不出来，请检查出生信息。</p>;
 
   const sections = [...new Set(plain.cards.map((c) => c.section))]
-    .filter((s) => ["性格", "身心", "亲近的人", "人生轨迹", "起伏"].includes(s));
+    .filter((s): s is PlainSection => (["性格", "身心", "亲近的人", "人生轨迹", "起伏"] as string[]).includes(s));
   const shown = plain.cards.filter((c) => c.section === sec);
 
   return (
@@ -43,7 +49,7 @@ export default function MePage() {
       <h1 className="m-h1">关于你</h1>
       <p className="m-lede">{plain.framing}</p>
 
-      <div className="m-chips">
+      <div className="m-chips" style={{ display: src === "code" ? undefined : "none" }}>
         {sections.map((s) => (
           <button key={s} className={`m-chip${s === sec ? " on" : ""}`} onClick={() => setSec(s)}>
             {s}
@@ -51,7 +57,22 @@ export default function MePage() {
         ))}
       </div>
 
-      {shown.map((c) => <Card key={c.id} card={c} />)}
+      <div className="m-chips" style={{ marginBottom: 10 }}>
+        {([["code", "代码生成"], ["ai", "交给 AI"]] as const).map(([v, name]) => (
+          <button key={v} className={`m-chip${src === v ? " on" : ""}`}
+            onClick={() => { setSrc(v); savePlainSource(v); }}>
+            {name}
+          </button>
+        ))}
+      </div>
+
+      {src === "ai" && report !== null && <AiHandoff report={report} />}
+
+      {src === "code" && plain.sectionNotes[sec] !== undefined && (
+        <p className="m-note" style={{ marginBottom: 12 }}>{plain.sectionNotes[sec]}</p>
+      )}
+
+      {src === "code" && shown.map((c) => <Card key={c.id} card={c} />)}
 
       <Disclaimer plain={plain.disclaimer} technical={plain.disclaimerTechnical} />
       <button className="m-btn ghost" onClick={() => { clearBirth(); setBirth(null); }}>

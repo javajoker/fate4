@@ -24,7 +24,7 @@ import { ELEMENTS } from "../types/ganzhi.js";
 import {
   AXIS_PLAIN, DIRECTION_PLAIN, ELEMENT_PLAIN, ELEMENT_STATE_PLAIN,
   ELEMENT_BODY_PLAIN, GOD_PLAIN, GOD_RELATION_PLAIN, QUADRANT_PLAIN, STRENGTH_PLAIN,
-  confidencePlain, favorPlain, PLAIN_DISCLAIMER, PLAIN_FRAMING,
+  confidencePlain, domainOfSeries, favorPlain, PLAIN_DISCLAIMER, PLAIN_FRAMING,
 } from "./vocab.js";
 
 export type PlainSection =
@@ -42,6 +42,8 @@ export interface PlainCard {
 
 export interface PlainReport {
   readonly cards: readonly PlainCard[];
+  /** 小节级的说明。放在小节开头说一次，不在每张卡片上重复。 */
+  readonly sectionNotes: Readonly<Partial<Record<PlainSection, string>>>;
   /** 每一页都要挂的框定语。 */
   readonly framing: string;
   /** 人话版的免责声明 —— 技术版的改写，四个要素一个不少。 */
@@ -166,19 +168,49 @@ export function plainCards(r: Report): PlainReport {
   // ── 起伏（统计节点） ──
   if (r.nodes !== null) {
     for (const f of r.nodes.findings.slice(0, 8)) {
-      cards.push(card(`node.${f.id}`, "起伏", "一段值得留意的时期",
-        `${DIRECTION_PLAIN[f.direction] ?? "这段时间有变动"}。`
-        + "这是把六十年的曲线拉出来，找其中偏离常态最多的几段 ——"
-        + "它是排序，不是概率，说的是「相比你自己的其他时候」。",
+      // 时间段与指事都从 evidence 里取 —— 它们本就在那儿，
+      // 不必也不该在人话层另算一遍。
+      const num = (label: string) => f.detail.evidence.find((e) => e.label === label)?.value;
+      const from = num("进入"); const to = num("退出");
+      const span = from === undefined ? ""
+        : to === undefined || to === from ? `${from} 年` : `${from}–${to} 年`;
+      const ref = f.detail.evidence.find((e) => e.ref.startsWith("node:"))?.ref ?? "";
+      const domain = domainOfSeries(ref.slice("node:".length));
+
+      cards.push(card(`node.${f.id}`, "起伏",
+        span === "" ? "一段值得留意的时期" : span,
+        // 那段「这是排序不是概率」的话只在小节说一次 —— 八张卡各说一遍，
+        // 读者会跳过它，而它恰恰是最不该被跳过的一句。
+        (domain === null ? "" : `${domain}，`)
+        + `${DIRECTION_PLAIN[f.direction] ?? "这段时间变动明显"}。`,
         [f.summary, ...f.detail.narrative], f.confidence));
     }
   }
 
   // ── 今年 / 本月 / 今天 ──
   if (r.current !== null) {
+    /**
+     * 该时点被引动的神煞及其指事。
+     *
+     * 神煞是**叙述素材**，不入权重。它回答的是「这一刻的变化，传统上会挂在
+     * 哪一类事上」—— 如金舆指向车马出行。**指事说的是符号与哪类事相联系，
+     * 不是会发生什么。**
+     */
+    const tagsOf = (hits: readonly { name: string; palace: string; tone: string;
+      narrativeTags: readonly string[] }[]) => hits
+      .filter((h) => h.tone === "activated" && h.narrativeTags.length > 0)
+      .map((h) => `${h.name}（落${h.palace}）指向「${h.narrativeTags.join("、")}」一类的事`);
+
+    const yearTags = tagsOf(r.current.year.evaluated.shensha);
+    const dayTags = r.current.day.shensha.map(
+      (h) => `${h.name}（落${h.palace}）指向「${h.narrativeTags.join("、")}」一类的事`);
+
     cards.push(card("cur.year", "今年", "今年整体",
       `${favorPlain(r.current.year.favorIndex)}。这说的是今年的结构与你本命的契合程度，`
-      + "不是运气好坏，更不是生活质量。",
+      + "不是运气好坏，更不是生活质量。"
+      + (yearTags.length === 0 ? ""
+        : `今年被引动的传统符号有：${yearTags.slice(0, 4).join("；")}。`
+          + "这是说这些符号在传统上与哪类事相联系，不是说这些事会发生。"),
       linesOf(r.current.narrative, "year.")));
     cards.push(card("cur.month", "本月", "这个月",
       r.current.month.narrative.length > 0
@@ -186,14 +218,25 @@ export function plainCards(r: Report): PlainReport {
         : "这个月没有特别被牵动的地方。",
       linesOf(r.current.narrative, "month.")));
     cards.push(card("cur.day", "今天", "今天",
-      r.current.day.conflicts.length > 0
+      (r.current.day.conflicts.length > 0
         ? "今天有几处张力，展开可以看到在哪。"
-        : "今天没有明显的张力。",
+        : "今天没有明显的张力。")
+      + (dayTags.length === 0 ? ""
+        : `今天的传统符号：${dayTags.slice(0, 3).join("；")}。`),
       linesOf(r.current.narrative, "day.")));
   }
 
   return {
     cards: Object.freeze(cards),
+    sectionNotes: Object.freeze({
+      起伏: "下面说的是「哪一类事」在某段时间里起伏大，不是会发生什么事 ——"
+        + "这套模型给不出具体的事件。它把六十年的曲线拉出来，"
+        + "找其中偏离常态最多的几段：是排序，不是概率，比的是你自己的其他时候。",
+      今年: "顺手与否说的是这一年的结构与你本命的契合程度，不是运气好坏，也不是生活质量。",
+      身心: "以下是传统的形体对照，不构成关于身体状况的判断，也给不出具体的病和时间。",
+      亲近的人: "说的是你与这几类关系的相处结构，不是对方是什么样的人 ——"
+        + "用你的出生时刻去描述另一个人，那是把一份推演套到没同意过的人身上。",
+    }),
     framing: PLAIN_FRAMING,
     disclaimer: PLAIN_DISCLAIMER,
     disclaimerTechnical: r.disclaimerBottom,
