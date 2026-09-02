@@ -77,7 +77,8 @@ describe("两层", () => {
     for (const f of F.findings) {
       expect(f.summary.text).toMatch(/。$/);
       expect(f.summary.text.split("。").filter((x) => x.length > 0)).toHaveLength(1);
-      expect(f.detail.narrative.length).toBeGreaterThanOrEqual(5);
+      // 中尺度少一条：ż 在 n=6 上同样不稳，不单独陈述
+      expect(f.detail.narrative.length).toBeGreaterThanOrEqual(f.scale === "medium" ? 4 : 5);
     }
   });
 
@@ -92,7 +93,8 @@ describe("两层", () => {
 
   it("展开层必带「这是排序不是概率」的框定", () => {
     for (const f of F.findings) {
-      expect(f.detail.narrative.map((l) => l.templateId)).toContain("node.scaleNote");
+      const ids = f.detail.narrative.map((l) => l.templateId);
+      expect(ids.some((i) => i.startsWith("node.scaleNote")), f.id).toBe(true);
     }
   });
 
@@ -100,6 +102,45 @@ describe("两层", () => {
     const ids = F.findings.map((f) => f.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(new Set(F.findings.map((f) => f.scale))).toEqual(new Set(["small", "medium", "large"]));
+  });
+});
+
+describe("**中尺度不引 σ 比值 —— n=6 时它与大尺度的三、四不在一个量纲上**", () => {
+  it("中节点的摘要里没有 σ", () => {
+    for (const f of F.findings.filter((x) => x.scale === "medium")) {
+      expect(f.summary.text, `${f.id} 引了 σ`).not.toMatch(/σ/);
+    }
+    for (const f of F.findings.filter((x) => x.scale !== "medium")) {
+      expect(f.summary.text).toMatch(/σ/);
+    }
+  });
+
+  it("**这不是保守，是那个比值真的会大到几十**", () => {
+    const zs = nodes.medium.nodes.map((n) => Math.abs(n.peakZ));
+    const zl = nodes.large.nodes.map((n) => Math.abs(n.peakZ));
+    expect(Math.max(...zs), "中尺度的 |z| 若不比大尺度大一个量级，这条设计就没必要")
+      .toBeGreaterThan(3 * Math.max(...zl));
+  });
+
+  it("比值仍在证据里，用来排序 —— 排序只需单调，不需量纲可比", () => {
+    for (const f of F.findings.filter((x) => x.scale === "medium")) {
+      expect(f.detail.evidence.some((e) => e.unit === "sigma")).toBe(true);
+    }
+    const zs = nodes.medium.nodes.map((n) => Math.abs(n.peakZ));
+    for (let i = 1; i < zs.length; i++) expect(zs[i]!).toBeLessThanOrEqual(zs[i - 1]!);
+  });
+
+  it("**取值的精度随量级走** —— 同党占比在 0.5 上下，压成一位小数就没了信息", () => {
+    expect(formatEvidence({ label: "", value: 0.4731, unit: "value", ref: "t" })).toBe("0.473");
+    expect(formatEvidence({ label: "", value: 5.1837, unit: "value", ref: "t" })).toBe("5.18");
+    expect(formatEvidence({ label: "", value: 177.81, unit: "value", ref: "t" })).toBe("177.8");
+    // 反向对照：一律一位小数会把两个相差整整一个 MAD 的数压成同一个样子
+    const ratio = F.findings.find((f) => f.id.includes("dayMaster.party"));
+    if (ratio !== undefined) {
+      const peak = ratio.detail.evidence.find((e) => e.label.endsWith("峰值"))!;
+      const mean = ratio.detail.evidence.find((e) => e.label.endsWith("基准均值"))!;
+      expect(formatEvidence(peak)).not.toBe(formatEvidence(mean));
+    }
   });
 });
 
@@ -125,9 +166,11 @@ describe("时点写法", () => {
 
 describe("趋吉避凶", () => {
   it("只对压力向的节点产出 —— 不判方向的不派规避方案", () => {
+    // 判方向看 direction 字段，不看摘要措辞 —— 中尺度的摘要不引 σ 比值，
+    // 措辞与大、小两尺度并不相同，拿字符串去判早晚读错。
     for (const f of F.findings) {
-      const dir = f.summary.text.includes("偏压力");
-      expect(f.guidance.length > 0, `${f.id}：${f.summary.text}`).toBe(dir);
+      expect(f.guidance.length > 0, `${f.id}：${f.summary.text}`)
+        .toBe(f.direction === "pressure");
     }
     expect(F.findings.some((f) => f.guidance.length > 0), "一条趋避都没有").toBe(true);
   });

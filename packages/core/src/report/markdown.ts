@@ -16,6 +16,8 @@ import {
 } from "./labels.js";
 import type { NarrativeLine } from "./render.js";
 import type { Report } from "./types.js";
+import { SCALE_LABEL } from "../temporal/nodes.js";
+import { formatEvidence } from "./finding.js";
 
 const nl = (lines: readonly NarrativeLine[]): string =>
   lines.map((l) => (l.hedged ? `- ${l.text}　_(低置信度，已改用留有余地的措辞)_` : `- ${l.text}`)).join("\n");
@@ -210,6 +212,35 @@ export function renderMarkdown(r: Report): string {
       }
       out.push("");
     }
+  }
+
+  // ── §6.5 ──
+  //
+  // 两层结构在 Markdown 里用 <details> 表达：默认折叠，点开才是展开层。
+  // 这是「默认一句话，点开看解释」在纯文本载体上唯一保真的写法 ——
+  // 把展开层直接铺开，两层就塌成一层，摘要的克制也就白费了。
+  if (r.nodes !== null) {
+    h(2, "§6.5 统计节点");
+    p(nl(r.nodes.narrative));
+    for (const f of r.nodes.findings) {
+      out.push(`- **${label(SCALE_LABEL, f.scale)}** ${f.summary.text}`);
+      out.push("");
+      out.push("  <details><summary>展开依据</summary>");
+      out.push("");
+      for (const l of f.detail.narrative) out.push(`  ${l.text}`);
+      out.push("");
+      out.push("  | 证据 | 取值 | 出处 |");
+      out.push("  | --- | --- | --- |");
+      for (const e of f.detail.evidence) {
+        out.push(`  | ${e.label} | ${formatEvidence(e)} | \`${e.ref}\` |`);
+      }
+      out.push("");
+      for (const g of f.guidance) out.push(`  ${g.line.text}`);
+      out.push("");
+      out.push("  </details>");
+      out.push("");
+    }
+    if (r.nodes.guidanceEmptyNote !== null) p(r.nodes.guidanceEmptyNote.text);
   }
 
   // ── §7 ──

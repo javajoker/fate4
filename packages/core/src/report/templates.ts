@@ -579,9 +579,58 @@ const bodyTemplates: NarrativeTemplate[] = [
 // ─────────────────────────────────────────────────────────
 
 const nodeTemplates: readonly NarrativeTemplate[] = [
+  T("node.section", "data", "node", ["count", "threshold", "from", "to", "maxShown"], {
+    zhHans: "以下 {count} 条为 {from}–{to} 年这条基准窗内，各条曲线越过 ±{threshold} 个标准差的时段。"
+      + "门槛决定哪些时段入选，每个尺度按偏离程度取前 {maxShown} 条 —— "
+      + "它是一个取舍旋钮，不是显著性水平：序列由出生时刻完全决定，"
+      + "越阈的采样点在任何一张盘上都是那么多。"
+      + "每条默认只给一句，展开才有依据；摘要里出现的每个数字都能在展开层找到出处。",
+    en: "The {count} entries below are the stretches in which each curve crosses ±{threshold} "
+      + "standard deviations, measured against the {from}–{to} baseline window. "
+      + "The threshold decides which stretches qualify, and each scale lists its top {maxShown} "
+      + "by deviation. It is a dial for selection, not a significance level: the series is fully "
+      + "determined by the moment of birth, and about as many samples cross the threshold in any "
+      + "chart. Each entry gives one line by default; the evidence sits behind it, and every "
+      + "figure in the summary can be traced there.",
+  }),
+
   T("node.summary", "data", "node", ["label", "span", "z", "shape", "direction"], {
     zhHans: "{label}在 {span}最偏离常态（{z}σ，{shape}·{direction}）。",
     en: "{label} sits furthest from its own norm during {span} ({z}σ, {shape} · {direction}).",
+  }),
+
+  // 中尺度不引 σ 比值 —— 见 node.summary.medium
+  T("node.summary.medium", "data", "node",
+    ["label", "span", "steps", "peakValue", "mean", "shape", "direction"], {
+      zhHans: "{label}在 {span}这一步，在这 {steps} 步大运中明显偏离"
+        + "（该步 {peakValue}，各步中位 {mean}，{shape}·{direction}）。",
+      en: "{label} in the step covering {span} departs markedly from the other {steps} luck steps "
+        + "(that step {peakValue} against a median of {mean} across steps; {shape} · {direction}).",
+    }),
+
+  T("node.level.medium", "data", "node", ["peakValue", "mean", "flatSteps"], {
+    zhHans: "该步 {peakValue}，各步中位 {mean}，另有 {flatSteps} 步都落在中位附近。"
+      + "此处不引「几个标准差」—— 六十年只有六步运，散布由中位数与绝对中位差估出，"
+      + "落在四五个取值相近的步上时，那个比值可以大到几十，"
+      + "与大节点的三、四完全不在一个量纲上，并列去读只会误导。"
+      + "比值仍用来给中节点排序，但不作为陈述。",
+    en: "That step reads {peakValue} against a median of {mean} across steps, "
+      + "with {flatSteps} of the others sitting near that median. "
+      + "No 「standard deviations」 figure is quoted here: sixty years hold only six luck steps, "
+      + "and the spread is estimated from the median and the median absolute deviation. "
+      + "When four or five steps sit close together that ratio can reach the dozens — "
+      + "nowhere near the three or four of a large-scale node, and misleading to read side by side. "
+      + "The ratio still orders the medium nodes; it is not quoted as a finding.",
+  }),
+
+  T("node.scaleNote.medium", "data", "node", ["from", "to"], {
+    zhHans: "此为中节点，基准是 {from}–{to} 年之间那六步大运的步均值。"
+      + "所谓「偏离」是在这六步之间排序，不是概率陈述 —— "
+      + "六个样本谈不上分布，能说的只是「哪一步与其余几步差得最远」。",
+    en: "This is a medium node; the baseline is the per-step mean of the six luck steps between "
+      + "{from} and {to}. 「Deviation」 ranks those six steps against one another and is not a "
+      + "probability claim — six samples do not make a distribution, and all that can be said is "
+      + "which step sits furthest from the rest.",
   }),
 
   T("node.scaleNote", "data", "node", ["scale", "from", "to"], {

@@ -13,6 +13,7 @@ const TABS: readonly [string, string][] = [
   ["/chart/luck", "大运"],
   ["/chart/year", "流年"],
   ["/chart/curves", "生命曲线"],
+  ["/chart/nodes", "统计节点"],
   ["/chart/calendar", "月历 · 今日"],
   ["/chart/report", "完整报告"],
   ["/chart/params", "参数校准"],

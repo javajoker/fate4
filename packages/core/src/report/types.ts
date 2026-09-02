@@ -14,6 +14,7 @@ import type { DayView, LuckStep, MonthView, YearView } from "../temporal/types.j
 import type { Locale } from "./templates.js";
 import type { NarrativeLine } from "./render.js";
 import type { GuardViolation } from "./guard.js";
+import type { FindingSet } from "./finding.js";
 
 export interface HiddenCell {
   readonly stem: Stem;
@@ -138,6 +139,25 @@ export interface YearsSection {
   readonly narrative: readonly NarrativeLine[];
 }
 
+/**
+ * §6.5 统计节点 —— 两层结论。
+ *
+ * 为 null 有两种情形：`includeNodes` 未开（默认），或 `subject: other`。
+ * 后者是**结构性略去** —— 节点的展开层里有神煞与结构事件的逐条对照，
+ * 那是对一个人一生时段的描述，不为他人生成。
+ */
+export interface NodesSection {
+  readonly findings: FindingSet["findings"];
+  /** 一条趋避都没有时的说明。**必须渲染** —— 空着会被读成「一生平顺」。 */
+  readonly guidanceEmptyNote: FindingSet["guidanceEmptyNote"];
+  /** 曲线的统计基准窗，供读者知道「常态」是相对哪一段而言。 */
+  readonly statsFrom: number;
+  readonly statsTo: number;
+  /** 判据门槛，单位为标准差。默认 2，可由 `nodes.threshold` 改。 */
+  readonly threshold: number;
+  readonly narrative: readonly NarrativeLine[];
+}
+
 export interface CurrentSection {
   readonly year: YearView;
   readonly month: MonthView;
@@ -184,6 +204,8 @@ export interface Report {
   readonly kin: KinSection;
   readonly luck: LuckSection;
   readonly years: YearsSection;
+  /** `includeNodes` 未开或 `subject: other` 时为 null。 */
+  readonly nodes: NodesSection | null;
   readonly current: CurrentSection | null;
   readonly method: MethodSection;
   readonly disclaimerBottom: string;

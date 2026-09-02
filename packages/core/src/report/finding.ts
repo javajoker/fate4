@@ -44,7 +44,7 @@ import type { Locale } from "./templates.js";
  * 同一个量在摘要与展开里必须格式化成同一个串，否则不变量形同虚设：
  * 摘要写 `3.5`、展开写 `3.54`，机械比对便认不出它们是同一个数。
  */
-export type EvidenceUnit = "sigma" | "weight" | "share" | "count" | "year" | "months";
+export type EvidenceUnit = "sigma" | "value" | "share" | "count" | "year" | "months";
 
 export interface Evidence {
   readonly label: string;
@@ -72,6 +72,11 @@ export interface Finding {
   readonly id: string;
   readonly kind: "node";
   readonly scale: NodeScale;
+  /**
+   * 吉凶取向。**与摘要文字分开存**：摘要的措辞随尺度而变
+   * （中尺度不引 σ 比值），拿字符串去判方向早晚会读错。
+   */
+  readonly direction: NodeInterval["direction"];
   /** 默认只显示这一句。 */
   readonly summary: NarrativeLine;
   readonly detail: FindingDetail;
@@ -92,7 +97,13 @@ export interface FindingSet {
 export function formatEvidence(e: Evidence): string {
   switch (e.unit) {
     case "sigma": return e.value.toFixed(2);
-    case "weight": return e.value.toFixed(1);
+    // 量纲随序列而变：十神权重上百，同党占比在 0.5 上下。
+    // 一律 toFixed(1) 会把「0.437 与 0.502」压成「0.4 与 0.5」——
+    // 摘要于是读作两个几乎相同的数在争谁更偏离，而它们相差了整整一个 MAD。
+    case "value": {
+      const a = Math.abs(e.value);
+      return e.value.toFixed(a < 1 ? 3 : a < 10 ? 2 : 1);
+    }
     case "share": return (e.value * 100).toFixed(1);
     case "count": case "year": case "months": return String(Math.round(e.value));
   }
@@ -211,39 +222,61 @@ function guidanceOf(n: NodeInterval, locale: Locale): Guidance | null {
  * `auditFinding` 是防止后来的改动破坏它的那道闸，构建期即执行。
  */
 export function buildFindings(
-  S: SeriesSet, sets: Readonly<Record<NodeScale, NodeSet>>,
+  S: SeriesSet, sets: Readonly<Record<NodeScale, NodeSet>> | readonly NodeSet[],
   locale: Locale = "zh-Hans",
 ): FindingSet {
   const findings: Finding[] = [];
+  // 收数组也收三尺度的字典 —— Web 只算当前选中的那一个尺度（每个约 300 ms），
+  // 报告则三个都要。让调用方各取所需，而不是逼 Web 白算两个尺度。
+  const list: readonly NodeSet[] = Array.isArray(sets)
+    ? sets
+    : (["large", "medium", "small"] as const).map((k) =>
+      (sets as Readonly<Record<NodeScale, NodeSet>>)[k]);
 
-  for (const scale of ["large", "medium", "small"] as const) {
-    const set = sets[scale];
+  for (const set of list) {
+    const scale = set.scale;
     for (const n of set.nodes) {
       const evidence: Evidence[] = [
         { label: `${n.label}·峰值偏离`, value: n.peakZ, unit: "sigma", ref: `node:${n.seriesId}` },
         { label: `${n.label}·变化率偏离`, value: n.peakRateZ, unit: "sigma", ref: `node:${n.seriesId}` },
-        { label: `${n.label}·峰值`, value: n.peakValue, unit: "weight", ref: `node:${n.seriesId}` },
-        { label: `${n.label}·基准均值`, value: n.mean, unit: "weight", ref: `node:${n.seriesId}` },
+        { label: `${n.label}·峰值`, value: n.peakValue, unit: "value", ref: `node:${n.seriesId}` },
+        { label: `${n.label}·基准均值`, value: n.mean, unit: "value", ref: `node:${n.seriesId}` },
         { label: "进入", value: n.enter.year, unit: "year", ref: `node:${n.seriesId}` },
         { label: "退出", value: n.exit.year, unit: "year", ref: `node:${n.seriesId}` },
         { label: "统计窗起", value: S.statsFrom, unit: "year", ref: "series:window" },
         { label: "统计窗止", value: S.statsTo, unit: "year", ref: "series:window" },
         { label: "时长", value: n.durationMonths, unit: "months", ref: `node:${n.seriesId}` },
+        { label: "基准窗采样点数", value: n.groupSize, unit: "count", ref: `node:${n.seriesId}` },
+        { label: "中位附近点数", value: n.nearBaseline, unit: "count", ref: `node:${n.seriesId}` },
       ];
       const ev = (label: string) =>
         formatEvidence(evidence.find((x) => x.label.endsWith(label))!);
       const src = { kind: "data" as const, ref: `node:${n.seriesId}@${n.enter.year}` };
 
+      // 中尺度不引 σ 比值。n=6 时它由两个次序统计量估出，可以大到几十
+      // （实测 57.1，而大节点最高 5.9），并列去读只会误导。
+      // 比值仍用来排序 —— 排序只需单调，不需量纲可比。
+      const med = scale === "medium";
       const narrative: NarrativeLine[] = [
-        renderTemplate("node.scaleNote", {
-          scale: SCALE_LABEL[scale], from: ev("统计窗起"), to: ev("统计窗止"),
-        }, { locale, source: src }),
-        renderTemplate("node.level", {
-          peakValue: ev("峰值"), mean: ev("基准均值"), z: ev("峰值偏离"),
-        }, { locale, source: src }),
-        renderTemplate("node.rate", { rateZ: ev("变化率偏离") }, { locale, source: src }),
-        renderTemplate(`node.shape.${n.shape}`, {}, { locale, source: src }),
+        med
+          ? renderTemplate("node.scaleNote.medium",
+            { from: ev("统计窗起"), to: ev("统计窗止") }, { locale, source: src })
+          : renderTemplate("node.scaleNote", {
+            scale: SCALE_LABEL[scale], from: ev("统计窗起"), to: ev("统计窗止"),
+          }, { locale, source: src }),
+        med
+          ? renderTemplate("node.level.medium", {
+            peakValue: ev("峰值"), mean: ev("基准均值"), flatSteps: ev("中位附近点数"),
+          }, { locale, source: src })
+          : renderTemplate("node.level", {
+            peakValue: ev("峰值"), mean: ev("基准均值"), z: ev("峰值偏离"),
+          }, { locale, source: src }),
       ];
+      if (!med) {
+        narrative.push(renderTemplate("node.rate", { rateZ: ev("变化率偏离") },
+          { locale, source: src }));
+      }
+      narrative.push(renderTemplate(`node.shape.${n.shape}`, {}, { locale, source: src }));
       if (!n.monthResolved) {
         narrative.push(renderTemplate("node.monthNote", { label: n.label },
           { locale, source: src }));
@@ -258,11 +291,17 @@ export function buildFindings(
         // 月序必须进 id：同一条序列在同一个立春年内可以有两段互不相连的穿越，
         // 只用年份会撞号。区间彼此不相交，故「序列 + 进入时点」唯一。
         id: `${scale}:${n.seriesId}@${n.enter.year}.${n.enter.monthIndex}`,
-        kind: "node", scale,
-        summary: renderTemplate("node.summary", {
-          label: n.label, span: spanText(n), z: ev("峰值偏离"),
-          shape: SHAPE_LABEL[n.shape], direction: DIRECTION_LABEL[n.direction],
-        }, { locale, source: src }),
+        kind: "node", scale, direction: n.direction,
+        summary: med
+          ? renderTemplate("node.summary.medium", {
+            label: n.label, span: spanText(n),
+            steps: ev("采样点数"), peakValue: ev("峰值"), mean: ev("基准均值"),
+            shape: SHAPE_LABEL[n.shape], direction: DIRECTION_LABEL[n.direction],
+          }, { locale, source: src })
+          : renderTemplate("node.summary", {
+            label: n.label, span: spanText(n), z: ev("峰值偏离"),
+            shape: SHAPE_LABEL[n.shape], direction: DIRECTION_LABEL[n.direction],
+          }, { locale, source: src }),
         detail: { narrative, evidence },
         // 节点是确定性序列上的排序，不是带不确定性的判定 —— 故恒为 1。
         // 给它派一个小于 1 的「置信度」等于凭空造出一个此处并不存在的量。

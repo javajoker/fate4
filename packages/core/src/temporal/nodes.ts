@@ -148,11 +148,29 @@ export interface NodeInterval {
   readonly peakValue: number;
   readonly mean: number;
   readonly sigma: number;
+  /** 该区间所在基准窗的采样点数。中尺度即大运步数。 */
+  readonly groupSize: number;
+  /**
+   * 基准窗内 `|z| < 1` 的采样点数 —— 「有多少点挤在常态附近」。
+   *
+   * 中尺度需要它才能把话说清楚：`57.1σ` 这个比值无从解读，
+   * 「六步里有四步都在中位附近，这一步不是」则一读就懂，而且说的是同一件事。
+   */
+  readonly nearBaseline: number;
   readonly reasons: readonly NodeReason[];
 }
 
 export interface NodeSet {
   readonly base: BaseChart;
+  readonly scale: NodeScale;
+  /**
+   * 越阈的总段数 —— **截断之前**的数目。
+   *
+   * `nodes` 只留前 `maxShown` 条。少了这个数，门槛就成了一个看不出效果的旋钮：
+   * θ 从 2 提到 3，越阈段从 221 落到 28，而列出来的仍是同样的 12 条。
+   * 读者会以为控件坏了，而它其实一直在工作。
+   */
+  readonly total: number;
   readonly nodes: readonly NodeInterval[];
   /** 因 σ 为 0 或摆动过小而被排除的序列 —— 明写出来，免得「没有节点」被误读为「一切平稳」。 */
   readonly excluded: readonly { readonly seriesId: string; readonly why: string }[];
@@ -392,6 +410,13 @@ function scaleView(s: Series, S: SeriesSet, scale: NodeScale): Scaled {
 
 // ─────────────────────────────────────────────────────────
 
+const EMPTY: readonly NodeReason[] = Object.freeze([]);
+
+/** 检出期的中间形态：理由还没找，只带一个能找它的闭包。 */
+interface Pending extends NodeInterval {
+  readonly resolve: () => NodeReason[];
+}
+
 /**
  * 检出一个尺度上的全部穿越区间。
  *
@@ -402,7 +427,7 @@ export function findNodes(
   S: SeriesSet, scale: NodeScale, override?: Partial<NodesParams>,
 ): NodeSet {
   const p: NodesParams = { ...S.base.params.nodes, ...override };
-  const nodes: NodeInterval[] = [];
+  const nodes: Pending[] = [];
   const excluded: { seriesId: string; why: string }[] = [];
 
   for (const s of S.series) {
@@ -461,10 +486,14 @@ export function findNodes(
           durationMonths: (r.to - r.from + 1) * view.monthsPerSample,
           peakZ: z[peakLocal]!, peakRateZ: rz[peakLocal]!,
           area, peakValue, mean: center, sigma,
-          reasons: scale === "medium"
+          groupSize: g.length,
+          nearBaseline: z.reduce((a, v) => a + (Math.abs(v) < 1 ? 1 : 0), 0),
+          // 理由**在截断之后**才填 —— 见下方 fillReasons
+          reasons: EMPTY,
+          resolve: scale === "medium"
             // 中尺度的「理由」就是那几步大运本身 —— 十年之变，因在运不在年
-            ? luckReasons(S, g.slice(r.from, r.to + 1).map((i) => view.frameOf(i)))
-            : reasonsAt(S.base, S.frames, indexOfFrame(S, enterF)),
+            ? () => luckReasons(S, g.slice(r.from, r.to + 1).map((i) => view.frameOf(i)))
+            : () => reasonsAt(S.base, S.frames, indexOfFrame(S, enterF)),
         });
       }
     }
@@ -474,7 +503,15 @@ export function findNodes(
   }
 
   nodes.sort((a, b) => Math.abs(b.peakZ) - Math.abs(a.peakZ));
-  return { base: S.base, nodes: nodes.slice(0, p.maxShown), excluded, threshold: p.threshold };
+  // 理由要跑 evaluateAt 与一遍应期，每条约 4 ms。对全部越阈段都算，
+  // 而后只留前十二条，就是把九成五的工作丢掉 —— 实测浏览器里主线程
+  // 因此卡住近一秒。故先排序截断，再给留下来的那几条找理由。
+  const kept = nodes.slice(0, p.maxShown).map(({ resolve, ...n }): NodeInterval =>
+    ({ ...n, reasons: resolve() }));
+  return {
+    base: S.base, scale, total: nodes.length,
+    nodes: kept, excluded, threshold: p.threshold,
+  };
 }
 
 /** 中尺度的理由：涉及的大运柱及其与用神的关系。 */

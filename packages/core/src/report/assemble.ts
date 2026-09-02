@@ -38,6 +38,9 @@ import { dayView, luckTimeline, monthView, yearView } from "../temporal/views.js
 import type { YearView } from "../temporal/types.js";
 import { DOMAIN_LABEL } from "../yingqi/types.js";
 import type { Locale } from "./templates.js";
+import { buildSeries } from "../temporal/series.js";
+import { allNodes } from "../temporal/nodes.js";
+import { buildFindings } from "./finding.js";
 import {
   disclaimerText, fmtIndex, fmtNum, fmtPct, renderTemplate,
   type NarrativeLine, type Slots,
@@ -49,7 +52,7 @@ import {
 import type {
   ChartSection, CurrentSection, ForceSection, GuardReport, HiddenCell, KinSection,
   LuckSection, MethodSection, PillarCell, Report, StrengthSection, YearCard,
-  BodySection, PersonaSection, YearCurvePoint, YearsSection,
+  BodySection, NodesSection, PersonaSection, YearCurvePoint, YearsSection,
 } from "./types.js";
 
 export const ENGINE_VERSION = "0.1.0";
@@ -78,6 +81,17 @@ export interface ReportOptions {
   readonly curveYears?: number;
   readonly maxFlows?: number;
   readonly engineVersion?: string;
+  /**
+   * §6.5 统计节点。**默认关闭。**
+   *
+   * 它要按月跑满六十年（720 次 `evaluateAt` 加一遍应期），约 1.5 秒 ——
+   * 比其余全部章节加起来还久。不是每份报告都需要，故显式开启。
+   * `subject: other` 时即便开了也不产出：节点的展开层逐条列出神煞与结构事件，
+   * 那是对一个人一生时段的描述。
+   */
+  readonly includeNodes?: boolean;
+  /** 节点判据门槛，单位为标准差。默认取 `params.nodes.threshold`（2）。 */
+  readonly nodeThreshold?: number;
 }
 
 /** 尚待人工决策的条目 —— 它们直接改变上文的判定，故随报告声明。见 docs/11-validation.md §5。 */
@@ -630,6 +644,34 @@ export function buildReport(
     curve, cards, highTension: highTension.slice(0, 20), narrative: L6.items,
   };
 
+  // ── §6.5 统计节点 ──
+  //
+  // 走曲线层与节点层，与 §6.1 的逐年曲线不是同一套采样：那里是逐年的三条线，
+  // 这里是逐月的五十五条。两者不合并 —— 逐年曲线是概览，随报告恒在；
+  // 节点要按月跑满六十年，代价高一个量级，故按需开启。
+  let nodesSection: NodesSection | null = null;
+  if (options.includeNodes === true && subject === "self") {
+    const S = buildSeries(base);
+    const override = options.nodeThreshold === undefined
+      ? undefined : { threshold: options.nodeThreshold };
+    const sets = allNodes(S, override);
+    const F = buildFindings(S, sets, locale);
+    const L65 = new Lines(locale);
+    L65.add("node.section", {
+      count: String(F.findings.length),
+      threshold: (override?.threshold ?? params.nodes.threshold).toFixed(1),
+      from: String(S.statsFrom), to: String(S.statsTo),
+      maxShown: String(params.nodes.maxShown),
+    });
+    nodesSection = {
+      findings: F.findings,
+      guidanceEmptyNote: F.guidanceEmptyNote,
+      statsFrom: S.statsFrom, statsTo: S.statsTo,
+      threshold: sets.large.threshold,
+      narrative: L65.items,
+    };
+  }
+
   // ── §7 当前时段 ──
   let current: CurrentSection | null = null;
   if (options.now !== undefined) {
@@ -694,7 +736,7 @@ export function buildReport(
     disclaimerTop: disclaimerText(locale),
     chart: chartSection, force, persona: personaSection, body: bodySection,
     strength: strengthSection, kin: kinSection,
-    luck: luckSection, years: yearsSection, current, method,
+    luck: luckSection, years: yearsSection, nodes: nodesSection, current, method,
     disclaimerBottom: disclaimerText(locale),
     guard: { scanned: 0, violations: [], hedged: [] },
   };
@@ -758,9 +800,22 @@ export function collectReportText(r: Report): { text: string; where: string }[] 
     ...(r.persona === null ? [] : [["persona", r.persona] as const]),
     ...(r.body === null ? [] : [["body", r.body] as const]),
     ...(r.current === null ? [] : [["current", r.current] as const]),
+    ...(r.nodes === null ? [] : [["nodes", r.nodes] as const]),
   ];
   for (const [name, s] of sections) {
     for (const l of s.narrative) push(l.text, `${name}.${l.templateId}`);
+  }
+  if (r.nodes !== null) {
+    // 三层都要扫，**且各自单独扫**：摘要、展开、趋避各是一块可以被单独复制走的文本，
+    // 拼起来扫会让展开层尾部的免责声明替摘要把关，而读者只看摘要。
+    for (const f of r.nodes.findings) {
+      push(f.summary.text, `nodes.${f.id}.summary`);
+      for (const l of f.detail.narrative) push(l.text, `nodes.${f.id}.detail.${l.templateId}`);
+      for (const g of f.guidance) push(g.line.text, `nodes.${f.id}.guidance.${g.line.templateId}`);
+    }
+    if (r.nodes.guidanceEmptyNote !== null) {
+      push(r.nodes.guidanceEmptyNote.text, "nodes.guidanceEmptyNote");
+    }
   }
   for (const c of r.years.cards) {
     for (const l of c.narrative) push(l.text, `years.card.${c.view.year}.${l.templateId}`);
@@ -796,6 +851,7 @@ export function guardReport(r: Report): GuardReport {
     ...(r.persona === null ? [] : [r.persona]),
     ...(r.body === null ? [] : [r.body]),
     ...(r.current === null ? [] : [r.current]),
+    ...(r.nodes === null ? [] : [r.nodes]),
   ];
   for (const s of sections) {
     for (const l of s.narrative) if (l.hedged) hedged.push(l.templateId);
