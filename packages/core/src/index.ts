@@ -14,6 +14,7 @@ export * from "./time/index.js";
 export * from "./chart/index.js";
 export * from "./yijing/index.js";
 export * from "./divination/index.js";
+export * from "./plain/index.js";
 export * from "./liuyao/index.js";
 export * from "./liuren/index.js";
 export * from "./qimen/index.js";

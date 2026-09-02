@@ -362,7 +362,7 @@ const ZH_HANS: readonly GuardRule[] = [
 // ═══════════════════════════════════════════════════════════
 
 /** 把一条正则扩成简繁双匹配。已是纯繁体或不含汉字时原样返回。 */
-function biscript(re: RegExp): RegExp {
+export function biscript(re: RegExp): RegExp {
   const hant = toHant(re.source);
   return hant === re.source ? re : new RegExp(`(?:${re.source})|(?:${hant})`, re.flags);
 }
