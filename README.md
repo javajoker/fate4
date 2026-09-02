@@ -58,6 +58,8 @@ L6 报告   汇总为分层报告
 | [09-report](docs/09-report.md) | 报告系统结构与叙述生成 |
 | [10-architecture](docs/10-architecture.md) | 应用方案：模块划分、API、UI、Agent Skill |
 | [11-validation](docs/11-validation.md) | 验证方案、测试向量、待校准清单 |
+| [12-persona-curves-nodes](docs/12-persona-curves-nodes.md) | L4p 人格层、L5c 生命曲线、L5n 统计节点、两层结论 |
+| [13-liuyao](docs/13-liuyao.md) | **第二台引擎** —— 即时问事与当日运程：六爻按时起卦，六壬奇门参照（规格草案） |
 | [pipeline.html](docs/pipeline.html) | **交互页** —— 管线总览 + L1 配重与大运摆动系数的实时校准（[在线版](https://claude.ai/code/artifact/f1eeac0e-1aa2-4242-b12f-4e31338e5bd7)） |
 
 ---
@@ -83,9 +85,13 @@ L6 报告   汇总为分层报告
 | **P12** | L4p 人格层 —— 内外十神、五行偏枯 | ✅ 完成 —— 张力改按五组算，真缺与过弱分开 |
 | **P13** | 《内经》五行配属 · 虚实寒热燥湿 · 三条新禁令 | ✅ 完成 —— 守卫新增「段」判定域 |
 | **P14** | L5c 生命曲线 —— 月度采样 | ✅ 完成 —— 运内结构翻转有实证 |
-| P15 | L5n 统计节点 —— 2σ 穿越区间 + 两层结论 | 📋 同上 |
+| **P15** | L5n 统计节点 —— θσ 穿越区间（默认 2σ）+ 两层结论 | ✅ 完成 |
+| **P16** | 报告 §6.5 节点入报告与网页 | ✅ 完成 |
+| **P17** | 繁体语言包 —— 拒绝猜测的转换器 | ✅ 完成 |
+| **P18** | 《穷通宝鉴》通行本 120 格调候表 | ✅ 完成 —— ⚠️ 凭记忆转录，待实体书核对 |
+| P19– | **六爻问事引擎**（[13-liuyao](docs/13-liuyao.md)） | 📋 规格草案，等待拍板 |
 
-全部 595 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
+全部 699 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
 
 ```bash
 pnpm install && pnpm test && pnpm typecheck
