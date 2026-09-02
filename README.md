@@ -96,9 +96,10 @@ L6 报告   汇总为分层报告
 | **P20** | Q5 应期区间 + Q6 问事报告 + 四条新禁令 | ✅ 完成 —— 32 类占事 × 多卦，守卫零命中 |
 | **P21** | 当日运程 —— 四柱流日 ∥ 六爻日卦，五类目对照 | ✅ 完成 —— 实测一致 110 / 分歧 116 |
 | **P22** | Web 问事页 + CLI `ask`/`daily`/`topics` + Skill | ✅ 完成 —— 一事不二占落地 |
-| P23– | 六壬四课三传、奇门时家转盘、三体系 crossref | 📋 规格已定案，待实现 |
+| **P23** | `liuren/` 六壬 —— 月将、天地盘、四课、十二天将、三传九宗门 | ✅ 完成 —— 十一种课体全覆盖 |
+| P24– | 奇门时家转盘、三体系 crossref | 📋 规格已定案，待实现 |
 
-全部 835 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
+全部 864 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
 
 ```bash
 pnpm install && pnpm test && pnpm typecheck
