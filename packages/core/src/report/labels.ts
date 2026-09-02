@@ -55,7 +55,7 @@ export const SCHOOL_LABEL = freeze({
   // 土的长生
   fireEarthSame: "火土同宫", waterEarthSame: "水土同宫",
   // 调候来源
-  heuristic: "可计算的降级规则（《穷通宝鉴》表未录入）", table: "《穷通宝鉴》120 格表",
+  heuristic: "可计算的极端气候降级规则", table: "《穷通宝鉴》通行本 120 格表（待核对）",
   // 女命子女星
   standard: "常规取法", reversed: "反取",
   // 起运换算

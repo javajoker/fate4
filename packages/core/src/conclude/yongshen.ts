@@ -27,7 +27,8 @@
 import { ELEMENTS, type Element, type TenGod } from "../types/ganzhi.js";
 import { CONTROLS, GENERATES } from "../ganzhi/tables.js";
 import { controlledBy, generatedBy } from "../ganzhi/algebra.js";
-import type { Branch } from "../types/ganzhi.js";
+import type { Branch, Stem } from "../types/ganzhi.js";
+import { tiaohouElements, tiaohouOf } from "./tiaohou.js";
 import type { ConclusionParams } from "../params/types.js";
 import { godGroupElement } from "./specialPattern.js";
 import { GOD_GROUPS, sumGods } from "./tenGods.js";
@@ -39,6 +40,8 @@ const SUMMER: readonly Branch[] = Object.freeze(["巳", "午", "未"]);
 
 export interface YongshenInput {
   readonly dayMasterElement: Element;
+  /** 日干本身 —— 调候表按日干查，不按五行：丙丁同为火，取用却不同。 */
+  readonly dayStem: Stem;
   readonly monthBranch: Branch;
   readonly byElement: Readonly<Record<Element, number>>;
   readonly tenGods: Readonly<Record<TenGod, number>>;
@@ -84,7 +87,7 @@ function assemble(
 function baseVerdict(
   input: YongshenInput, p: ConclusionParams,
 ): Verdict<YongshenVerdict> {
-  const { dayMasterElement: dm, monthBranch, byElement, tenGods, strength, special } = input;
+  const { dayMasterElement: dm, dayStem, monthBranch, byElement, tenGods, strength, special } = input;
   const derivation: DerivationStep[] = [];
   const alternatives: { value: YongshenVerdict; reason: string }[] = [];
 
@@ -108,17 +111,32 @@ function baseVerdict(
   const tooCold = isWinter && fireShare < p.yongshen.tiaohou.fireFloor;
   const tooHot = isSummer && waterShare < p.yongshen.tiaohou.waterFloor;
 
+  // ⚠️ 表决定「调候要什么」，门槛决定「调候是否压过扶抑」—— 这两件事是分开的。
+  // 《穷通宝鉴》给每一张盘都开了调候用神；若照单全收，扶抑、通关、病药立刻全成死码。
+  // 故取用查表，而是否短路仍由极端气候的粗判把关。这正是现代命书的通行做法。
+  const useTable = p.yongshen.tiaohou.source === "table";
+  const cell = useTable ? tiaohouOf(dayStem, monthBranch) : null;
+
   if (tooCold || tooHot) {
-    const primary: Element = tooCold ? "火" : "水";
+    // 用表时取表中首位用神的五行；否则退回「寒则火、燥则水」的粗判。
+    // 两者常一致，但表能给出粗判给不出的答案 ——
+    // 如壬水生于子月，寒而不取火，取戊土制水、丙火解冻，首位是戊。
+    const tablePrimary = cell === null ? null : tiaohouElements(cell)[0]!;
+    const primary: Element = tablePrimary ?? (tooCold ? "火" : "水");
     derivation.push({
       step: "调候", detail: tooCold
         ? `生于${monthBranch}月，火仅占 ${(fireShare * 100).toFixed(1)}% < ${p.yongshen.tiaohou.fireFloor * 100}%，极寒`
         : `生于${monthBranch}月，水仅占 ${(waterShare * 100).toFixed(1)}% < ${p.yongshen.tiaohou.waterFloor * 100}%，极燥`,
       values: { fireShare, waterShare },
     });
-    derivation.push({
-      step: "来源", detail: "《穷通宝鉴》120 格调候表尚未转录，此处为可计算的极端气候降级规则",
-    });
+    derivation.push(cell === null
+      ? { step: "来源", detail: "《穷通宝鉴》120 格调候表未启用，此处为可计算的极端气候降级规则" }
+      : {
+        step: "来源",
+        detail: `《穷通宝鉴》通行本 ${dayStem}日生${monthBranch}月：调候取 ${cell.stems.join("、")}`
+          + `（${cell.tier === "varies" ? "⚠️ 该格版本有出入" : "各本一致"}）。`
+          + "该表为凭记忆转录，未经实体书逐格核对。",
+      });
     // 调候与扶抑方向相反时，必须两存 ——
     // 「身弱却取克身之神」是真实的张力，不是矛盾；把它藏起来才是错的。
     if (weakDayMaster(strength)) {
@@ -135,11 +153,29 @@ function baseVerdict(
         });
       }
     }
+    const second = cell === null ? null : (tiaohouElements(cell)[1] ?? null);
+    // 置信度：表比降级规则高，但因未经实体书核对而封顶；异文格再降一档。
+    const base = cell === null ? 0.55 : cell.tier === "firm" ? 0.72 : 0.62;
+    // 调候与扶抑指向相反时**封在 0.50 以下**，与来源无关。
+    // 两条都立得住的取用法给出相反答案，这就是真的两说 ——
+    // 此时若还报出「多半如此」的置信度，等于替读者把选择做掉了。
+    const confidence = alternatives.length > 0 ? Math.min(base - 0.10, 0.45) : base;
     return {
-      value: assemble(primary, null, "tiaohou", byElement, p, { tiaohouSource: p.yongshen.tiaohou.source }),
-      // 降级规则的置信度封顶 —— 不冒充完整调候；若与扶抑冲突则再降
-      confidence: alternatives.length > 0 ? 0.45 : 0.55, derivation, alternatives,
+      value: assemble(primary, second, "tiaohou", byElement, p, {
+        tiaohouSource: p.yongshen.tiaohou.source,
+        ...(cell === null ? {} : { tiaohouStems: cell.stems, tiaohouTier: cell.tier }),
+      }),
+      confidence, derivation, alternatives,
     };
+  }
+
+  // 气候未到极端 —— 调候不短路，但表的取用仍记进推导，供读者自行对照。
+  if (cell !== null) {
+    derivation.push({
+      step: "调候（未短路）",
+      detail: `《穷通宝鉴》${dayStem}日生${monthBranch}月取 ${cell.stems.join("、")}；`
+        + "本盘气候未达极端，故不以调候短路，仅备参照。",
+    });
   }
 
   // ── 通关：两组势均力敌且相克 ──

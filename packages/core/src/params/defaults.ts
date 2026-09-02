@@ -168,7 +168,7 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
     yongshen: Object.freeze({
       priority: Object.freeze(["tiaohou", "tongguan", "fuyi", "bingyao"]),
       tiaohou: Object.freeze({
-        source: "heuristic",   // ⚠️ #2 《穷通宝鉴》120 格待转录
+        source: "table",       // 《穷通宝鉴》通行本 120 格；⚠️ 凭记忆转录，待实体书核对
         fireFloor: 0.08, waterFloor: 0.08,
       }),
       weakYongshenThreshold: 15,

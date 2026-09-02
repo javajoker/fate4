@@ -199,7 +199,7 @@ const yongshenTemplates: NarrativeTemplate[] = [
   }),
 
   T("yongshen.heuristicSource", "data", "yongshen", [], {
-    zhHans: "调候一项走的是可计算的极端气候降级规则 —— 《穷通宝鉴》逐日干月支表尚未录入本系统。此项判定的依据弱于其余各项，已计入置信度。",
+    zhHans: "调候取用查的是《穷通宝鉴》通行本逐日干月支表。该表凭记忆转录，未经实体书逐格核对，其中 31 格已知版本有出入。此项判定的依据弱于其余各项，已计入置信度。",
     en: "The climatic adjustment runs on a computable extreme-climate fallback: the classical day-stem-by-month-branch table is not yet loaded into this engine. This verdict rests on weaker ground than the others, and the confidence figure already reflects that.",
   }),
 ];

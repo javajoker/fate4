@@ -238,7 +238,8 @@ conclusion:
     # 若按「调候→扶抑→通关→病药」实现，通关与病药都是死代码。见 conclude/yongshen.ts 模块头。
     priority: [tiaohou, tongguan, fuyi, bingyao]
     tiaohou:
-      source: heuristic            # heuristic | table   ⚠️ #2 待转录《穷通宝鉴》
+      source: table            # heuristic | table；表为《穷通宝鉴》通行本 120 格
+                               # ⚠️ 凭记忆转录未经实体书核对，改回 heuristic 即退到极端气候降级规则
       fireFloor:  0.08             # 冬月火占比低于此值 → 极寒
       waterFloor: 0.08             # 夏月水占比低于此值 → 极燥
     weakYongshenThreshold: 15      # 用神权重低于此值 → needsLuckSupport

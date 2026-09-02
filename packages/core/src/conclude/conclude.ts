@@ -58,7 +58,7 @@ export function conclude(input: ConcludeInput): Conclusions {
   const keDamage = keDamageMatrix(carriers, input.flows);
 
   const yongshen = yongshenVerdict({
-    dayMasterElement: dayMaster.element, monthBranch, byElement,
+    dayMasterElement: dayMaster.element, dayStem: dayMaster.stem, monthBranch, byElement,
     tenGods: tg.vector, strength: strength.value, special: specialPattern.value,
     keDamage,
   }, cp);

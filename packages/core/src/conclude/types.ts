@@ -42,8 +42,17 @@ export interface YongshenVerdict {
   readonly strength: number;
   /** 用神选对了但盘中不存在 —— 只能等大运送来。常被忽略的重要状态。 */
   readonly needsLuckSupport: boolean;
-  /** 调候用神的来源：heuristic 表示《穷通宝鉴》表尚未就位，走降级规则。 */
+  /** 调候用神的来源：heuristic = 可计算的极端气候降级；table = 《穷通宝鉴》120 格。 */
   readonly tiaohouSource?: "heuristic" | "table";
+  /**
+   * 调候用神的**天干原貌**，仅 `table` 来源有。
+   *
+   * `primary` 只到五行，而调候正是靠丙丁（太阳与灯烛）、壬癸（江河与雨露）
+   * 的分别立论的。丢掉的这一层要让读者看见，不是替他抹平。
+   */
+  readonly tiaohouStems?: readonly Stem[];
+  /** 该格的转录信心：varies = 版本有出入，见 TIAOHOU_VARIANTS。 */
+  readonly tiaohouTier?: "firm" | "varies";
 }
 
 export type GejuName =

@@ -251,15 +251,28 @@ describe("用神", () => {
     expect(c.yongshen.value.method).toBe("tiaohou");
     expect(c.yongshen.value.primary).toBe("火");
     expect(c.yongshen.value.needsLuckSupport).toBe(true);
-    expect(c.yongshen.value.tiaohouSource).toBe("heuristic");
+    expect(c.yongshen.value.tiaohouSource).toBe("table");
   });
 
-  it("**调候来源如实标注** —— 不冒充完整调候表", () => {
+  it("**默认走 120 格表，且如实交代它是凭记忆转录的**", () => {
     const c = run(WINTER);
-    expect(c.schoolsUsed.tiaohouSource).toBe("heuristic");
+    expect(c.schoolsUsed.tiaohouSource).toBe("table");
+    const v = c.yongshen.value;
+    expect(v.method).toBe("tiaohou");
+    expect(v.tiaohouStems, "开了表却没带天干原貌").toBeDefined();
+    expect(v.tiaohouTier).toMatch(/firm|varies/);
     const d = c.yongshen.derivation.map((x) => x.detail).join(" ");
     expect(d).toContain("《穷通宝鉴》");
-    expect(d).toContain("尚未转录");
+    expect(d, "不确定性藏在开关里等于没人看得见 —— 它必须出现在推导链上")
+      .toContain("未经实体书逐格核对");
+  });
+
+  it("退回 heuristic 即是极端气候降级规则，不带天干原貌", () => {
+    const c = run(WINTER, loadParams({
+      conclusion: { yongshen: { tiaohou: { source: "heuristic" } } } }));
+    expect(c.schoolsUsed.tiaohouSource).toBe("heuristic");
+    expect(c.yongshen.value.tiaohouStems).toBeUndefined();
+    expect(c.yongshen.derivation.map((x) => x.detail).join(" ")).toContain("未启用");
   });
 
   it("**调候与扶抑方向相反时并列，不藏起来**", () => {
