@@ -566,11 +566,149 @@ const bodyTemplates: NarrativeTemplate[] = [
   }),
 ];
 
+
+// ─────────────────────────────────────────────────────────
+// §2.9 统计节点 —— 两层结论
+//
+// 摘要层只出一句，展开层才给依据。**摘要里的每个数字都必须在
+// `detail.evidence` 里找得到**（`auditFinding` 强制）：否则摘要写「财运向好」、
+// 展开写「财星被劫」，而读者通常只看一层。
+//
+// 每条模板都自带「这是排序，不是概率」的框定 —— 序列是确定性的准周期序列，
+// |z|≥2 的点必然约占 5%，与这张盘是什么盘无关。
+// ─────────────────────────────────────────────────────────
+
+const nodeTemplates: readonly NarrativeTemplate[] = [
+  T("node.summary", "data", "node", ["label", "span", "z", "shape", "direction"], {
+    zhHans: "{label}在 {span}最偏离常态（{z}σ，{shape}·{direction}）。",
+    en: "{label} sits furthest from its own norm during {span} ({z}σ, {shape} · {direction}).",
+  }),
+
+  T("node.scaleNote", "data", "node", ["scale", "from", "to"], {
+    zhHans: "此为{scale}，基准取 {from}–{to} 年这一段本身的散布。"
+      + "所谓「偏离」是在这条序列自己的六十年里排序，不是概率陈述 —— "
+      + "命盘的时间序列由出生时刻完全决定，越阈的采样点总在二十分之一上下，与哪张盘无关。",
+    en: "This is a {scale}; the baseline is the spread of the {from}–{to} window itself. "
+      + "「Deviation」 here ranks moments within this one series' own sixty years and is not a "
+      + "probability claim: the chart's time series is fully determined by the moment of birth, "
+      + "so about one sample in twenty crosses the threshold no matter whose chart it is.",
+  }),
+
+  T("node.level", "data", "node", ["peakValue", "mean", "z"], {
+    zhHans: "峰值 {peakValue}，该段基准均值 {mean}，相差 {z} 个标准差。",
+    en: "Peak {peakValue} against a baseline mean of {mean} — a gap of {z} standard deviations.",
+  }),
+
+  T("node.rate", "data", "node", ["rateZ"], {
+    zhHans: "同比变化率偏离 {rateZ} 个标准差。差分取一整年，"
+      + "以消掉立春换柱那个每年必现的阶跃 —— 否则量到的只是「立春跳得比月内大」。",
+    en: "The year-over-year rate of change sits {rateZ} standard deviations from its norm. "
+      + "The difference is taken across a full year so that the annual step at Start of Spring "
+      + "cancels out; otherwise the measurement only says 「the annual step is larger than "
+      + "within-year drift」, which is always true.",
+  }),
+
+  T("node.shape.sustained", "data", "node", [], {
+    zhHans: "形态为持续极端：水平长期偏离，变化率却不高 —— 是一段状态，不是一次转折。",
+    en: "Shape: sustained. The level stays far from norm while the rate of change does not — "
+      + "a condition, not a turning point.",
+  }),
+  T("node.shape.swift", "data", "node", [], {
+    zhHans: "形态为急速穿越：水平本身未及极端，但变得很快 —— 换运前后的典型形态。"
+      + "此类节点的吉凶取变化的方向，不取水平的高低。",
+    en: "Shape: swift crossing. The level itself is not extreme but is moving fast — "
+      + "typical around a change of luck pillar. Its reading follows the direction of change, "
+      + "not the height of the level.",
+  }),
+  T("node.shape.surge", "data", "node", [], {
+    zhHans: "形态为突入极端：水平与变化率同时越阈，三种形态中最强的一种。",
+    en: "Shape: surge. Level and rate cross the threshold together — the strongest of the three shapes.",
+  }),
+
+  T("node.monthNote", "data", "node", ["label"], {
+    zhHans: "{label}属权重类序列，而流月不参与权重。"
+      + "故此段的边界是立春年的边界，报到年为止 —— 写成某月是它没有的精度。",
+    en: "{label} is a weight-bearing series, and the fleeting month carries no weight. "
+      + "Its boundaries are therefore the boundaries of solar years, and it is reported to the "
+      + "year only — naming a month would claim a precision the model does not have.",
+  }),
+
+  T("node.reasons", "data", "node", ["items"], {
+    zhHans: "同期可对照的盘面事件：{items}。这些是检出之后才去找的对照，"
+      + "不参与检出本身 —— 曲线说「这里变了」，它们说「大概是因为这个」。",
+    en: "Chart events in the same window: {items}. These are looked up after detection, not before, and "
+      + "take no part in it — the curve says 「something changed here」 and they suggest why.",
+  }),
+
+  T("node.noReasons", "data", "node", [], {
+    zhHans: "同期没有可对照的神煞或结构事件。曲线的变动来自权重推移本身。",
+    en: "No shensha or structural event lines up with this window; the movement comes from the "
+      + "shifting weights themselves.",
+  }),
+
+  // ── 趋吉避凶 ──
+  //
+  // 每条都必须自带传统框定与免责导向：这一段最容易被单独复制走，
+  // 而单独复制走的一句「宜守不宜攻」就是建议。守卫按**段**判定，见 zh.guidance.framing。
+  // 三条趋避各自成一条完整模板，而**不是**「框架 + 可插拔的短语」。
+  //
+  // 初版把「以守代攻、缓图为上」抽成独立的片段模板，措辞守卫当场拦下 ——
+  // 它是对的：那个串一旦存在于模板库里，就是一句可以被原样摘走的行动指令，
+  // 无论调用方本来打算把它插进多完整的框定里。故不留这样的片段。
+  T("guidance.item.hold", "data", "guidance", ["domain", "span", "trigger"], {
+    zhHans: "{domain}在 {span}张力偏高，形态为长期偏离；同期的传统触发标记为{trigger}。"
+      + "传统趋避之说于此类时段主张以守代攻、缓图为上。"
+      + "以上是典籍之说与盘面数值的并列，不构成任何专业建议；"
+      + "涉及健康、法律、财务的决定请咨询持证专业人士。",
+    en: "The {domain} domain runs at elevated tension through {span}, in a sustained pattern; "
+      + "the traditional markers in the same window are {trigger}. For such stretches the classical "
+      + "「seek fortune, avoid harm」 lore holds to holding rather than pressing, and to moving slowly. "
+      + "The above sets classical lore beside a chart figure and constitutes no professional advice; "
+      + "for decisions touching health, law, or finance, please consult a licensed professional.",
+  }),
+
+  T("guidance.item.watch", "data", "guidance", ["domain", "span", "trigger"], {
+    zhHans: "{domain}在 {span}张力变动很快，水平本身未及极端；同期的传统触发标记为{trigger}。"
+      + "传统趋避之说于此类时段主张凡事多留一分回旋，不轻许诺。"
+      + "以上是典籍之说与盘面数值的并列，不构成任何专业建议；"
+      + "涉及健康、法律、财务的决定请咨询持证专业人士。",
+    en: "The {domain} domain changes quickly through {span} without the level itself reaching an "
+      + "extreme; the traditional markers in the same window are {trigger}. For such stretches the "
+      + "classical 「seek fortune, avoid harm」 lore holds to leaving room to turn back and not "
+      + "committing lightly. The above sets classical lore beside a chart figure and constitutes no "
+      + "professional advice; for decisions touching health, law, or finance, please consult a "
+      + "licensed professional.",
+  }),
+
+  T("guidance.item.settle", "data", "guidance", ["domain", "span", "trigger"], {
+    zhHans: "{domain}在 {span}张力与变动同时偏高；同期的传统触发标记为{trigger}。"
+      + "传统趋避之说于此类时段主张先安内而后图外，不宜多头并进。"
+      + "以上是典籍之说与盘面数值的并列，不构成任何专业建议；"
+      + "涉及健康、法律、财务的决定请咨询持证专业人士。",
+    en: "In the {domain} domain both tension and rate of change run high through {span}; "
+      + "the traditional markers in the same window are {trigger}. For such stretches the classical "
+      + "「seek fortune, avoid harm」 lore holds to settling what is near before reaching outward, and "
+      + "to not pressing on several fronts at once. The above sets classical lore beside a chart "
+      + "figure and constitutes no professional advice; for decisions touching health, law, or "
+      + "finance, please consult a licensed professional.",
+  }),
+
+  T("guidance.none", "data", "guidance", [], {
+    zhHans: "本命六十年中没有张力显著偏高的时段可供列举。"
+      + "这说的是这条序列自身的散布较平，不是「一生平顺」——"
+      + "同一套判据在任何一张盘上都只挑出最偏的那几段。",
+    en: "No stretch of the sixty years stands out as markedly elevated in tension. "
+      + "That says the series' own spread is flat, not that a life will be smooth: "
+      + "the same criterion picks only the most deviant stretches of whatever chart it is given.",
+  }),
+];
+
 export const NARRATIVE_TEMPLATES: readonly NarrativeTemplate[] = Object.freeze([
   ...strengthTemplates, ...rootTemplates, ...patternTemplates, ...yongshenTemplates,
   ...gejuTemplates, ...metricsTemplates, ...kinTemplates, ...shenshaTemplates,
   ...personaTemplates, ...bodyTemplates,
   ...timelineTemplates, ...currentTemplates, ...methodTemplates,
+  ...nodeTemplates,
 ]);
 
 export const TEMPLATES_BY_ID: ReadonlyMap<string, NarrativeTemplate> = new Map(

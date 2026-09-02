@@ -119,9 +119,11 @@ describe("序列", () => {
         : [...y.jishen, ...y.choushen].includes(e as never) ? "adverse" : "neutral";
       expect(s.polarity, s.id).toBe(expected);
     }
-    // 域张力恒不判方向 —— 张力本就是「顺逆并存」的度量
+    // 域的两条量方向性不同，不可一并处理：
+    // 张力是「顺逆并存」的度量，高张力既非吉也非凶 —— 定方向等于把拆开的又合回去；
+    // 净值 = 顺 − 逆，符号即方向。两条都写 neutral 会让趋避一节几乎空着。
     for (const s of S.series.filter((x) => x.kind === "domain")) {
-      expect(s.polarity, s.id).toBe("neutral");
+      expect(s.polarity, s.id).toBe(s.id.endsWith(".tension") ? "neutral" : "favorable");
     }
   });
 });

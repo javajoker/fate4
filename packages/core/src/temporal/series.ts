@@ -310,12 +310,19 @@ export function buildSeries(base: BaseChart, opts: SeriesOptions = {}): SeriesSe
   push("innerOuter.tension", "innerOuter", "内外张力",
     base.persona.innerOuterTension, "neutral",
     (ev) => innerOuterTensionOf(ev, base.conclusions.dayMaster));
-  // ── 域 18 条（张力恒不判方向）──
+  // ── 域 18 条 ──
+  //
+  // 两条量的方向性不同，不可一并处理：
+  // `net = 顺 − 逆`，符号即方向，故取 favorable；
+  // `tension = min(顺,逆)/max(顺,逆)`，是**顺逆并存**的度量，高张力既非吉也非凶，
+  // 给它定方向等于把已经拆开的东西又合回去，故 neutral。
+  // 初版两条都写 neutral，后果是「婚姻感情·净值 −5.94σ」这样的节点
+  // 一律报「只报变动」，趋避一节因而几乎空着 —— 而它恰恰是最该有内容的地方。
   const domains = Object.keys(DOMAIN_LABEL) as Domain[];
   for (const d of domains) {
     push(`domain.${d}.tension`, "domain", `${DOMAIN_LABEL[d]}·张力`, 0, "neutral",
       (_ev, i) => domainsAt[i]!.find((x) => x.domain === d)?.tension ?? 0);
-    push(`domain.${d}.net`, "domain", `${DOMAIN_LABEL[d]}·净值`, 0, "neutral",
+    push(`domain.${d}.net`, "domain", `${DOMAIN_LABEL[d]}·净值`, 0, "favorable",
       (_ev, i) => domainsAt[i]!.find((x) => x.domain === d)?.net ?? 0);
   }
   // ── 综合 3 条 ──
