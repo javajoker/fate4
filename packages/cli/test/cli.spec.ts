@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildChart, buildReport, chartOptionsOf, loadParams, renderMarkdown, scanText,
+  buildChart, buildQuestionReport, buildReport, cast, castMomentOf, chartOptionsOf,
+  dailyOutlook, dress, judge, loadParams, pickYongshen, renderDailyMarkdown,
+  renderMarkdown, renderQuestionMarkdown, scanText,
   formatViolations, type BirthInput,
 } from "@fate/core";
 import { run, guardOutput } from "../src/index.js";
@@ -240,6 +242,10 @@ describe("输出经措辞扫描", () => {
       ["month", "--chart", "c.json", "--year", "2026", "--month", "3"],
       ["day", "--chart", "c.json", "--date", "2026-03-15"],
       ["report", "--chart", "c.json", "--now", "2026-09-01"],
+      ["ask", "--topic", "wealth.seek", "--city", "上海", "--at", "2026-09-02 14:30"],
+      ["ask", "--topic", "health.body", "--city", "上海", "--at", "2026-09-02 14:30"],
+      ["daily", "--chart", "c.json", "--date", "2026-09-02"],
+      ["topics"],
       ["cities"],
     ];
     for (const argv of cmds) {
@@ -252,6 +258,8 @@ describe("输出经措辞扫描", () => {
   it("人读输出里不得漏出英文枚举", () => {
     for (const argv of [
       ["chart", ...EXAMPLE_ARGS], ["luck", "--chart", "c.json"],
+      ["ask", "--topic", "career.job", "--city", "上海", "--at", "2026-09-02 14:30"],
+      ["daily", "--chart", "c.json", "--date", "2026-09-02"],
       ["year", "--chart", "c.json", "--year", "2026"],
       ["month", "--chart", "c.json", "--year", "2026", "--month", "3"],
       ["day", "--chart", "c.json", "--date", "2026-03-15"],
@@ -401,3 +409,159 @@ function offsetHours(tz: string): number {
     Number(p["hour"]) % 24, Number(p["minute"]));
   return (asUtc - at.getTime()) / 3_600_000;
 }
+
+// ═══════════════════════════════════════════════════════════
+// 第二台引擎 —— 六爻问事与当日运程
+// ═══════════════════════════════════════════════════════════
+
+const ASK = [
+  "--topic", "wealth.seek", "--city", "上海", "--at", "2026-09-02 14:30",
+];
+
+describe("fate ask", () => {
+  it("三十二类占事都列得出来，且标出受限的那一类", () => {
+    const r = cli(["topics"]);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("wealth.seek");
+    expect(r.out).toContain("health.body");
+    expect(r.out).toContain("输出受限");
+    expect((r.out.match(/^ {4}\S+/gm) ?? []).length).toBe(32);
+  });
+
+  it("未知占事给出可操作的错，而不是静默挑一个", () => {
+    const r = cli(["ask", "--topic", "no.such", "--city", "上海"]);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain("fate topics");
+  });
+
+  it("**与内核直调逐字节相同** —— 与四柱报告同一条验收判据", () => {
+    const r = cli(["ask", ...ASK]);
+    expect(r.code).toBe(0);
+    const params = loadParams({});
+    const moment = castMomentOf({
+      year: 2026, month: 9, day: 2, hour: 14, minute: 30,
+      timeZone: "Asia/Shanghai", longitude: 121.47,
+    });
+    const gua = dress(cast(moment, { method: "time" }, params.liuyao), params.liuyao);
+    const j = judge(gua, pickYongshen(gua, "wealth.seek"), params.liuyao);
+    const direct = renderQuestionMarkdown(buildQuestionReport(j, params));
+    expect(r.out.trim()).toBe(direct.trim());
+  });
+
+  it("三法都能起卦；掷钱须给合法的六位钱象", () => {
+    expect(cli(["ask", ...ASK, "--method", "number", "--number", "27"]).code).toBe(0);
+    expect(cli(["ask", ...ASK, "--method", "number", "--number", "3", "--number2", "5"]).code).toBe(0);
+    expect(cli(["ask", ...ASK, "--method", "coin", "--coins", "121212"]).code).toBe(0);
+    expect(cli(["ask", ...ASK, "--method", "coin"]).code).toBe(2);
+    expect(cli(["ask", ...ASK, "--method", "coin", "--coins", "12129"]).code).toBe(2);
+    expect(cli(["ask", ...ASK, "--method", "number"]).code).toBe(2);
+  });
+
+  it("用神随人而定的占事，不给 --relation 即报错", () => {
+    expect(cli(["ask", ...ASK.slice(2), "--topic", "travel.return"]).code).toBe(1);
+    expect(cli(["ask", ...ASK.slice(2), "--topic", "travel.return", "--relation", "子孙"]).code)
+      .toBe(0);
+  });
+
+  it("**问题原文不进输出、不进文件** —— 只留指纹", () => {
+    const files = new Map<string, string>();
+    const secret = "我是否应当在下月辞职";
+    const r = cli(["ask", ...ASK, "--question", secret, "--journal", "j.json"], files);
+    expect(r.code).toBe(0);
+    expect(r.out).not.toContain(secret);
+    expect(r.err).not.toContain(secret);
+    expect(files.get("j.json") ?? "").not.toContain(secret);
+    expect(r.out).toMatch(/问题指纹 \| [0-9a-f]{16}/);
+  });
+});
+
+describe("**一事不二占** —— 允许重掷等于允许摇到满意为止", () => {
+  const Q = ["--question", "这笔投资该不该做", "--journal", "j.json"];
+
+  it("同一问题同一日再问，返回首卦并明说", () => {
+    const files = new Map<string, string>();
+    const first = cli(["ask", ...ASK, ...Q], files);
+    expect(first.code).toBe(0);
+    const second = cli(["ask", ...ASK, ...Q], files);
+    expect(second.code).toBe(0);
+    expect(second.err).toContain("一事不二占");
+    expect(second.out).toBe(first.out);
+  });
+
+  it("**换个时刻也返回首卦** —— 否则等一个时辰就能重来", () => {
+    const files = new Map<string, string>();
+    const first = cli(["ask", ...ASK, ...Q], files);
+    const later = cli([
+      "ask", "--topic", "wealth.seek", "--city", "上海",
+      "--at", "2026-09-02 22:00", ...Q,
+    ], files);
+    expect(later.out).toBe(first.out);
+  });
+
+  it("**换个起卦法也返回首卦** —— 首卦的起卦法才作数", () => {
+    const files = new Map<string, string>();
+    const first = cli(["ask", ...ASK, ...Q], files);
+    const other = cli(["ask", ...ASK, ...Q, "--method", "coin", "--coins", "303030"], files);
+    expect(other.out).toBe(first.out);
+    expect(other.err).toContain("不作数");
+  });
+
+  it("**反向对照：换个问题、换个占事、换一天，都该另起一卦**", () => {
+    const files = new Map<string, string>();
+    const base = cli(["ask", ...ASK, ...Q], files);
+    const otherQ = cli(["ask", ...ASK, "--question", "另一件事", "--journal", "j.json"], files);
+    expect(otherQ.out).not.toBe(base.out);
+    const otherTopic = cli([
+      "ask", "--topic", "career.job", "--city", "上海", "--at", "2026-09-02 14:30", ...Q,
+    ], files);
+    expect(otherTopic.out).not.toBe(base.out);
+    const otherDay = cli([
+      "ask", "--topic", "wealth.seek", "--city", "上海", "--at", "2026-09-09 14:30", ...Q,
+    ], files);
+    expect(otherDay.out).not.toBe(base.out);
+  });
+
+  it("不给 --journal 即不设防 —— 且这一点不该悄悄发生", () => {
+    const files = new Map<string, string>();
+    const a = cli(["ask", ...ASK, "--question", "同一问题"], files);
+    const b = cli(["ask", ...ASK, "--question", "同一问题"], files);
+    expect(a.out).toBe(b.out);           // 同时刻同问题，卦本就相同
+    expect(a.err).not.toContain("一事不二占");
+    expect(files.size, "没给 --journal 时不该落盘").toBe(0);
+  });
+
+  it("记录文件损坏时报错，不静默重置", () => {
+    const files = new Map([["j.json", "{ 这不是 JSON"]]);
+    const r = cli(["ask", ...ASK, ...Q], files);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("宁可报错也不覆盖");
+  });
+});
+
+describe("fate daily", () => {
+  const files = withChart();
+
+  it("两侧并列，且明写不作合并", () => {
+    const r = cli(["daily", "--chart", "c.json", "--date", "2026-09-02"], files);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("四柱侧");
+    expect(r.out).toContain("六爻侧");
+    expect(r.out).toContain("不作合并");
+    expect(r.out).toContain("不构成互相印证");
+  });
+
+  it("**与内核直调逐字节相同**", () => {
+    const r = cli(["daily", "--chart", "c.json", "--date", "2026-09-02"], files);
+    const chart = buildChart(EXAMPLE);
+    const direct = renderDailyMarkdown(
+      dailyOutlook(chart, { year: 2026, month: 9, day: 2 }, loadParams({})));
+    expect(r.out.trim()).toBe(direct.trim());
+  });
+
+  it("JSON 与 Markdown 出自同一棵树", () => {
+    const j = cli(["daily", "--chart", "c.json", "--date", "2026-09-02", "--json"], files);
+    const tree = JSON.parse(j.out);
+    expect(tree.comparisons.length).toBeGreaterThan(0);
+    expect(tree.claims.length).toBe(6);
+  });
+});

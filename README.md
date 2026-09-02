@@ -5,7 +5,7 @@
 | 组件 | 说明 |
 | --- | --- |
 | `packages/core` | 纯 TypeScript、零运行时依赖的推演内核。排盘、配重、传导、断论、神煞、应期全在这里。可单测、可被任何宿主调用。 |
-| `packages/web` | Next.js（App Router）Web 应用。命盘、大运、流年、流月、流日与报告的可视化。 |
+| `packages/web` | Next.js（App Router）Web 应用。命盘、大运、流年、流月、流日与报告的可视化，另有独立的六爻问事页。 |
 | `packages/cli` | 命令行。Skill 的执行后端，也是回归测试的入口。零第三方依赖（除 YAML 解析）。 |
 | `packages/skill` | Claude Agent Skill。通过 CLI 调用 `core`，拿到结构化 JSON 后由模型组织叙述。 |
 
@@ -95,9 +95,10 @@ L6 报告   汇总为分层报告
 | **P19** | Q2 用神（32 类占事）+ Q3 力量 + Q4 断论 | ✅ 完成 —— 断论层不出成败字眼 |
 | **P20** | Q5 应期区间 + Q6 问事报告 + 四条新禁令 | ✅ 完成 —— 32 类占事 × 多卦，守卫零命中 |
 | **P21** | 当日运程 —— 四柱流日 ∥ 六爻日卦，五类目对照 | ✅ 完成 —— 实测一致 110 / 分歧 116 |
-| P22– | Web 问事页、CLI `ask`、Skill、六壬、奇门 | 📋 规格已定案，待实现 |
+| **P22** | Web 问事页 + CLI `ask`/`daily`/`topics` + Skill | ✅ 完成 —— 一事不二占落地 |
+| P23– | 六壬四课三传、奇门时家转盘、三体系 crossref | 📋 规格已定案，待实现 |
 
-全部 821 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
+全部 835 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
 
 ```bash
 pnpm install && pnpm test && pnpm typecheck

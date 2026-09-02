@@ -111,7 +111,7 @@ describe("占事分类", () => {
   it("**32 类全部可断，一类不落**", () => {
     for (const t of TOPICS) {
       const ys = pickYongshen(G, t.id, "父母");
-      expect(() => judge(G, ys.value, P), t.id).not.toThrow();
+      expect(() => judge(G, ys, P), t.id).not.toThrow();
     }
   });
 
@@ -268,7 +268,7 @@ describe("**Q4 断论只出结构，不出结果**", () => {
   it("断论层的每一条都不含成败、吉凶、时点的字眼", () => {
     for (const g of allGua(16)) {
       for (const id of ["wealth.seek", "career.job", "health.body", "self.fortune"]) {
-        const j = judge(g, pickYongshen(g, id).value, COIN);
+        const j = judge(g, pickYongshen(g, id), COIN);
         const text = j.findings.map(
           (f) => f.value + f.derivation.map((d) => d.step + d.detail).join("")).join("");
         for (const w of OUTCOME_WORDS) {
@@ -283,7 +283,7 @@ describe("**Q4 断论只出结构，不出结果**", () => {
   it("六个方面齐全，用神伏藏时仍出力量一条", () => {
     for (const g of allGua(8)) {
       const ys = pickYongshen(g, "wealth.seek");
-      const j = judge(g, ys.value, COIN);
+      const j = judge(g, ys, COIN);
       const aspects = new Set(j.findings.map((f) => f.aspect));
       expect(aspects.has("用神力量"), g.ben.name).toBe(true);
       expect(aspects.has("世应关系")).toBe(true);
@@ -299,7 +299,7 @@ describe("**Q4 断论只出结构，不出结果**", () => {
 
   it("每条断论都带推导，置信度在合理区间", () => {
     for (const g of allGua(8)) {
-      for (const f of judge(g, pickYongshen(g, "career.job").value, COIN).findings) {
+      for (const f of judge(g, pickYongshen(g, "career.job"), COIN).findings) {
         expect(f.derivation.length, f.aspect).toBeGreaterThan(0);
         expect(f.confidence).toBeGreaterThan(0.2);
         expect(f.confidence).toBeLessThanOrEqual(1);
@@ -386,7 +386,7 @@ describe("Q6 问事报告", () => {
     let n = 0;
     for (const g of allGua(512)) {
       for (const t of TOPICS) {
-        const j = judge(g, pickYongshen(g, t.id, "父母").value, COIN);
+        const j = judge(g, pickYongshen(g, t.id, "父母"), COIN);
         const r = buildQuestionReport(j, loadParams({ liuyao: { castMethod: "coin" } }));
         expect(r.guard.violations.map((v) => `${v.ruleId}@${v.where}: ${v.match}`),
           `${g.ben.name} / ${t.label}`).toEqual([]);
@@ -398,7 +398,7 @@ describe("Q6 问事报告", () => {
   });
 
   it("免责声明首尾各一次，且说明「同一时辰同卦」", () => {
-    const j = judge(G, pickYongshen(G, "wealth.seek").value, P);
+    const j = judge(G, pickYongshen(G, "wealth.seek"), P);
     const r = buildQuestionReport(j, DEFAULT_PARAMS);
     expect(r.disclaimerTop).toBe(r.disclaimerBottom);
     expect(r.disclaimerTop).toContain("同一时辰");
@@ -408,7 +408,7 @@ describe("Q6 问事报告", () => {
   });
 
   it("**只存问题的哈希，不存原文**", () => {
-    const j = judge(G, pickYongshen(G, "wealth.seek").value, P);
+    const j = judge(G, pickYongshen(G, "wealth.seek"), P);
     const r = buildQuestionReport(j, DEFAULT_PARAMS, { questionFingerprint: "ab12cd34" });
     expect(r.meta.questionFingerprint).toBe("ab12cd34");
     // meta 里与「问题」相关的字段**只有指纹一个** —— 没有放得下原文的地方
@@ -418,7 +418,7 @@ describe("Q6 问事报告", () => {
   });
 
   it("健康类不产出时间窗，且写明为什么", () => {
-    const j = judge(G, pickYongshen(G, "health.body").value, P);
+    const j = judge(G, pickYongshen(G, "health.body"), P);
     const r = buildQuestionReport(j, DEFAULT_PARAMS);
     expect(r.yingqi.result.windows).toEqual([]);
     expect(r.yingqi.result.suppressed).toContain("不产出时间窗");
@@ -429,7 +429,7 @@ describe("Q6 问事报告", () => {
   it("繁体问事报告同样零命中，且没有简体残留", () => {
     const HANT = loadParams({ report: { locale: "zh-Hant" } });
     for (const t of ["wealth.seek", "career.job", "health.body", "self.fortune"]) {
-      const j = judge(G, pickYongshen(G, t).value, HANT.liuyao);
+      const j = judge(G, pickYongshen(G, t), HANT.liuyao);
       const r = buildQuestionReport(j, HANT);
       expect(r.guard.violations, t).toEqual([]);
       const text = collectQuestionText(r).map((c) => c.text).join("");
@@ -438,7 +438,7 @@ describe("Q6 问事报告", () => {
   });
 
   it("每一句都指回来源 —— 报告层不做新判断", () => {
-    const j = judge(G, pickYongshen(G, "career.job").value, P);
+    const j = judge(G, pickYongshen(G, "career.job"), P);
     const r = buildQuestionReport(j, DEFAULT_PARAMS);
     for (const sec of [r.casting, r.topic, r.judgement, r.yingqi]) {
       for (const l of sec.narrative) {

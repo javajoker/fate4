@@ -15,6 +15,7 @@ const TABS: readonly [string, string][] = [
   ["/chart/curves", "生命曲线"],
   ["/chart/nodes", "统计节点"],
   ["/chart/calendar", "月历 · 今日"],
+  ["/chart/daily", "当日运程"],
   ["/chart/report", "完整报告"],
   ["/chart/params", "参数校准"],
 ];

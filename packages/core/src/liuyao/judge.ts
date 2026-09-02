@@ -39,6 +39,14 @@ export interface LiuyaoFinding {
 
 export interface Judgement {
   readonly gua: DressedGua;
+  /**
+   * 用神的**完整判定**，不只是取中的那一个爻。
+   *
+   * 初版只存 `Yongshen` 的值，于是「妻财两现、按阶梯取了第四爻」这件事
+   * 只活在 Verdict 的推导链里，报告层拿不到 —— 读者看到的是一个仿佛唯一的用神。
+   * 报告不做新判断、每句话都要能溯源，靠的正是这条推导链，故整个 Verdict 都要带上。
+   */
+  readonly yongshenVerdict: Verdict<Yongshen>;
   readonly yongshen: Yongshen;
   /** 用神力量。用神伏藏时为 null。 */
   readonly strength: Verdict<YaoStrength> | null;
@@ -60,8 +68,9 @@ const movingLabel = (y: YaoInfo): string => {
 };
 
 export function judge(
-  gua: DressedGua, ys: Yongshen, p: LiuyaoParams,
+  gua: DressedGua, ysv: Verdict<Yongshen>, p: LiuyaoParams,
 ): Judgement {
+  const ys = ysv.value;
   const findings: LiuyaoFinding[] = [];
   const yao = ys.yao;
   const strength = yao === null ? null : strengthOf(gua, yao, p);
@@ -194,7 +203,7 @@ export function judge(
     });
   }
 
-  return { gua, yongshen: ys, strength, findings: Object.freeze(findings) };
+  return { gua, yongshenVerdict: ysv, yongshen: ys, strength, findings: Object.freeze(findings) };
 }
 
 const rank = (b: YaoBand): number =>

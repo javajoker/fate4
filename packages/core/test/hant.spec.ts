@@ -60,7 +60,7 @@ const liuyaoCorpus = (() => {
       const CP = { ...P, castMethod: "coin" as const };
       const g = dress(cast(M, { method: "coin", throws: t as never }, CP), CP);
       for (const topic of TOPICS) {
-        const j = judge(g, pickYongshen(g, topic.id, "父母").value, P);
+        const j = judge(g, pickYongshen(g, topic.id, "父母"), P);
         const r = buildQuestionReport(j, DEFAULT_PARAMS);
         out.push(...collectQuestionText(r).map((c) => c.text));
         for (const f of j.findings) {

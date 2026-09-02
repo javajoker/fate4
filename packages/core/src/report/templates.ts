@@ -781,6 +781,13 @@ const liuyaoTemplates: NarrativeTemplate[] = [
     zhHans: "所占为「{topic}」，以{pos}为用 —— 此类占事无六亲用神。",
     en: "The question is \"{topic}\"; the {pos} line serves as the subject, as this class of question has no kin-line subject.",
   }),
+  T("liuyao.yong.duoxian", "verdict", "yongshen", ["yong", "positions", "taken", "why"], {
+    zhHans: "{yong}见于第 {positions} 爻，用神多现。按「动爻＞临世应＞舍空破＞与日辰有关系＞月建旺相」的次序取第{taken}爻。{why}",
+    en: "The {yong} line appears at positions {positions}: the subject is multiple. Applying the order active line, then self or other line, then discarding void and month-broken lines, then day-branch relation, then seasonal strength, position {taken} is taken. {why}",
+  }, 0.6, {
+    zhHans: "{yong}见于第 {positions} 爻，用神多现。诸条判据下第{taken}爻与其余相当，此处暂取之，另一说并列在后 —— 两存，不作定夺。{why}",
+    en: "The {yong} line appears at positions {positions}, so the subject is multiple. Position {taken} is no better grounded than the others under every criterion; it is taken provisionally and the alternative is listed alongside, borderline and left open. {why}",
+  }),
   T("liuyao.yong.strength", "verdict", "liuyaoStrength", ["yong", "pos", "band", "rung"], {
     zhHans: "用神{yong}在第{pos}爻，力量为{band}，判据为「{rung}」。",
     en: "The subject line {yong} sits in position {pos} with strength {band}, decided by the rule \"{rung}\".",

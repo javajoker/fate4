@@ -76,6 +76,7 @@ export function buildQuestionReport(
   const p = params.liuyao;
   const gua = j.gua;
   const ys: Yongshen = j.yongshen;
+  const ysVerdict = j.yongshenVerdict;
   const T = (s: string) => (locale === "zh-Hant" ? toHant(s) : s);
 
   // ── 起卦 ──
@@ -103,6 +104,20 @@ export function buildQuestionReport(
     L1.add("liuyao.topic", {
       topic: ys.topic.label, yong: ys.gods.yong, yuan: ys.gods.yuan, ji: ys.gods.ji,
     }, 1, "yongshen");
+  }
+
+  // 用神多现是断卦的要紧一步，不能只留在推导链里 —— 读者看不到「本来还有别的爻可取」，
+  // 就会以为这个用神是唯一的。
+  if (ys.candidates.length > 1 && ys.yao !== null && ys.gods !== null) {
+    const why = ysVerdict.derivation
+      .filter((d) => d.step === "多现取舍" || d.step === "多现未定")
+      .map((d) => d.detail).join("；");
+    L1.add("liuyao.yong.duoxian", {
+      yong: ys.gods.yong,
+      positions: ys.candidates.map((c) => c.pos).join("、"),
+      taken: ys.yao.pos,
+      why: why === "" ? "诸条判据逐级淘汰后所余。" : why,
+    }, ysVerdict.confidence, "yongshen.多现");
   }
 
   // ── 断论 ──

@@ -159,7 +159,7 @@ export function dailyOutlook(
 
   const gua = dress(cast(moment, castInputFor(p), p.liuyao), p.liuyao);
   const ys = pickYongshen(gua, "self.fortune");
-  const j = judge(gua, ys.value, p.liuyao);
+  const j = judge(gua, ys, p.liuyao);
 
   const claims = [...baziClaims(base, dv), ...liuyaoClaims(gua, j, p)];
   const comparisons = crossref(claims);

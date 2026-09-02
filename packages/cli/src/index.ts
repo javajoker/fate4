@@ -17,14 +17,18 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { load as loadYaml } from "js-yaml";
 import {
-  buildReport, dayView, disclaimerText, evaluate, formatViolations, luckTimeline,
-  monthView, MONTH_BRANCH_ORDER, renderMarkdown, scanText, yearView,
-  type BirthInput, type PartialParams,
+  buildQuestionReport, buildReport, cast, castMomentOf, dailyOutlook, dayView,
+  disclaimerText, dress, evaluate, formatViolations, judge, luckTimeline,
+  monthView, MONTH_BRANCH_ORDER, pickYongshen, renderDailyMarkdown, renderMarkdown,
+  renderQuestionMarkdown, scanText, TOPICS, TOPIC_BY_ID, yearView,
+  loadParams,
+  type BirthInput, type CastInput, type CoinThrow, type Liuqin, type PartialParams,
 } from "@fate/core";
 import { UsageError, type Io } from "./io.js";
 import { num, oneOf, parse, parseDate, parseTime, req, reqNum } from "./args.js";
 import { findCity, CITIES } from "./cities.js";
 import { makeChartFile, readChartFile, rebuild } from "./chartFile.js";
+import { appendEntry, findEntry, fingerprintOf, keyOf, readJournal } from "./journal.js";
 import { renderChart, renderDay, renderLuck, renderMonth, renderYear } from "./render.js";
 
 const COMMON = {
@@ -48,6 +52,15 @@ const USAGE = `fate —— 四柱推演命令行
               [--subject self|other] [--locale zh-Hans|zh-Hant|en]
               [--nodes [--node-threshold 2.0]]
 
+  fate ask    --topic 占事id [--question 问题文本 | --question-hash 指纹]
+              (--city 城市 | --tz 时区 --lon 经度)
+              [--at "YYYY-MM-DD HH:MM"] [--method time|number|coin]
+              [--number N [--number2 M]] [--coins 121212] [--relation 六亲]
+              [--journal f.json] [--locale …] [--json]
+
+  fate daily  --chart c.json [--date YYYY-MM-DD] [--locale …] [--json]
+
+  fate topics             列出 32 类占事
   fate cities             列出内置城市表
   fate --help
 
@@ -57,6 +70,9 @@ const USAGE = `fate —— 四柱推演命令行
   --nodes   加算 §6.5 统计节点。默认关闭 —— 它要按月跑满六十年，
             约 1.3 秒，比其余全部章节加起来还久。
             「--subject other」时即便开了也不产出。
+  --journal 问卜记录。一事不二占：同一问题同一日再问，返回首卦。
+            只存问题的**指纹**，不存原文。默认不落盘（即不设防）。
+  --question 问题文本。仅用于就地算指纹，**不写入任何文件、不打印**。
   -o        写入文件而非标准输出。
 
 --month 取公历月 1–12，解析为「节落在该月内的那个节气月」（如 9 月 → 白露起的酉月）。
@@ -279,11 +295,181 @@ function cmdCities(argv: readonly string[], io: Io): void {
   emit(io, o.join("\n"), false);
 }
 
+// ═══════════════════════════════════════════════════════════
+// 第二台引擎 —— 六爻问事与当日运程
+// ═══════════════════════════════════════════════════════════
+
+/** --city 或 --tz/--lon。与 cmdChart 同一套解析，避免两处各写一遍。 */
+function placeOf(v: Record<string, string | boolean | undefined>): {
+  timeZone: string; longitude: number;
+} {
+  const cityName = typeof v["city"] === "string" ? v["city"] : undefined;
+  if (cityName !== undefined) {
+    const c = findCity(cityName);
+    if (c === undefined) {
+      throw new UsageError(
+        `城市表里没有「${cityName}」。表是便利而非权威，请直接给 --tz 与 --lon。`);
+    }
+    const lon = num(v, "lon");
+    return { timeZone: c.timeZone, longitude: lon ?? c.longitude };
+  }
+  return { timeZone: req(v, "tz"), longitude: reqNum(v, "lon") };
+}
+
+function cmdTopics(argv: readonly string[], io: Io): void {
+  const v = parse(argv, { json: { type: "boolean" } });
+  if (v["json"] === true) { emit(io, { topics: TOPICS }, true); return; }
+  const o = ["三十二类占事 —— 大类供选择，具体占事决定用神。", ""];
+  let cat = "";
+  for (const t of TOPICS) {
+    if (t.category !== cat) { cat = t.category; o.push(`  【${cat}】`); }
+    const use = t.use.kind === "liuqin" ? `用神 ${t.use.value}`
+      : t.use.kind === "shi" ? "用神 世爻"
+        : t.use.kind === "ying" ? "用神 应爻"
+          : t.use.kind === "shiYing" ? "以世应关系为主" : "用神随所问之人（须给 --relation）";
+    o.push(`    ${t.id.padEnd(20)} ${t.label.padEnd(10, "　")} ${use}`
+      + (t.restricted === true ? "  ⚠️ 输出受限：不给预后、不给时间窗" : ""));
+  }
+  emit(io, o.join("\n"), false);
+}
+
+function cmdAsk(argv: readonly string[], io: Io): void {
+  const v = parse(argv, {
+    topic: { type: "string" }, question: { type: "string" },
+    "question-hash": { type: "string" }, relation: { type: "string" },
+    at: { type: "string" }, method: { type: "string" },
+    number: { type: "string" }, number2: { type: "string" },
+    coins: { type: "string" }, journal: { type: "string" },
+    locale: { type: "string" },
+    tz: { type: "string" }, lon: { type: "string" }, city: { type: "string" },
+    ...COMMON,
+  });
+
+  const topicId = req(v, "topic");
+  const topic = TOPIC_BY_ID.get(topicId);
+  if (topic === undefined) {
+    throw new UsageError(`未知占事 ${JSON.stringify(topicId)}。fate topics 可列出全部三十二类。`);
+  }
+  const params = loadParams(loadOverrides(io, v["params"] as string | undefined));
+  const locale = oneOf(v, "locale", ["zh-Hans", "zh-Hant", "en"] as const, params.report.locale);
+
+  // 问题文本只用于就地算指纹 —— 不落盘、不打印、不进报告
+  const qh = typeof v["question-hash"] === "string" ? v["question-hash"]
+    : typeof v["question"] === "string" ? fingerprintOf(v["question"]) : null;
+
+  const { timeZone, longitude } = placeOf(v);
+  const now = typeof v["at"] === "string" ? parseAt(v["at"]) : nowOf(io);
+  const at = { ...now, timeZone, longitude };
+
+  const requested = oneOf(v, "method", ["time", "number", "coin"] as const, params.liuyao.castMethod);
+  const moment = castMomentOf(at);
+  const dayGanzhi = `${moment.pillars.day.stem}${moment.pillars.day.branch}`;
+
+  // ── 一事不二占 ──
+  const journalPath = typeof v["journal"] === "string" ? v["journal"] : null;
+  const key = qh === null ? null : keyOf({ dayGanzhi, topicId, questionFingerprint: qh });
+  const journal = journalPath === null ? null : readJournal(io, journalPath);
+  const prior = journal !== null && key !== null ? findEntry(journal, key) : null;
+  if (prior !== null) {
+    io.err(`一事不二占：本日已为该问题起过卦（${prior.dayGanzhi}，记于 ${prior.recordedAt}），`
+      + "此处返回首卦。重掷等于允许一直摇到满意为止，故不另起。");
+  }
+  // 重放时以**当初的时刻与输入**重算，故所得卦与首卦逐字相同。
+  // 起卦法也须取首卦的 —— 命令行这次给的是什么并不作数，否则
+  //「一事不二占」就成了「换个起卦法即可重来」。
+  const input: CastInput = prior?.input ?? castInputOf(v, requested);
+  if (prior !== null && v["method"] !== undefined && prior.input.method !== requested) {
+    io.err(`（本次给的 --method ${requested} 不作数：首卦以 ${prior.input.method} 起，`
+      + "换个起卦法不算换了一件事。)");
+  }
+  const method = input.method;
+  const p = method === params.liuyao.castMethod
+    ? params
+    : { ...params, liuyao: { ...params.liuyao, castMethod: method } };
+  const casting = cast(prior === null ? moment : castMomentOf(prior.at), input, p.liuyao);
+  const gua = dress(casting, p.liuyao);
+  const relation = typeof v["relation"] === "string" ? v["relation"] as Liuqin : undefined;
+  const ys = pickYongshen(gua, topicId, relation);
+  const j = judge(gua, ys, p.liuyao);
+  const report = buildQuestionReport(j, p, {
+    locale, ...(qh === null ? {} : { questionFingerprint: qh }),
+  });
+
+  if (journal !== null && key !== null && prior === null) {
+    appendEntry(io, journalPath!, journal, {
+      dayGanzhi, topicId, questionFingerprint: qh!,
+      at, input, recordedAt: new Date().toISOString(),
+    });
+  }
+
+  if (v["json"] === true) {
+    emit(io, report as unknown as Record<string, unknown>, true, v["out"] as string | undefined);
+    return;
+  }
+  emit(io, renderQuestionMarkdown(report), false, v["out"] as string | undefined);
+}
+
+function cmdDaily(argv: readonly string[], io: Io): void {
+  const v = parse(argv, {
+    date: { type: "string" }, locale: { type: "string" }, ...CHART_REF,
+  });
+  const { chart, params } = loadChart(io, v);
+  const locale = oneOf(v, "locale", ["zh-Hans", "zh-Hant", "en"] as const, params.report.locale);
+  const d = typeof v["date"] === "string" ? parseDate(v["date"], "--date") : io.today();
+  const o = dailyOutlook(chart, d, params);
+  if (v["json"] === true) {
+    emit(io, o as unknown as Record<string, unknown>, true, v["out"] as string | undefined);
+    return;
+  }
+  emit(io, renderDailyMarkdown(o, locale), false, v["out"] as string | undefined);
+}
+
+/** `--at "YYYY-MM-DD HH:MM"`。问事必须精确到分 —— 时辰由真太阳时定。 */
+function parseAt(raw: string): {
+  year: number; month: number; day: number; hour: number; minute: number;
+} {
+  const [dPart, tPart] = raw.trim().split(/\s+/);
+  if (dPart === undefined || tPart === undefined) {
+    throw new UsageError(`--at 须形如 "2026-09-02 14:30"，实为 ${JSON.stringify(raw)}`);
+  }
+  return { ...parseDate(dPart, "--at"), ...parseTime(tPart) };
+}
+
+/** 未给 --at 时取系统时刻。内核里没有 Date.now()，取当下是外壳的职责。 */
+function nowOf(io: Io): { year: number; month: number; day: number; hour: number; minute: number } {
+  const d = io.today();
+  const n = new Date();
+  return { ...d, hour: n.getHours(), minute: n.getMinutes() };
+}
+
+function castInputOf(
+  v: Record<string, string | boolean | undefined>, method: "time" | "number" | "coin",
+): CastInput {
+  if (method === "time") return { method: "time" };
+  if (method === "number") {
+    const n = num(v, "number");
+    if (n === undefined) throw new UsageError("--method number 须同时给 --number。");
+    const n2 = num(v, "number2");
+    return n2 === undefined
+      ? { method: "number", value: n }
+      : { method: "number", value: n, second: n2 };
+  }
+  const raw = typeof v["coins"] === "string" ? v["coins"] : undefined;
+  if (raw === undefined || !/^[0-3]{6}$/.test(raw)) {
+    throw new UsageError(
+      "--method coin 须给 --coins，形如 121212 —— 自初爻起六次，每位为三枚铜钱中的阳面数（0–3）。");
+  }
+  const throws = [...raw].map((c) => Number(c) as CoinThrow) as [
+    CoinThrow, CoinThrow, CoinThrow, CoinThrow, CoinThrow, CoinThrow];
+  return { method: "coin", throws };
+}
+
 // ─────────────────────────────────────────────────────────
 
 const COMMANDS: Readonly<Record<string, (a: readonly string[], io: Io) => void>> = {
   chart: cmdChart, luck: cmdLuck, year: cmdYear,
   month: cmdMonth, day: cmdDay, report: cmdReport, cities: cmdCities,
+  ask: cmdAsk, daily: cmdDaily, topics: cmdTopics,
 };
 
 export function run(argv: readonly string[], io: Io): number {
