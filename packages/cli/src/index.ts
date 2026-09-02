@@ -46,6 +46,7 @@ const USAGE = `fate —— 四柱推演命令行
   fate day    --chart c.json --date YYYY-MM-DD [--json]
   fate report --chart c.json [--format markdown|json] [--now YYYY-MM-DD]
               [--subject self|other] [--locale zh-Hans|en]
+              [--nodes [--node-threshold 2.0]]
 
   fate cities             列出内置城市表
   fate --help
@@ -53,6 +54,9 @@ const USAGE = `fate —— 四柱推演命令行
 选项
   --params  参数覆盖文件（.json，或 .yaml/.yml）。覆盖项与默认深合并后校验。
   --json    输出结构化 JSON，供程序消费。
+  --nodes   加算 §6.5 统计节点。默认关闭 —— 它要按月跑满六十年，
+            约 1.3 秒，比其余全部章节加起来还久。
+            「--subject other」时即便开了也不产出。
   -o        写入文件而非标准输出。
 
 --month 取公历月 1–12，解析为「节落在该月内的那个节气月」（如 9 月 → 白露起的酉月）。
@@ -88,7 +92,8 @@ function emit(io: Io, v: Record<string, unknown> | string, asJson: boolean, out?
   const text = asJson || typeof v !== "string"
     ? JSON.stringify(v, null, 2)
     : v;
-  if (out === undefined) io.out(text);
+  const asData = asJson || typeof v !== "string";
+  if (out === undefined) io.out(text, asData ? "data" : "narrative");
   else io.writeFile(out, text.endsWith("\n") ? text : `${text}\n`);
 }
 
@@ -231,6 +236,7 @@ function cmdReport(argv: readonly string[], io: Io): void {
   const v = parse(argv, {
     format: { type: "string" }, now: { type: "string" },
     subject: { type: "string" }, locale: { type: "string" },
+    nodes: { type: "boolean" }, "node-threshold": { type: "string" },
     ...CHART_REF,
   });
   const { chart, params } = loadChart(io, v);
@@ -239,8 +245,22 @@ function cmdReport(argv: readonly string[], io: Io): void {
   const locale = oneOf(v, "locale", ["zh-Hans", "zh-Hant", "en"] as const, params.report.locale);
   const now = typeof v["now"] === "string" ? parseDate(v["now"], "--now") : io.today();
 
+  // §6.5 默认关闭：它要按月跑满六十年，约 1.3 秒，比其余全部章节加起来还久。
+  const includeNodes = v["nodes"] === true;
+  const thRaw = v["node-threshold"];
+  if (thRaw !== undefined && !includeNodes) {
+    throw new UsageError("--node-threshold 须与 --nodes 同用，否则那一节根本不生成。");
+  }
+  const nodeThreshold = typeof thRaw === "string" ? Number(thRaw) : undefined;
+  if (nodeThreshold !== undefined && !(nodeThreshold > 0)) {
+    throw new UsageError(`--node-threshold 须为正数，实为 ${JSON.stringify(thRaw)}`);
+  }
+
   // 与 Web 完全相同的一次调用。窗口等默认值都在 core 里，此处不另作决定。
-  const report = buildReport(chart, { params, subject, locale, now });
+  const report = buildReport(chart, {
+    params, subject, locale, now, includeNodes,
+    ...(nodeThreshold === undefined ? {} : { nodeThreshold }),
+  });
 
   if (format === "json" || v["json"] === true) {
     emit(io, report as unknown as Record<string, unknown>, true, v["out"] as string | undefined);
@@ -288,15 +308,36 @@ export function run(argv: readonly string[], io: Io): number {
 }
 
 /** 输出前的措辞扫描 —— §6.4.3。命中即以非零码退出，绝不把违规文本送出去。 */
-export function guardOutput(text: string): { clean: boolean; report: string } {
-  const vs = scanText(text, "cli.stdout");
+/**
+ * 出口前再扫一遍标准输出。
+ *
+ * ## ⚠️ JSON 转储按「词汇」档扫，不按「叙述」档
+ *
+ * 这不是放宽，是判定档本来就分两种（见 `guard.ts` 的 `TextKind`）：
+ * 「词汇表不是断语 —— 孤立名词无从框定语境，`requireContext` 对它不适用」。
+ *
+ * 原实现对整个 stdout 一律按叙述档扫，后果是**任何带神煞名的 JSON 都印不出来**：
+ * `fate report --json`、`fate year --json` 全部以退出码 3 失败 ——
+ * 一个神煞叫「血光」，它在 JSON 里是数组中的一个字符串，
+ * 而 `zh.health.framing` 要求这个词周围有传统框定语。数组里当然没有。
+ *
+ * 词汇档**只跳过 `requireContext`**，`forbid` 一条不减：病名、绝对情态、
+ * 概率陈述在 JSON 里照样拦。而 JSON 里那些真正的叙述句，
+ * 在 `buildReport` 里已由 `guardReport` 按叙述档扫过，
+ * 结果就放在同一份 JSON 的 `guard.violations` 里，消费方读得到。
+ */
+export function guardOutput(
+  text: string, kind: "narrative" | "data" = "narrative",
+): { clean: boolean; report: string } {
+  const vs = scanText(text, "cli.stdout", kind === "data" ? { kind: "vocabulary" } : {});
   return { clean: vs.length === 0, report: formatViolations(vs) };
 }
 
 export async function main(argv: readonly string[]): Promise<number> {
   const buf: string[] = [];
+  let kind: "narrative" | "data" = "narrative";
   const io: Io = {
-    out: (s) => buf.push(s),
+    out: (s, k) => { buf.push(s); if (k !== undefined) kind = k; },
     err: (s) => process.stderr.write(`${s}\n`),
     readFile: (p) => readFileSync(p, "utf8"),
     writeFile: (p, s) => writeFileSync(p, s, "utf8"),
@@ -308,7 +349,7 @@ export async function main(argv: readonly string[]): Promise<number> {
   const code = run(argv, io);
   const text = buf.join("\n");
   if (text.length > 0) {
-    const g = guardOutput(text);
+    const g = guardOutput(text, kind);
     if (!g.clean) {
       process.stderr.write(`输出被措辞守卫拦下，未予打印：\n${g.report}\n`);
       return 3;

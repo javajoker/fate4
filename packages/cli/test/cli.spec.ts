@@ -264,6 +264,76 @@ describe("输出经措辞扫描", () => {
     expect(guardOutput("日主偏弱。").clean).toBe(true);
     expect(guardOutput("命主 2029 年会离婚，且必然破财。").clean).toBe(false);
   });
+
+  it("**JSON 转储按词汇档扫 —— 否则任何带神煞名的 JSON 都印不出来**", () => {
+    // 一个神煞叫「血光」。它在 JSON 里是数组中的一个字符串，
+    // 而 zh.health.framing 要求这个词周围有传统框定语 —— 数组里当然没有。
+    // 原实现对整个 stdout 一律按叙述档扫，`fate report --json` 因此恒以码 3 失败。
+    const dump = JSON.stringify({ shensha: ["血光", "劫煞"] }, null, 2);
+    expect(guardOutput(dump, "narrative").clean, "叙述档本就该拦下它").toBe(false);
+    expect(guardOutput(dump, "data").clean, "词汇档不该拦一个孤立的神煞名").toBe(true);
+  });
+
+  it("**但词汇档只跳 requireContext，forbid 一条不减**", () => {
+    for (const bad of [
+      { note: "命主必然破财。" },          // zh.prediction.absolute
+      { note: "此运易患肝炎。" },          // zh.medical.diseaseName
+      { note: "发生巨变的概率为 5%。" },    // zh.stats.probability
+    ]) {
+      const dump = JSON.stringify(bad, null, 2);
+      expect(guardOutput(dump, "data").clean, dump).toBe(false);
+    }
+  });
+});
+
+describe("§6.5 统计节点", () => {
+  const files = withChart();
+
+  it("默认不产出 —— 它要按月跑满六十年，比其余全部章节加起来还久", () => {
+    const r = cli(["report", "--chart", "c.json", "--format", "json"], files);
+    expect(r.code).toBe(0);
+    expect((JSON.parse(r.out) as { nodes: unknown }).nodes).toBeNull();
+  });
+
+  it("--nodes 打开，且两层结构齐全", () => {
+    const r = cli(["report", "--chart", "c.json", "--nodes", "--format", "json"], files);
+    expect(r.code).toBe(0);
+    const n = (JSON.parse(r.out) as {
+      nodes: { findings: { summary: { text: string }; detail: { evidence: unknown[] } }[];
+        threshold: number };
+    }).nodes;
+    expect(n.findings.length).toBeGreaterThan(0);
+    expect(n.threshold).toBe(2);
+    for (const f of n.findings) expect(f.detail.evidence.length).toBeGreaterThan(0);
+  });
+
+  it("--node-threshold 生效，且必须与 --nodes 同用", () => {
+    const r = cli(["report", "--chart", "c.json", "--nodes",
+      "--node-threshold", "2.5", "--format", "json"], files);
+    expect((JSON.parse(r.out) as { nodes: { threshold: number } }).nodes.threshold).toBe(2.5);
+
+    // 单给门槛而不开节点，那一节根本不生成 —— 静默忽略会让人以为它生效了
+    const bad = cli(["report", "--chart", "c.json", "--node-threshold", "2.5"], files);
+    expect(bad.code).not.toBe(0);
+    expect(bad.err).toMatch(/须与 --nodes 同用/);
+
+    const neg = cli(["report", "--chart", "c.json", "--nodes", "--node-threshold", "-1"], files);
+    expect(neg.code).not.toBe(0);
+  });
+
+  it("subject=other 时即便开了也不产出 —— 那是对一个人一生时段的描述", () => {
+    const r = cli(["report", "--chart", "c.json", "--nodes",
+      "--subject", "other", "--format", "json"], files);
+    expect((JSON.parse(r.out) as { nodes: unknown }).nodes).toBeNull();
+  });
+
+  it("Markdown 用 details 折叠 —— 直接铺开，两层就塌成一层", () => {
+    const r = cli(["report", "--chart", "c.json", "--nodes"], files);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("## §6.5 统计节点");
+    expect(r.out).toContain("<details><summary>展开依据</summary>");
+    expect(formatViolations(scanText(r.out, "report --nodes"))).toBe("措辞扫描通过。");
+  });
 });
 
 describe("城市表 —— 便利而非权威", () => {

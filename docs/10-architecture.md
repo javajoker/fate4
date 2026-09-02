@@ -74,12 +74,14 @@ core/src/
 │   ├── types.ts  helpers.ts  rules.ts  engine.ts  domains.ts
 ├── temporal/
 │   ├── series.ts                 # L5c 生命曲线（月度采样）
+│   ├── nodes.ts                  # L5n 统计节点（θσ 穿越区间）
 │   ├── evaluate.ts               # 瞬时求解
 │   ├── views.ts                  # 大运/流年/流月/流日四视图
 │   └── types.ts
 ├── report/
 │   ├── templates.ts  render.ts   # 模板库与求值
 │   ├── guard.ts                  # §9-6 措辞扫描
+│   ├── finding.ts                # 两层结论 + 趋吉避凶 + 摘要⊆证据的审计
 │   ├── labels.ts                 # 枚举 → 中文
 │   ├── assemble.ts  markdown.ts  types.ts
 └── params/
@@ -94,7 +96,7 @@ core/src/
 
 `chart/baseChart.ts`（P11）与 `conclude/{traits,persona}.ts`（P12）已就位。
 `conclude/neijing.ts`（P13）亦已就位。
-`temporal/series.ts`（P14）亦已就位。**P15 将新增**：`temporal/nodes.ts`、`report/finding.ts`。
+`temporal/series.ts`（P14）、`temporal/nodes.ts`（P15）、`report/finding.ts`（P16）亦已就位。
 
 ### 2.1 公共 API
 
@@ -143,7 +145,13 @@ export function paramsHash(params: Params): string;
 export function buildBaseChart(chart: NatalChart, params: Params): BaseChart;
 export function evaluateAt(base: BaseChart, at: Instant): InstantChart;
 export function series(base: BaseChart, opts?): Series[];        // 月度曲线
-export function nodes(series: readonly Series[], opts?): NodeInterval[];  // 2σ 穿越区间
+export function findNodes(S: SeriesSet, scale: NodeScale,
+                          override?: Partial<NodesParams>): NodeSet;   // θσ 穿越区间
+export function allNodes(S: SeriesSet, override?: Partial<NodesParams>):
+                          Readonly<Record<NodeScale, NodeSet>>;
+export function buildFindings(S: SeriesSet,
+                              sets: Record<NodeScale, NodeSet> | readonly NodeSet[],
+                              locale?): FindingSet;                    // 两层结论
 ```
 
 这样「基准算过一次」成为**类型层面的事实**，而不是调用方需要记得的纪律。
@@ -334,7 +342,8 @@ description: 四柱（八字）排盘与推演。当用户提供出生年月日�
 | 内经 | 配属表十三行逐格对账；病名无条件禁；框定语与免责语缺一即拦 | vitest |
 | L6 | 模板文本不得含 Markdown（同一份要进 Web、CLI、JSON 三处） | vitest |
 | L5c | 序列条数与分组；月内变化的两个来源可分；流月不入权重；扰动只取最强一条 | vitest |
-| L5n | 三尺度；中节点用 MAD；**平直序列不产出节点**的反向对照 | vitest（P15） |
+| L5n | 三尺度；中节点用 MAD；**平直序列不产出节点**的反向对照 | vitest（`nodes.spec.ts`，29 条） |
+| L6 两层 | 摘要里的每个数字都能在证据里找到；**凭空多一个数必被报出**的反向对照 | vitest（`finding.spec.ts`，21 条） |
 | 端到端 | CLI 的 Markdown 与内核直调**逐字节相同** | vitest |
 
 **L3 的顺序无关性测试是最重要的一个。**它是「同步迭代」这个设计承诺的唯一证明。
@@ -371,10 +380,11 @@ description: 四柱（八字）排盘与推演。当用户提供出生年月日�
 | **P11** | `BaseChart` 一等对象 + `evaluateAt` | 📋 基础盘在一次报告生成中**恰好算一次**；现有断言全绿不变 |
 | **P12** | L4p 人格层 | ✅ 张力改按五组算；真缺与过弱分开；置信度与并列门槛由构造对齐 |
 | **P13** | 内经配属 + 三条轴 + 守卫的「整段」判定域 | ✅ 配属表十三行逐格对账；病名无条件禁；框定语与免责语缺一即拦；虚实补第六档 |
-| **P14** | L5c 曲线层 | 📋 47 条序列 + 扰动序列；**运内结构翻转**有实证样例 |
-| **P15** | L5n 节点层 + Finding 两层 | 📋 穿越区间；中节点走 MAD；summary 的每个数字可在 detail 的 evidence 中找到 |
+| **P14** | L5c 曲线层 | ✅ 55 条序列 + 扰动序列；**运内结构翻转**有实证样例 |
+| **P15** | L5n 节点层 | ✅ 三尺度；中节点走 MAD；五条反向对照 |
+| **P16** | Finding 两层 + 趋吉避凶 + §6.5 入报告与网页 | ✅ summary 的每个数字在构建期即校验可在 detail 的 evidence 中找到 |
 
-P11–P15 的完整算法见 [12-persona-curves-nodes](12-persona-curves-nodes.md)。
+P11–P16 的完整算法见 [12-persona-curves-nodes](12-persona-curves-nodes.md)。
 
 **P2 不通过不进 P3。**排盘错了，后面全部无意义——而排盘的对错是可以 100% 客观验证的，没有任何借口。
 

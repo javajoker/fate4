@@ -12,7 +12,7 @@
 5. 逐步大运、逐年流年的即时盘 —— 以基础盘为固定基准
 6. 逐月的神煞与引动事件 + 运势描述（**不重算权重**）
 7. 逐日的五行冲突提示（**不重算权重**）
-8. 月度采样的**生命曲线**与 2σ **穿越区间**（[12](12-persona-curves-nodes.md) §3–§4）
+8. 月度采样的**生命曲线**与 θσ **穿越区间**（默认 2σ，可配置；[12](12-persona-curves-nodes.md) §3–§4）
 9. 以上汇总为分层报告，每条结论分「一句话」与「完整解释」两层
 
 ## 2. 核心抽象：载体（Carrier）
@@ -99,7 +99,7 @@ InstantChart ← evaluateAt(base, { luck, annual, fleetingMonth })
    ├─ L5d dayView(date)       → DayView             仅五行冲突，**无权重字段**
    ├─ L5e yingqi()            → YingqiEvent[]       规则引擎
    ├─ L5f series()            → Series[]            月度采样的生命曲线
-   ├─ L5g nodes()             → NodeInterval[]      2σ 穿越区间
+   ├─ L5n findNodes()         → NodeSet             θσ 穿越区间（默认 2σ）
    │
    ▼
 L6  buildReport()             → Report

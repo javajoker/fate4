@@ -68,8 +68,9 @@
     6.2  逐年卡片：六柱盘、结构事件、触发的应期规则、按域聚合
     6.3  高张力年份列表（tension 排序）
 
-§6.4 生命曲线 —— 47 条序列 + 扰动序列，月度采样
-§6.5 统计节点 —— 三尺度、2σ 穿越区间、三种形态、神煞作为理由
+§6.4 生命曲线 —— 55 条序列 + 扰动序列，月度采样
+§6.5 统计节点 —— 三尺度、θσ 穿越区间、三种形态、神煞作为理由、两层结论与趋吉避凶
+     （默认关闭，`includeNodes`：按月跑满六十年约 1.3 秒；`subject: other` 时不产出）
 
 §7  当前时段
     7.1  本年
@@ -135,29 +136,49 @@ hedged: "日主{dm}生于{monthBranch}月，同党占 {ratio}，偏向身弱，�
 ```ts
 interface Finding {
   readonly id: string;
-  readonly summary: NarrativeLine;        // 默认显示
+  readonly kind: "node";
+  readonly scale: NodeScale;
+  readonly direction: NodeDirection;      // 吉凶取向，与摘要措辞分开存
+  readonly summary: NarrativeLine;        // 默认显示，同样由模板产出
   readonly detail: {
     readonly narrative: readonly NarrativeLine[];
-    readonly derivation: readonly DerivationStep[];
     readonly evidence: readonly Evidence[];   // 载体 / 事件 / 规则 / 序列 / 节点
-    readonly alternatives: readonly Alternative[];
   };
   readonly confidence: number;
-  readonly hedged: boolean;
+  readonly guidance: readonly Guidance[];  // 趋吉避凶，仅压力向节点有
+}
+
+interface Evidence {
+  readonly label: string;
+  readonly value: number;
+  readonly unit: "sigma" | "value" | "share" | "count" | "year" | "months";
+  readonly ref: string;                   // node:… | shensha:… | luck:… | series:…
 }
 ```
 
-**硬约束**：`summary` 与 `detail` 共用同一组槽位，且
-**`summary` 中出现的每个数字，都必须在 `detail.evidence` 里找得到**（由测试强制）。
+**硬约束**：**`summary` 中出现的每个数字，都必须在 `detail.evidence` 里找得到** ——
+由 `auditFinding` 在**构建期**执行，对不上直接抛，不是事后测试。
 
 没有这条，两层会各说各话：摘要写「财运向好」，展开却是「财星被劫」。
 这类不一致在两层结构里极难被发现，因为读者通常只看一层。
+
+它拦不住形容词层面的失真（那需要语义判断），但拦得住数字层面的，
+而分层报告出问题十有八九正是这一种。两点实现细节：
+
+- `formatEvidence` 是全系统唯一把 `Evidence` 变成串的地方 ——
+  摘要写 `3.5`、展开写 `3.54`，机械比对便认不出它们是同一个数。
+- 取值精度随量级走（`unit: "value"`）：一律一位小数会把同党占比的
+  `0.473` 与 `0.358` 压成 `0.5` 与 `0.4`。
+
+**吉凶取向单独存字段。**摘要措辞随尺度而变（中尺度不引 σ 比值，
+见 [12](12-persona-curves-nodes.md) §4.3.1），拿字符串去判方向早晚会读错。
 
 三个前端的默认行为：
 
 | 载体 | 默认 | 展开 |
 | --- | --- | --- |
 | Web | 只渲染 summary，可点开 | detail 内联展开 |
+| Markdown | summary 一行 | `<details>` 折叠 —— 直接铺开，两层就塌成一层 |
 | CLI | summary | `--detail` |
 | Skill | 模型拿到完整 Finding | **先说 summary，用户追问再说 detail** |
 
