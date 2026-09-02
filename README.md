@@ -92,9 +92,10 @@ L6 报告   汇总为分层报告
 | **P17a** | `astro/moon.ts` 定朔 + `chart/lunar.ts` 农历 | ✅ 完成 —— 11 个春节、10 个闰月逐一对上 |
 | **P17b** | `yijing/` 八卦、六十四卦、八宫世应、京房纳甲、六亲、六神 | ✅ 完成 —— 八宫由规则生成，不转录 |
 | **P18** | `liuyao/` Q0 起卦（三法）+ Q1 装卦 | ✅ 完成 —— 掷钱 4096 种组合全可装 |
-| P19– | Q2–Q6 用神、力量、断论、应期、报告 | 📋 规格已定案，待实现 |
+| **P19** | Q2 用神（32 类占事）+ Q3 力量 + Q4 断论 | ✅ 完成 —— 断论层不出成败字眼 |
+| P20– | Q5 应期区间 + Q6 报告 + 四条新禁令 | 📋 规格已定案，待实现 |
 
-全部 769 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
+全部 791 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
 
 ```bash
 pnpm install && pnpm test && pnpm typecheck

@@ -84,6 +84,16 @@ export interface YaoInfo {
   readonly yuepoNullified: "破而逢动" | null;
   readonly monthPhase: MonthPhase;
   readonly dayRelations: readonly DayRelation[];
+  /**
+   * 静爻逢日辰冲的两种归宿 —— 旺衰不同，结局相反。
+   *
+   * 旺相之爻逢冲为**暗动**：虽静而实动，能生克他爻，只是不显于卦面。
+   * 衰弱之爻逢冲为**冲散**：本就无力，一冲即溃。
+   *
+   * 初稿把两者一并当作「日冲」记入关系，于是暗动之爻既不算动、
+   * 又只被记了一笔「受冲」—— 它对他爻的作用整个丢了。
+   */
+  readonly chongState: "暗动" | "冲散" | null;
   /** 动爻才有。 */
   readonly bian: {
     readonly stem: Stem; readonly branch: Branch; readonly element: Element;
@@ -246,6 +256,10 @@ export function dress(casting: Casting, p: LiuyaoParams): DressedGua {
       yuepo: isPo, yuepoNullified: poNull,
       monthPhase: monthPhaseOf(monthEl, branchElement(branch)),
       dayRelations: rels,
+      chongState: !moving && rels.includes("日冲")
+        ? (monthPhaseOf(monthEl, branchElement(branch)) === "旺"
+          || monthPhaseOf(monthEl, branchElement(branch)) === "相" ? "暗动" : "冲散")
+        : null,
       bian: bianInfo,
     });
   }
