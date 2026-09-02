@@ -98,9 +98,9 @@ L6 报告   汇总为分层报告
 | **P22** | Web 问事页 + CLI `ask`/`daily`/`topics` + Skill | ✅ 完成 —— 一事不二占落地 |
 | **P23** | `liuren/` 六壬 —— 月将、天地盘、四课、十二天将、三传九宗门 | ✅ 完成 —— 十一种课体全覆盖 |
 | **P24** | `qimen/` 奇门时家转盘 —— 定局、地盘、转天盘、八门八神 | ✅ 完成 —— 十八局全覆盖 |
-| P25 | `divination/crossref` 四体系一致与分歧 | 📋 规格已定案，待实现 |
+| **P25** | `divination/crossref` 四体系一致与分歧 + Web 合参页 | ✅ 完成 —— 实测一致 45 / 分歧 66 |
 
-全部 897 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
+全部 920 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
 
 ```bash
 pnpm install && pnpm test && pnpm typecheck
