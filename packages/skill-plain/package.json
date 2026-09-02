@@ -1,0 +1,7 @@
+{
+  "name": "@fate/skill-plain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": { "@fate/cli": "workspace:*" }
+}

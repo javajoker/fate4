@@ -1,0 +1,149 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { buildChart, buildReport, plainCards, type BirthInput } from "@fate/core";
+import { Card } from "./Card";
+import { CITIES, clearBirth, loadBirth, saveBirth } from "./store";
+
+/**
+ * 「我」页 —— 采集出生信息，给出性格、身心、亲近的人、人生轨迹、起伏。
+ *
+ * 采集刻意简单：日期、时间、城市、性别。时辰不知道就明说不知道 ——
+ * **不猜**，并告诉用户缺了它会少掉哪些内容。
+ */
+export default function MePage() {
+  const [birth, setBirth] = useState<BirthInput | null>(null);
+  const [ready, setReady] = useState(false);
+  const [sec, setSec] = useState<string>("性格");
+
+  useEffect(() => { setBirth(loadBirth()); setReady(true); }, []);
+
+  const plain = useMemo(() => {
+    if (birth === null) return null;
+    try {
+      const r = buildReport(buildChart(birth), {
+        includeNodes: true,
+        now: (() => { const d = new Date();
+          return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() }; })(),
+      });
+      return plainCards(r);
+    } catch { return null; }
+  }, [birth]);
+
+  if (!ready) return <p className="m-lede">载入中…</p>;
+  if (birth === null) return <BirthForm onDone={(b) => { saveBirth(b); setBirth(b); }} />;
+  if (plain === null) return <p className="m-lede">算不出来，请检查出生信息。</p>;
+
+  const sections = [...new Set(plain.cards.map((c) => c.section))]
+    .filter((s) => ["性格", "身心", "亲近的人", "人生轨迹", "起伏"].includes(s));
+  const shown = plain.cards.filter((c) => c.section === sec);
+
+  return (
+    <>
+      <h1 className="m-h1">关于你</h1>
+      <p className="m-lede">{plain.framing}</p>
+
+      <div className="m-chips">
+        {sections.map((s) => (
+          <button key={s} className={`m-chip${s === sec ? " on" : ""}`} onClick={() => setSec(s)}>
+            {s}
+          </button>
+        ))}
+      </div>
+
+      {shown.map((c) => <Card key={c.id} card={c} />)}
+
+      <Disclaimer plain={plain.disclaimer} technical={plain.disclaimerTechnical} />
+      <button className="m-btn ghost" onClick={() => { clearBirth(); setBirth(null); }}>
+        清除本机保存的出生信息
+      </button>
+    </>
+  );
+}
+
+/** 免责声明。人话版在前，技术版原文可展开 —— 改写过的东西，得让人看得到原件。 */
+export function Disclaimer({ plain, technical }: { plain: string; technical: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="m-note">
+      {plain}
+      <div style={{ marginTop: 8 }}>
+        <button
+          onClick={() => setOpen(!open)}
+          style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
+            font: "inherit", color: "var(--accent)" }}
+        >
+          {open ? "收起原文" : "看原文"}
+        </button>
+        {open && <p style={{ marginTop: 7 }}>{technical}</p>}
+      </div>
+    </div>
+  );
+}
+
+function BirthForm({ onDone }: { onDone: (b: BirthInput) => void }) {
+  const [date, setDate] = useState("1990-05-12");
+  const [time, setTime] = useState("14:30");
+  const [unknownHour, setUnknownHour] = useState(false);
+  const [city, setCity] = useState(0);
+  const [gender, setGender] = useState<"male" | "female">("male");
+
+  const submit = () => {
+    const [Y, M, D] = date.split("-").map(Number);
+    const [h, mi] = time.split(":").map(Number);
+    const [, tz, lon] = CITIES[city]!;
+    onDone({
+      year: Y!, month: M!, day: D!,
+      hour: unknownHour ? 12 : (h ?? 12), minute: unknownHour ? 0 : (mi ?? 0),
+      gender, timeZone: tz, longitude: lon,
+      ...(unknownHour ? { unknownHour: true } : {}),
+    });
+  };
+
+  return (
+    <>
+      <h1 className="m-h1">先说说你的出生信息</h1>
+      <p className="m-lede">
+        只存在这台设备上，不会上传。出生时间越准，结果越细 ——
+        差一个小时可能就是另一套说法。
+      </p>
+      <div className="m-form">
+        <div className="m-field">
+          <label htmlFor="d">出生日期</label>
+          <input id="d" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div className="m-field">
+          <label htmlFor="t">出生时间</label>
+          <input id="t" type="time" value={time} disabled={unknownHour}
+            onChange={(e) => setTime(e.target.value)} />
+          <label className="inline" style={{ marginTop: 6 }}>
+            <input type="checkbox" checked={unknownHour}
+              onChange={(e) => setUnknownHour(e.target.checked)} />
+            不知道具体时间
+          </label>
+        </div>
+        <div className="m-field">
+          <label htmlFor="c">出生城市</label>
+          <select id="c" value={city} onChange={(e) => setCity(Number(e.target.value))}>
+            {CITIES.map((x, i) => <option key={x[0]} value={i}>{x[0]}</option>)}
+          </select>
+        </div>
+        <div className="m-field">
+          <label htmlFor="g">性别</label>
+          <select id="g" value={gender}
+            onChange={(e) => setGender(e.target.value as "male" | "female")}>
+            <option value="male">男</option>
+            <option value="female">女</option>
+          </select>
+        </div>
+        <button className="m-btn" onClick={submit}>开始</button>
+      </div>
+      {unknownHour && (
+        <p className="m-note">
+          不知道具体时间的话，与「晚年、子女、志向」相关的部分会算不出来，
+          整体也会少掉将近三成的信息。这些地方会直接留白，不会拿别的顶上。
+        </p>
+      )}
+    </>
+  );
+}

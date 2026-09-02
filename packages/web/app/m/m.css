@@ -1,0 +1,64 @@
+/*
+ * 移动版样式。
+ *
+ * 沿用全站的中性色板（globals.css）—— 有序量用单色阶，分类量才用色相，
+ * 全站无红绿吉凶色。这一条在移动版尤其要守：卡片一旦染上红绿，
+ * 「顺/逆」立刻被读成「好/坏」，而顺逆衡量的是结构契合度，不是运气好坏。
+ */
+
+.m-shell { min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); }
+.m-main { flex: 1; padding: 18px 16px calc(72px + env(safe-area-inset-bottom)); max-width: 560px; margin: 0 auto; width: 100%; }
+
+.m-tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.m-tabs a {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 9px 0 8px; text-decoration: none; color: var(--ink-3); font-size: 11px;
+}
+.m-tabs a.on { color: var(--accent); }
+.m-tabs .ic { font-size: 17px; line-height: 1; }
+
+.m-h1 { font-family: var(--serif); font-size: 23px; font-weight: 600; margin: 4px 0 6px; color: var(--ink); }
+.m-lede { font-size: 13px; line-height: 1.65; color: var(--ink-2); margin-bottom: 18px; }
+.m-sec { font-family: var(--serif); font-size: 15px; font-weight: 600; color: var(--ink-2);
+  margin: 22px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+
+.m-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px 15px; margin-bottom: 10px; }
+.m-card h3 { font-family: var(--serif); font-size: 15.5px; font-weight: 600; margin-bottom: 7px; color: var(--ink); }
+.m-card p { font-size: 14px; line-height: 1.75; color: var(--ink); }
+.m-card .dim { color: var(--ink-3); font-size: 12px; line-height: 1.6; }
+
+.m-why { margin-top: 11px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.m-why button { background: none; border: none; padding: 0; cursor: pointer;
+  font-size: 12.5px; color: var(--accent); font-family: inherit; }
+.m-why ul { margin-top: 9px; padding-left: 16px; }
+.m-why li { font-size: 12.5px; line-height: 1.7; color: var(--ink-2); margin-bottom: 6px; }
+
+.m-form { display: flex; flex-direction: column; gap: 13px; }
+.m-field { display: flex; flex-direction: column; gap: 5px; }
+.m-field label { font-size: 12.5px; color: var(--ink-2); }
+/* 复选框不能吃满宽 —— 否则它会把标签挤到下一行去 */
+.m-field label input[type="checkbox"] { width: auto; padding: 0; margin-right: 6px; vertical-align: -2px; }
+.m-field label.inline { display: flex; align-items: center; }
+
+.m-field input, .m-field select {
+  width: 100%; padding: 11px 12px; font-size: 16px; font-family: inherit;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 8px;
+}
+.m-btn { width: 100%; padding: 13px; font-size: 15px; font-family: inherit; font-weight: 600;
+  background: var(--accent); color: var(--bg); border: none; border-radius: 9px; cursor: pointer; }
+.m-btn.ghost { background: var(--surface); color: var(--accent); border: 1px solid var(--line); }
+
+.m-note { font-size: 11.5px; line-height: 1.7; color: var(--ink-3);
+  background: var(--surface-2); border-radius: 8px; padding: 11px 12px; margin: 14px 0; }
+
+.m-chips { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 12px; }
+.m-chip { padding: 6px 12px; font-size: 12.5px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); cursor: pointer; }
+.m-chip.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }

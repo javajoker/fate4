@@ -11,6 +11,16 @@ import { GUARD_RULES, scanText } from "../src/report/guard.js";
 import { toHant, SIMPLIFIED_ONLY } from "../src/report/hant.js";
 import { ELEMENTS, TEN_GODS } from "../src/types/ganzhi.js";
 import type { BirthInput } from "../src/chart/types.js";
+import { castMomentOf } from "../src/liuyao/moment.js";
+import { cast } from "../src/liuyao/cast.js";
+import { dress } from "../src/liuyao/dress.js";
+import { pickYongshen } from "../src/liuyao/yongshen.js";
+import { judge } from "../src/liuyao/judge.js";
+import { buildQuestionReport } from "../src/liuyao/report.js";
+import { loadParams } from "../src/params/load.js";
+import {
+  plainQuestion, YAO_BAND_PLAIN, MOTION_PLAIN, SHIYING_PLAIN,
+} from "../src/plain/question.js";
 
 const CHARTS: readonly BirthInput[] = [
   { year: 1990, month: 5, day: 12, hour: 14, minute: 30,
@@ -265,7 +275,20 @@ describe("分节", () => {
     for (const p of PLAINS) {
       expect(p.framing).toContain("不是对你本人的鉴定");
       expect(p.framing).toContain("可以展开看");
-      expect(p.disclaimer.length).toBeGreaterThan(20);
+    }
+  });
+
+  it("**人话版的免责声明是改写，不是删减** —— 四个要素一个不许少", () => {
+    for (const p of PLAINS) {
+      // 改写声明很容易在「说得通顺些」的名义下弱化它，故把要素写成断言
+      expect(p.disclaimer, "少了「文化研究/自我省思」的定位").toMatch(/文化研究|自我省思/);
+      expect(p.disclaimer, "少了「不具备预测能力」").toContain("不具备预测未来事件的能力");
+      expect(p.disclaimer, "少了「不构成专业建议」").toMatch(/不构成.*建议/);
+      expect(p.disclaimer, "少了「导向持证专业人士」").toContain("持证专业人士");
+      // 且它确实不出术语
+      expect(p.disclaimer).not.toMatch(/命理|八字|四柱|五行|十神/);
+      // 技术版原文仍在，供展开对照
+      expect(p.disclaimerTechnical).toContain("四柱命理");
     }
   });
 });
@@ -284,3 +307,80 @@ function collectAll(r: ReturnType<typeof buildReport>) {
   for (const c of r.years.cards) out.push(...c.narrative);
   return out;
 }
+
+// ═══════════════════════════════════════════════════════════
+
+describe("问事的人话", () => {
+  const P = loadParams({});
+  const moments = [
+    { year: 2026, month: 9, day: 2, hour: 14, minute: 30 },
+    { year: 2026, month: 3, day: 15, hour: 10, minute: 0 },
+    { year: 2025, month: 12, day: 5, hour: 8, minute: 0 },
+  ];
+  const QS = moments.flatMap((m) => {
+    const mo = castMomentOf({ ...m, timeZone: "Asia/Shanghai", longitude: 121.47 });
+    const gua = dress(cast(mo, { method: "time" }, P.liuyao), P.liuyao);
+    return ["wealth.seek", "career.job", "self.fortune", "health.body"].map((t) =>
+      plainQuestion(buildQuestionReport(judge(gua, pickYongshen(gua, t), P.liuyao), P)));
+  });
+
+  it("**结果里一个术语都不出** —— 整页平常话，忽然冒出「用神妻财」最刺眼", () => {
+    const JARGON = ["用神", "世爻", "应爻", "六亲", "妻财", "官鬼", "父母爻",
+      "子孙", "兄弟爻", "旬空", "月破", "暗动", "六冲", "六合", "卦"];
+    for (const q of QS) {
+      for (const c of q.cards) {
+        for (const w of JARGON) {
+          // 「卦」在人话里是允许的（「这一卦」是常识词），其余一律不出
+          if (w === "卦") continue;
+          expect(c.body.includes(w), `${c.id} 漏出术语「${w}」：${c.body}`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it("五档分量、四种动静、五种世应关系都有对应的话", () => {
+    for (const b of ["有力", "偏有力", "平", "偏无力", "无力"]) {
+      expect(YAO_BAND_PLAIN[b]?.length, b).toBeGreaterThan(10);
+    }
+    for (const m of ["moving", "still", "hidden", "absent"]) {
+      expect(MOTION_PLAIN[m]?.length, m).toBeGreaterThan(8);
+    }
+    for (const s of ["世生应", "应生世", "世克应", "应克世", "比和"]) {
+      expect(SHIYING_PLAIN[s]?.length, s).toBeGreaterThan(8);
+    }
+  });
+
+  it("**每张卡都挂着技术原文** —— 人话是概括，原件必须看得到", () => {
+    for (const q of QS) {
+      for (const c of q.cards) {
+        expect(c.evidence.length, `${c.id} 没有依据`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("**健康类不出时段，且说明为什么不出**", () => {
+    const health = QS.filter((q) =>
+      q.cards.some((c) => c.body.includes("这一类不给时段")));
+    expect(health.length, "健康类竟给了时段").toBe(moments.length);
+    for (const q of health) {
+      const w = q.cards.find((c) => c.id === "q.window")!;
+      expect(w.body).toContain("给不出");
+      expect(w.body).not.toMatch(/\d{4} 年的/);
+    }
+  });
+
+  it("全部问事人话过人话守卫，零命中", () => {
+    for (const q of QS) {
+      const text = q.cards.map((c) => `${c.title}。${c.body}`).join("\n")
+        + `\n${q.framing}\n${q.disclaimer}`;
+      expect(scanPlain(text, "plain.q").map((v) => `${v.ruleId}: ${v.match}`)).toEqual([]);
+    }
+  });
+
+  it("框定语说明了「结果属于时刻，不属于人」", () => {
+    for (const q of QS) {
+      expect(q.framing).toContain("属于那个时刻，不属于你");
+      expect(q.framing).toContain("可以展开看");
+    }
+  });
+});

@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildChart, buildQuestionReport, buildReport, cast, castMomentOf, chartOptionsOf,
   dailyOutlook, dress, judge, loadParams, pickYongshen, renderDailyMarkdown,
-  renderCrossMarkdown, renderMarkdown, renderQuestionMarkdown, crossReading, scanText,
+  plainCards, renderCrossMarkdown, renderMarkdown, renderQuestionMarkdown,
+  crossReading, scanPlain, scanText,
   formatViolations, type BirthInput,
 } from "@fate/core";
 import { run, guardOutput } from "../src/index.js";
@@ -613,5 +614,65 @@ describe("fate cross —— 四家合参", () => {
     const tree = JSON.parse(j.out);
     expect(tree.systems).toBe(4);
     expect(new Set(tree.claims.map((c: { system: string }) => c.system)).size).toBe(4);
+  });
+});
+
+describe("fate plain —— 人话版", () => {
+  const files = withChart();
+
+  it("分节可选，未知分节给出可选项", () => {
+    const r = cli(["plain", "--chart", "c.json", "--section", "性格"], files);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("## 性格");
+    expect(r.out).not.toContain("## 人生轨迹");
+    const bad = cli(["plain", "--chart", "c.json", "--section", "没这节"], files);
+    expect(bad.code).toBe(2);
+    expect(bad.err).toContain("可选");
+  });
+
+  it("**每张卡都带依据，且依据是技术原文** —— 命令行没有「点开」这个动作", () => {
+    const r = cli(["plain", "--chart", "c.json"], files);
+    expect(r.out).toContain("<details><summary>看依据</summary>");
+    expect(r.out).toContain("〔推演〕");
+    // 依据里该出现术语 —— 那正是它的本分
+    expect(r.out).toMatch(/〔推演〕[^\n]*(?:日主|用神|通根|十神)/);
+  });
+
+  it("**人话正文里一个术语都不出**", () => {
+    const r = cli(["plain", "--chart", "c.json"], files);
+    // 只看正文：去掉 details 块
+    const body = r.out.replace(/<details>[\s\S]*?<\/details>/g, "")
+      .replace(/_技术版原文：[^\n]*/g, "");
+    for (const w of ["用神", "十神", "日主", "通根", "大运", "流年", "八字", "命理"]) {
+      expect(body.includes(w), `人话正文漏出术语「${w}」`).toBe(false);
+    }
+  });
+
+  it("**人话版走它自己的守卫档** —— 技术层禁「你」，人话层要用「你」", () => {
+    const r = cli(["plain", "--chart", "c.json"], files);
+    expect(r.code, r.err).toBe(0);
+    expect(r.out).toContain("你");
+    // 同一段文字若按技术层扫，必被第二人称拦下 —— 两档确实不同
+    expect(scanText(r.out, "t").some((v) => v.ruleId === "zh.secondPerson.address")).toBe(true);
+    // 而按人话档扫是干净的
+    expect(scanPlain(r.out, "t")).toEqual([]);
+  });
+
+  it("免责声明给人话版，并附技术版原文", () => {
+    const r = cli(["plain", "--chart", "c.json"], files);
+    expect(r.out).toContain("不具备预测未来事件的能力");
+    expect(r.out).toContain("持证专业人士");
+    expect(r.out).toContain("技术版原文：");
+  });
+
+  it("**与内核直调逐字节相同**", () => {
+    const r = cli(["plain", "--chart", "c.json", "--json"], files);
+    const direct = plainCards(buildReport(buildChart(EXAMPLE), {
+      params: loadParams({}), includeNodes: true,
+      now: { year: 2026, month: 9, day: 1 },
+    }));
+    const tree = JSON.parse(r.out);
+    expect(tree.cards.map((c: { id: string }) => c.id))
+      .toEqual(direct.cards.map((c) => c.id));
   });
 });

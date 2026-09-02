@@ -7,7 +7,8 @@
 | `packages/core` | 纯 TypeScript、零运行时依赖的推演内核。排盘、配重、传导、断论、神煞、应期全在这里。可单测、可被任何宿主调用。 |
 | `packages/web` | Next.js（App Router）Web 应用。命盘、大运、流年、流月、流日与报告的可视化，另有独立的六爻问事页。 |
 | `packages/cli` | 命令行。Skill 的执行后端，也是回归测试的入口。零第三方依赖（除 YAML 解析）。 |
-| `packages/skill` | Claude Agent Skill。通过 CLI 调用 `core`，拿到结构化 JSON 后由模型组织叙述。 |
+| `packages/skill` | Claude Agent Skill（术语版）。通过 CLI 调用 `core`，拿到结构化 JSON 后由模型组织叙述。 |
+| `packages/skill-plain` | Claude Agent Skill（平常话版）。同一台引擎，转述而非翻译 —— 人话由引擎的定值映射产出并过人话专用守卫。 |
 
 Web 应用全部计算在浏览器内完成，**生辰数据不出本机**：记录存 IndexedDB，命盘标识与分享链接走 URL 片段（`#` 之后）—— 片段不随请求发往服务器，也不进任何访问日志。故整站可静态导出，无服务端路由。
 
@@ -80,7 +81,8 @@ Web 应用全部计算在浏览器内完成，**生辰数据不出本机**：记
 | [10-architecture](docs/10-architecture.md) | 应用方案：模块划分、API、UI、Agent Skill |
 | [11-validation](docs/11-validation.md) | 验证方案、测试向量、待校准清单 |
 | [12-persona-curves-nodes](docs/12-persona-curves-nodes.md) | L4p 人格层、L5c 生命曲线、L5n 统计节点、两层结论 |
-| [13-liuyao](docs/13-liuyao.md) | **第二台引擎** —— 即时问事与当日运程：六爻按时起卦，六壬奇门参照（规格草案） |
+| [13-liuyao](docs/13-liuyao.md) | **第二至四台引擎** —— 即时问事与当日运程：六爻、六壬、奇门，四家合参 |
+| [14-plain](docs/14-plain.md) | **人话层与移动版** —— 去掉术语恰恰去掉了天然的对冲 |
 | [pipeline.html](docs/pipeline.html) | **交互页** —— 管线总览 + L1 配重与大运摆动系数的实时校准（[在线版](https://claude.ai/code/artifact/f1eeac0e-1aa2-4242-b12f-4e31338e5bd7)） |
 
 ---
@@ -120,8 +122,11 @@ Web 应用全部计算在浏览器内完成，**生辰数据不出本机**：记
 | **P23** | `liuren/` 六壬 —— 月将、天地盘、四课、十二天将、三传九宗门 | ✅ 完成 —— 十一种课体全覆盖 |
 | **P24** | `qimen/` 奇门时家转盘 —— 定局、地盘、转天盘、八门八神 | ✅ 完成 —— 十八局全覆盖 |
 | **P25** | `divination/crossref` 四体系一致与分歧 + Web 合参页 | ✅ 完成 —— 实测一致 45 / 分歧 66 |
+| **P26** | `plain/` 人话层 —— 判定枚举到平常话 + 六条人话专有禁令 | ✅ 完成 |
+| **P27** | 移动版 `/m` —— 我 · 时间 · 问事 · 关于 | ✅ 完成 —— 四个路由静态导出 |
+| **P28** | `fate plain` + `@fate/skill-plain` | ✅ 完成 |
 
-全部 920 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
+全部 955 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
 
 ```bash
 pnpm install && pnpm test && pnpm typecheck

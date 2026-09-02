@@ -24,7 +24,7 @@ import { ELEMENTS } from "../types/ganzhi.js";
 import {
   AXIS_PLAIN, DIRECTION_PLAIN, ELEMENT_PLAIN, ELEMENT_STATE_PLAIN,
   ELEMENT_BODY_PLAIN, GOD_PLAIN, GOD_RELATION_PLAIN, QUADRANT_PLAIN, STRENGTH_PLAIN,
-  confidencePlain, favorPlain, PLAIN_FRAMING,
+  confidencePlain, favorPlain, PLAIN_DISCLAIMER, PLAIN_FRAMING,
 } from "./vocab.js";
 
 export type PlainSection =
@@ -44,8 +44,10 @@ export interface PlainReport {
   readonly cards: readonly PlainCard[];
   /** 每一页都要挂的框定语。 */
   readonly framing: string;
-  /** 报告自身的免责声明，原文照搬。 */
+  /** 人话版的免责声明 —— 技术版的改写，四个要素一个不少。 */
   readonly disclaimer: string;
+  /** 技术版的免责声明原文，供「看依据」一并展示。 */
+  readonly disclaimerTechnical: string;
 }
 
 const card = (
@@ -193,7 +195,8 @@ export function plainCards(r: Report): PlainReport {
   return {
     cards: Object.freeze(cards),
     framing: PLAIN_FRAMING,
-    disclaimer: r.disclaimerBottom,
+    disclaimer: PLAIN_DISCLAIMER,
+    disclaimerTechnical: r.disclaimerBottom,
   };
 }
 

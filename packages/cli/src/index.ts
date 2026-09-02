@@ -20,7 +20,7 @@ import {
   buildQuestionReport, buildReport, cast, castMomentOf, dailyOutlook, dayView,
   disclaimerText, dress, evaluate, formatViolations, judge, luckTimeline,
   monthView, MONTH_BRANCH_ORDER, pickYongshen, renderDailyMarkdown, renderMarkdown,
-  renderCrossMarkdown, renderQuestionMarkdown, crossReading,
+  plainCards, scanPlain, renderCrossMarkdown, renderQuestionMarkdown, crossReading,
   scanText, TOPICS, TOPIC_BY_ID, yearView,
   loadParams,
   type BirthInput, type CastInput, type CoinThrow, type Liuqin, type PartialParams,
@@ -64,6 +64,10 @@ const USAGE = `fate —— 四柱推演命令行
   fate cross  (--city 城市 | --tz 时区 --lon 经度) [--at "YYYY-MM-DD HH:MM"]
               [--chart c.json] [--topic 占事id] [--locale …] [--json]
               四家合参：四柱流日 ∥ 六爻 ∥ 六壬 ∥ 奇门。不给 --chart 则三家。
+
+  fate plain  --chart c.json [--section 性格|身心|亲近的人|人生轨迹|起伏|今年|本月|今天]
+              [--json]
+              人话版：把判定换成平常话，每条附技术原文作依据。
 
   fate topics             列出 32 类占事
   fate cities             列出内置城市表
@@ -458,6 +462,54 @@ function cmdCross(argv: readonly string[], io: Io): void {
   emit(io, renderCrossMarkdown(r, locale), false, v["out"] as string | undefined);
 }
 
+/**
+ * 人话版。
+ *
+ * 输出刻意分成「一句人话 + 缩进的依据」两层，而不是只出人话 ——
+ * 命令行没有「点开」这个动作，若只出人话，那层来历就等于不存在了。
+ */
+function cmdPlain(argv: readonly string[], io: Io): void {
+  const v = parse(argv, { section: { type: "string" }, ...CHART_REF });
+  const { chart, params } = loadChart(io, v);
+  const d = io.today();
+  const report = buildReport(chart, { params, includeNodes: true, now: d });
+  const p = plainCards(report);
+
+  if (v["json"] === true) {
+    emit(io, p as unknown as Record<string, unknown>, true, v["out"] as string | undefined);
+    return;
+  }
+  const want = typeof v["section"] === "string" ? v["section"] : null;
+  const cards = want === null ? p.cards : p.cards.filter((c) => c.section === want);
+  if (cards.length === 0 && want !== null) {
+    throw new UsageError(`没有「${want}」这一节。可选：`
+      + [...new Set(p.cards.map((c) => c.section))].join(" / "));
+  }
+
+  const o: string[] = ["# 人话版", "", `> ${p.framing}`, ""];
+  let sec = "";
+  for (const c of cards) {
+    if (c.section !== sec) { sec = c.section; o.push(`## ${sec}`, ""); }
+    o.push(`### ${c.title}`, "", c.body, "");
+    if (c.evidence.length > 0) {
+      // 每条依据带「推演」二字：既是给读者的标示，也让人话守卫的框定语
+      // 落在同一段里 —— 依据块引的是技术原文，含术语是它的本分，
+      // 但守卫按段判定，看不到上一行的 <summary>。
+      o.push("<details><summary>看依据</summary>", "");
+      for (const e of c.evidence) o.push(`- 〔推演〕${e.text}`);
+      o.push("", "</details>", "");
+    }
+  }
+  o.push("---", "", p.disclaimer, "", `_技术版原文：${p.disclaimerTechnical}_`, "");
+  emitPlain(io, o.join("\n"), v["out"] as string | undefined);
+}
+
+/** 人话版的输出走 `plain` 档。 */
+function emitPlain(io: Io, text: string, out?: string): void {
+  if (out === undefined) io.out(text, "plain");
+  else io.writeFile(out, `${text}\n`);
+}
+
 /** `--at "YYYY-MM-DD HH:MM"`。问事必须精确到分 —— 时辰由真太阳时定。 */
 function parseAt(raw: string): {
   year: number; month: number; day: number; hour: number; minute: number;
@@ -503,7 +555,7 @@ function castInputOf(
 const COMMANDS: Readonly<Record<string, (a: readonly string[], io: Io) => void>> = {
   chart: cmdChart, luck: cmdLuck, year: cmdYear,
   month: cmdMonth, day: cmdDay, report: cmdReport, cities: cmdCities,
-  ask: cmdAsk, daily: cmdDaily, topics: cmdTopics, cross: cmdCross,
+  ask: cmdAsk, daily: cmdDaily, topics: cmdTopics, cross: cmdCross, plain: cmdPlain,
 };
 
 export function run(argv: readonly string[], io: Io): number {
@@ -547,15 +599,19 @@ export function run(argv: readonly string[], io: Io): number {
  * 结果就放在同一份 JSON 的 `guard.violations` 里，消费方读得到。
  */
 export function guardOutput(
-  text: string, kind: "narrative" | "data" = "narrative",
+  text: string, kind: "narrative" | "data" | "plain" = "narrative",
 ): { clean: boolean; report: string } {
-  const vs = scanText(text, "cli.stdout", kind === "data" ? { kind: "vocabulary" } : {});
+  // 人话版走它自己的规则集：放开第二人称，另加六条更硬的。
+  // 用技术层的规则扫人话，会把每一个「你」都拦下来。
+  const vs = kind === "plain"
+    ? scanPlain(text, "cli.stdout")
+    : scanText(text, "cli.stdout", kind === "data" ? { kind: "vocabulary" } : {});
   return { clean: vs.length === 0, report: formatViolations(vs) };
 }
 
 export async function main(argv: readonly string[]): Promise<number> {
   const buf: string[] = [];
-  let kind: "narrative" | "data" = "narrative";
+  let kind: "narrative" | "data" | "plain" = "narrative";
   const io: Io = {
     out: (s, k) => { buf.push(s); if (k !== undefined) kind = k; },
     err: (s) => process.stderr.write(`${s}\n`),

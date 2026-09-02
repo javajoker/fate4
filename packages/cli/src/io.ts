@@ -10,10 +10,15 @@ export interface Io {
    * 写一段输出。
    *
    * `kind` 说的是**这段文本是什么**，不是它长什么样：
-   * `narrative` 是给人读的句子，`data` 是结构化转储（JSON）。
-   * 措辞守卫据此选判定档 —— 见 `guardOutput`。
+   * `narrative` 是给人读的句子，`data` 是结构化转储（JSON），
+   * `plain` 是人话版。三者各走各的守卫档 —— 见 `guardOutput`。
+   *
+   * 人话版单立一档，是因为它**放开第二人称却另加六条更硬的**：
+   * 技术层禁「你」，人话层要用「你」，但同时禁方位属相、禁适配判断、禁祈使句。
+   * 拿技术层的规则去扫人话，会把每一个「你」都拦下来；
+   * 拿人话层的规则去扫技术叙述，则会漏掉那条第二人称的红线。
    */
-  readonly out: (s: string, kind?: "narrative" | "data") => void;
+  readonly out: (s: string, kind?: "narrative" | "data" | "plain") => void;
   readonly err: (s: string) => void;
   readonly readFile: (p: string) => string;
   readonly writeFile: (p: string, s: string) => void;
