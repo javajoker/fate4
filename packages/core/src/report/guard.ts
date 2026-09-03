@@ -212,7 +212,11 @@ const ZH_HANS: readonly GuardRule[] = [
     id: "zh.body.framing",
     locale: "zh-Hans", category: "medical", mode: "requireContext",
     domain: "paragraph",
-    pattern: /(?:肝|胆|小肠|脾|胃|肺|大肠|肾|膀胱)|在窍为|在体为|在志为|在气为|其华在/g,
+    // ⚠️「胆」在中文里绝大多数时候不是脏腑：大胆、壮胆、丧胆、胆识、胆怯、
+    // 胆战心惊。实测 448 条爻辞白话，本条命中三处全是「大胆」「闻风丧胆」——
+    // 而人话层「你可以更大胆一些」这种句子迟早会自己撞上来。
+    // 故「胆」一字须排除这些定型搭配；其余脏腑名歧义小，照旧。
+    pattern: /(?:肝|(?<![大壮丧斗尝放])胆(?![量识怯战敢子小大寒])|小肠|脾|胃|肺|大肠|肾|膀胱)|在窍为|在体为|在志为|在气为|其华在/g,
     // 全表唯一要求**两个条件同时成立**的一条：既要有传统框定，又要有免责导向。
     // 脏腑是所有输出里最容易被当成医嘱的一节，只框定不免责、或只免责不框定，
     // 都放行不得。框定语常在段首、免责语在段尾，故判定域必须是段。
@@ -269,7 +273,8 @@ const ZH_HANS: readonly GuardRule[] = [
     id: "zh.liuyao.outcomeVerb",
     locale: "zh-Hans", category: "prediction", mode: "forbid",
     pattern: /可成|不成|难成|必得|必失|立至|即至|无妨|有望|指日可待|十有八九/g,
-    allow: [/不成立/, /不成文/],
+    // 「不成熟」是「时机尚不成熟」的不成熟，不是「事不成」。
+    allow: [/不成立/, /不成文/, /不成熟/, /不成形/],
     why: "成败词是六爻特有的结果断言，不在通用情态表里。",
     fix: "只描述用神的力量与生克，成败留给读者。",
   },
@@ -372,8 +377,12 @@ export function biscript(re: RegExp): RegExp {
  *
  * 主模式取**纯繁体**（简体那条由 ZH_HANS 自己负责，双写会把同一处报两遍）；
  * `context` 的框定语与 `allow` 的豁免窗取简繁双写 —— 用哪种写法都该算数。
+ *
+ * 导出是为了让 `plain/guard.ts` 复用同一份派生逻辑。那边曾把这段照抄一遍，
+ * 于是两处慢慢长歪：本文件这份后来补了 `biscript`，那份没有。
+ * 凡是「同一件事写两遍」的地方，迟早只改一处。
  */
-function toHantRule(r: GuardRule): GuardRule {
+export function toHantRule(r: GuardRule): GuardRule {
   return {
     ...r,
     id: r.id.replace(/^zh\./, "zht."),

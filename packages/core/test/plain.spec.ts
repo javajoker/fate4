@@ -21,7 +21,7 @@ import { judge } from "../src/liuyao/judge.js";
 import { buildQuestionReport } from "../src/liuyao/report.js";
 import { loadParams } from "../src/params/load.js";
 import {
-  plainQuestion, YAO_BAND_PLAIN, MOTION_PLAIN, SHIYING_PLAIN,
+  plainQuestion, YAO_BAND_PLAIN, MOTION_PLAIN, SHIYING_PLAIN, GUA_FLAG_PLAIN,
 } from "../src/plain/question.js";
 
 const CHARTS: readonly BirthInput[] = [
@@ -350,6 +350,49 @@ describe("问事的人话", () => {
     for (const s of ["世生应", "应生世", "世克应", "应克世", "比和"]) {
       expect(SHIYING_PLAIN[s]?.length, s).toBeGreaterThan(8);
     }
+  });
+
+  it("**词表里的每一条都过守卫** —— 不能只查它非空", () => {
+    // 上一条只查了「有这么一句话，且够长」。`MOTION_PLAIN.absent` 恰好是
+    // 一句违规的话（末尾「不是事情办不成」撞上 `zh.liuyao.outcomeVerb`），
+    // 而它只在用神伏藏时才出现 —— 固定那几张盘一次都没走到，于是躺了很久。
+    // 词表是静态的，就该穷举扫，不该指望抽样把它走遍。
+    const TABLES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+      YAO_BAND_PLAIN, MOTION_PLAIN, SHIYING_PLAIN, GUA_FLAG_PLAIN,
+    };
+    for (const [name, t] of Object.entries(TABLES)) {
+      for (const [k, v] of Object.entries(t)) {
+        expect(scanPlain(v, `${name}.${k}`), `${name}.${k}：${v}`).toEqual([]);
+        expect(scanPlain(toHant(v), `${name}.${k}.hant`), `${name}.${k} 繁体`).toEqual([]);
+      }
+    }
+  });
+
+  it("**四种动静都真的走得到** —— 覆盖靠遍历，不靠碰运气", () => {
+    // 掷钱法能掷出静卦与伏神，按时法不能。上面那组固定盘走不到 absent，
+    // 正是这个原因。
+    const CP = loadParams({ liuyao: { castMethod: "coin" } });
+    const seen = new Set<string>();
+    const mo = castMomentOf({
+      year: 2026, month: 9, day: 2, hour: 14, minute: 30,
+      timeZone: "Asia/Shanghai", longitude: 121.47,
+    });
+    for (let n = 0; n < 4096 && seen.size < 4; n += 7) {
+      const throws = Array.from({ length: 6 }, (_, i) => ((n >> (i * 2)) & 3));
+      const g = dress(cast(mo, { method: "coin", throws: throws as never }, CP.liuyao), CP.liuyao);
+      for (const topic of ["wealth.seek", "career.job", "self.fortune"]) {
+        const q = plainQuestion(buildQuestionReport(
+          judge(g, pickYongshen(g, topic), CP.liuyao), CP));
+        for (const c of q.cards) {
+          for (const [k, v] of Object.entries(MOTION_PLAIN)) {
+            if (c.body.startsWith(v.slice(0, 12))) seen.add(k);
+          }
+          expect(scanPlain(c.body, c.id), `${c.id}：${c.body}`).toEqual([]);
+        }
+      }
+    }
+    expect([...seen].sort(), "有档位从未出现过 —— 它的措辞等于没被测过")
+      .toEqual(["absent", "hidden", "moving", "still"]);
   });
 
   it("**每张卡都挂着技术原文** —— 人话是概括，原件必须看得到", () => {

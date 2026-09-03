@@ -14,8 +14,9 @@
  * 技术层照旧禁「你」，人话层走 {@link scanPlain}。
  */
 
-import { biscript, GUARD_RULES, type GuardRule, type GuardViolation } from "../report/guard.js";
-import { toHant } from "../report/hant.js";
+import {
+  ALL_GUARD_RULES, toHantRule, type GuardRule, type GuardViolation,
+} from "../report/guard.js";
 
 const PLAIN_ONLY: readonly GuardRule[] = [
   {
@@ -73,33 +74,33 @@ const PLAIN_ONLY: readonly GuardRule[] = [
   },
 ];
 
-/** 人话层的规则：技术层的全部，减去「禁第二人称」，加上本模块的六条。 */
+/**
+ * 人话层的规则：技术层的**全部语言**，减去「禁第二人称」，加上本模块的六条。
+ *
+ * ## 这里曾漏掉繁体的技术规则
+ *
+ * 初稿取的是 `GUARD_RULES["zh-Hans"]`，只有简体那一半。于是繁体人话输出
+ * 实际只受本模块六条派生规则的约束 —— 预言、医疗、财务、六爻成败词
+ * 一条都不管。用繁体语料实测：同一批文本简体命中 51 处、繁体命中 1 处。
+ * 那 50 处的差额不是繁体写得更干净，是**根本没人查**。
+ *
+ * 改取 `ALL_GUARD_RULES`（简、繁、英三份），并由测试断言简繁一一对应。
+ * 「人话层比技术层更严」这句话，得对每一种字形都成立才算数。
+ */
 export const PLAIN_RULES: readonly GuardRule[] = Object.freeze([
-  ...GUARD_RULES["zh-Hans"].filter((r) => r.category !== "secondPerson"),
+  ...ALL_GUARD_RULES.filter((r) => r.category !== "secondPerson"),
   ...PLAIN_ONLY,
-  // 繁体由简体派生 —— 与 report/guard.ts 同一条思路。
-  //
-  // ⚠️ `context` 必须**简繁双写**，不能只转成繁体。触发词多为简繁同形
-  // （五行、命理、八字），框定语却不同形 —— 只转繁体的话，繁体规则会在
-  // 简体正文上必然误报「缺框定语」。这个 bug 在 report/guard.ts 修过一次，
-  // 此处手写派生时又犯了一遍，故改为复用那边的 `biscript`。
-  ...PLAIN_ONLY.map((r) => ({
-    ...r,
-    id: r.id.replace(/^zh\./, "zht."),
-    locale: "zh-Hant" as const,
-    pattern: new RegExp(toHant(r.pattern.source), r.pattern.flags),
-    why: toHant(r.why),
-    fix: toHant(r.fix),
-    ...(r.context === undefined ? {} : { context: biscript(r.context) }),
-    ...(r.allow === undefined ? {} : { allow: r.allow.map(biscript) }),
-  })),
+  // 繁体派生复用 report/guard.ts 的 `toHantRule` —— 此处曾照抄一份，
+  // 而那份没有跟上对面后来补的 `biscript`。同一件事不写第二遍。
+  ...PLAIN_ONLY.map(toHantRule),
 ]);
 
 /**
  * 扫描一段人话。
  *
  * 与 `scanText` 的差别只有两处：放开第二人称，另加六条。
- * 其余（预言、医疗、财务、法律、神煞断语、统计措辞、六爻成败词）**一条不减**。
+ * 其余（预言、医疗、财务、法律、神煞断语、统计措辞、六爻成败词）**一条不减**，
+ * 且与 `scanText` 一样跑全部语言 —— 中文人话里混进一句英文断言同样要拦。
  */
 export const scanPlain = (text: string, where: string): GuardViolation[] =>
   scanWith(PLAIN_RULES, text, where);

@@ -166,6 +166,14 @@ export default function AskPage() {
           <div className="m-sec">结果</div>
           <p className="m-lede">{plainQuestion(out.report).framing}</p>
           {plainQuestion(out.report).cards.map((c) => <Card key={c.id} card={c} />)}
+
+          <div className="m-sec">说的是什么事</div>
+          <p className="m-lede">
+            上面几条说的是「这件事在结果里的分量」。下面几条说的是「说的是什么事」——
+            它们来自《周易》的爻辞和它的传统转述，是引来的原话，一个字没改。
+            两路各说各的，不互相印证。
+          </p>
+          {plainQuestion(out.report).yaoci.map((c) => <Card key={c.id} card={c} />)}
           <div className="m-card">
             <div className="m-why" style={{ marginTop: 0, paddingTop: 0, borderTop: "none" }}>
               <button onClick={() => setWhy(!why)}>

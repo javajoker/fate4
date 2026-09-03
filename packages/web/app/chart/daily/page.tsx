@@ -118,6 +118,38 @@ export default function DailyPage() {
           </div>
 
           <div className="card">
+            <h3>指事</h3>
+            <p className="dim">
+              爻辞一路的说法 —— 引文。与上面的纳甲断法各说各的，不互相印证。
+            </p>
+            <p>
+              {o.liuyao.yaoci.gua.ben.name}：{o.liuyao.yaoci.gua.ben.classic.text}
+              {o.liuyao.yaoci.gua.bian !== null && (
+                <>　→　{o.liuyao.yaoci.gua.bian.name}：{o.liuyao.yaoci.gua.bian.classic.text}</>
+              )}
+            </p>
+            <table>
+              <thead><tr><th>爻</th><th>位</th><th>爻辞</th><th>指事</th></tr></thead>
+              <tbody>
+                {o.liuyao.yaoci.picks.flatMap((pk) => [
+                  <tr key={`${pk.pos}-b`}>
+                    <td>{pk.pos}</td><td>{pk.role}</td>
+                    <td>{pk.ben.classic.text}</td>
+                    <td>{pk.ben.gist?.text ?? <span className="dim">—</span>}</td>
+                  </tr>,
+                  ...(pk.bian === null ? [] : [
+                    <tr key={`${pk.pos}-v`}>
+                      <td>{pk.pos}</td><td className="dim">变出</td>
+                      <td>{pk.bian.classic.text}</td>
+                      <td>{pk.bian.gist?.text ?? <span className="dim">—</span>}</td>
+                    </tr>,
+                  ]),
+                ])}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="card">
             <h3>叙述</h3>
             <ul>{dailyNarrative(o).map((l, i) => <li key={i}>{l.text}</li>)}</ul>
           </div>

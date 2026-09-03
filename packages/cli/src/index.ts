@@ -20,7 +20,8 @@ import {
   buildQuestionReport, buildReport, cast, castMomentOf, dailyOutlook, dayView,
   disclaimerText, dress, evaluate, formatViolations, judge, luckTimeline,
   monthView, MONTH_BRANCH_ORDER, pickYongshen, renderDailyMarkdown, renderMarkdown,
-  plainCards, scanPlain, renderCrossMarkdown, renderQuestionMarkdown, crossReading,
+  plainCards, plainQuestion, scanPlain, renderCrossMarkdown, renderQuestionMarkdown, crossReading,
+  type PlainCard,
   scanText, TOPICS, TOPIC_BY_ID, yearView,
   loadParams,
   type BirthInput, type CastInput, type CoinThrow, type Liuqin, type PartialParams,
@@ -349,7 +350,7 @@ function cmdAsk(argv: readonly string[], io: Io): void {
     at: { type: "string" }, method: { type: "string" },
     number: { type: "string" }, number2: { type: "string" },
     coins: { type: "string" }, journal: { type: "string" },
-    locale: { type: "string" },
+    locale: { type: "string" }, plain: { type: "boolean" },
     tz: { type: "string" }, lon: { type: "string" }, city: { type: "string" },
     ...COMMON,
   });
@@ -415,7 +416,41 @@ function cmdAsk(argv: readonly string[], io: Io): void {
     emit(io, report as unknown as Record<string, unknown>, true, v["out"] as string | undefined);
     return;
   }
+  if (v["plain"] === true) {
+    emitPlain(io, renderPlainQuestion(plainQuestion(report)), v["out"] as string | undefined);
+    return;
+  }
   emit(io, renderQuestionMarkdown(report), false, v["out"] as string | undefined);
+}
+
+/**
+ * 问事的人话版。
+ *
+ * 与 `cmdPlain`（四柱人话版）同一套排法，且**指事单列一节** ——
+ * 上面几节是本引擎的话，指事那一节是引来的原话，两者混排读者分不清谁在说。
+ */
+function renderPlainQuestion(p: ReturnType<typeof plainQuestion>): string {
+  const o: string[] = ["# 问事・人话版", "", `> ${p.framing}`, ""];
+  const block = (cards: readonly PlainCard[]) => {
+    for (const c of cards) {
+      o.push(`### ${c.title}`, "", c.body, "");
+      if (c.evidence.length > 0) {
+        o.push("<details><summary>看依据</summary>", "");
+        for (const e of c.evidence) o.push(`- 〔推演〕${e.text}`);
+        o.push("", "</details>", "");
+      }
+    }
+  };
+  o.push("## 这件事在卦里的分量", "");
+  block(p.cards);
+  if (p.yaoci.length > 0) {
+    o.push("## 说的是什么事", "",
+      "以下为《周易》爻辞及其传统转述的**引文**，原样端出，一个字未改。"
+      + "与上一节各说各的，不互相印证。", "");
+    block(p.yaoci);
+  }
+  o.push("---", "", p.disclaimer, "", `_技术版原文：${p.disclaimerTechnical}_`, "");
+  return o.join("\n");
 }
 
 function cmdDaily(argv: readonly string[], io: Io): void {

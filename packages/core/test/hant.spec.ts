@@ -8,12 +8,14 @@ import { buildReport, collectReportText } from "../src/report/assemble.js";
 import { renderMarkdown } from "../src/report/markdown.js";
 import { NEIJING } from "../src/conclude/neijing.js";
 import { GUARD_RULES, scanText } from "../src/report/guard.js";
+import { PLAIN_RULES, scanPlain } from "../src/plain/guard.js";
 import { castMomentOf } from "../src/liuyao/moment.js";
 import { cast, type CoinThrow } from "../src/liuyao/cast.js";
 import { dress } from "../src/liuyao/dress.js";
 import { pickYongshen } from "../src/liuyao/yongshen.js";
 import { judge } from "../src/liuyao/judge.js";
 import { buildQuestionReport, collectQuestionText } from "../src/liuyao/report.js";
+import { QUOTE_PREFIX } from "../src/liuyao/yaoci.js";
 import { TOPICS } from "../src/liuyao/topics.js";
 import { HEXAGRAMS } from "../src/yijing/hexagrams.js";
 import { TRIGRAMS } from "../src/yijing/trigrams.js";
@@ -66,7 +68,12 @@ const liuyaoCorpus = (() => {
       for (const topic of TOPICS) {
         const j = judge(g, pickYongshen(g, topic.id, "父母"), P);
         const r = buildQuestionReport(j, DEFAULT_PARAMS);
-        out.push(...collectQuestionText(r).map((c) => c.text));
+        // ⚠️ 排除 `quote:` 段。那是爻辞语料的引文，**不经 toHant** ——
+        // 它自带繁体原文。若把它算进本语料，就等于要求把四百多条爻辞的
+        // 两百来个生僻字（贞、咎、吝、簋、禴、豮……）逐个做简繁归类，
+        // 而这些字一次都不会被转换。引文的繁体由 yaoci.spec.ts 另行把关。
+        out.push(...collectQuestionText(r)
+          .filter((c) => !c.where.startsWith(QUOTE_PREFIX)).map((c) => c.text));
         for (const f of j.findings) {
           out.push(f.value, ...f.derivation.map((x) => x.step + x.detail));
         }
@@ -295,6 +302,40 @@ describe("**守卫的简繁对等 —— 是构造保证，不是维护约定**"
       expect(r.category).toBe(hans[i]!.category);
       expect(r.locale).toBe("zh-Hant");
     }
+  });
+
+  it("**人话层的规则也简繁对等** —— 那里曾只装了简体的一半", () => {
+    // 实打实的盲区：`PLAIN_RULES` 初版取 `GUARD_RULES["zh-Hans"]`，
+    // 于是繁体人话输出只受人话层自己那六条派生规则约束，预言、医疗、财务、
+    // 六爻成败词一条不管。用同一批繁体语料实测：简体命中 51 处、繁体命中 1 处。
+    const ids = new Set(PLAIN_RULES.map((r) => r.id));
+    const zh = [...ids].filter((i) => i.startsWith("zh."));
+    expect(zh.length).toBeGreaterThan(20);
+    for (const id of zh) {
+      expect(ids.has(id.replace(/^zh\./, "zht.")), `${id} 没有繁体对应`).toBe(true);
+    }
+    // 第二人称是人话层唯一有意放开的一条 —— 简繁两边都该不在
+    expect([...ids].some((i) => i.includes("secondPerson"))).toBe(false);
+  });
+
+  it("**植入违规，人话层两种字体都逮到**", () => {
+    const PLANTED: readonly string[] = [
+      "你 2030 年必然离婚。",
+      "你的病难愈。",
+      "建议你去投资买房。",
+      "你适合从事金融行业。",
+      "你的长相端正。",
+      "你应该往东方发展。",
+    ];
+    for (const bad of PLANTED) {
+      expect(scanPlain(bad, "t").length, `简体未逮到：${bad}`).toBeGreaterThan(0);
+      const t = toHant(bad);
+      expect(scanPlain(t, "t").length, `繁体未逮到：${t}`).toBeGreaterThan(0);
+    }
+    // 反向对照：合规的人话两边都放行，否则「全绿」只是因为什么都拦
+    const OK = "这是一套传统模型的说法：在需要沉静的场合，你的状态更省力。";
+    expect(scanPlain(OK, "t")).toEqual([]);
+    expect(scanPlain(toHant(OK), "t")).toEqual([]);
   });
 
   it("繁体规则的模式确实是繁体 —— 不是照抄简体", () => {

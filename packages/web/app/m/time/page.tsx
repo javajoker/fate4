@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  buildChart, buildReport, dailyOutlook, plainCards,
+  buildChart, buildReport, dailyOutlook, plainCards, plainYaociCards, dailyNarrative,
   AXIS_DIRECTIONAL, favorPlain, SYSTEM_LABEL, type BirthInput,
 } from "@fate/core";
 import { Card } from "../Card";
@@ -65,6 +65,7 @@ export default function TimePage() {
         <>
           {cards.map((c) => <Card key={c.id} card={c} />)}
           {tab === "今天" && <TodayCross daily={data.daily} />}
+          {tab === "今天" && <TodayYaoci daily={data.daily} />}
         </>
       )}
 
@@ -105,6 +106,22 @@ function ByYear({ report }: { report: ReturnType<typeof buildReport> }) {
           </div>
         </div>
       ))}
+    </>
+  );
+}
+
+/**
+ * 今天这一格说的是什么事 —— 爻辞一路。
+ *
+ * 与 `TodayCross` 分开：那一块比的是两套推法的**取向**，这一块给的是**所指**。
+ * 混在一起，读者会以为爻辞也在给今天打分。
+ */
+function TodayYaoci({ daily }: { daily: ReturnType<typeof dailyOutlook> }) {
+  const cards = plainYaociCards(daily.liuyao.yaoci, dailyNarrative(daily), "d");
+  return (
+    <>
+      <div className="m-sec">今天说的是什么事</div>
+      {cards.map((c) => <Card key={c.id} card={c} />)}
     </>
   );
 }

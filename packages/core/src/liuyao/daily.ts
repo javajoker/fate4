@@ -31,6 +31,7 @@ import { dress, type DressedGua } from "./dress.js";
 import { pickYongshen } from "./yongshen.js";
 import { judge, type Judgement } from "./judge.js";
 import { liuyaoClaims } from "./claims.js";
+import { yaociReading, type YaociReading } from "./yaoci.js";
 import { renderTemplate, type NarrativeLine } from "../report/render.js";
 import type { Locale } from "../report/templates.js";
 import { SYSTEM_LABEL, AXIS_DIRECTIONAL } from "../divination/claim.js";
@@ -46,8 +47,17 @@ export interface DailyOutlook {
   readonly date: { readonly year: number; readonly month: number; readonly day: number };
   /** 四柱侧 —— 流日事件匹配，不重算权重。 */
   readonly bazi: DayView;
-  /** 六爻侧 —— 该日的日卦。 */
-  readonly liuyao: { readonly gua: DressedGua; readonly judgement: Judgement };
+  /**
+   * 六爻侧 —— 该日的日卦。
+   *
+   * `yaoci` 是**指事**：日卦这一格传统上说的是什么事。它不进 `claims`，
+   * 因而不参与合参 —— 合参比的是两套体系各自的结构断言，爻辞不出结构断言。
+   */
+  readonly liuyao: {
+    readonly gua: DressedGua;
+    readonly judgement: Judgement;
+    readonly yaoci: YaociReading;
+  };
   readonly claims: readonly StructuralClaim[];
   readonly comparisons: readonly AxisComparison[];
   readonly summary: string;
@@ -125,7 +135,11 @@ export function dailyOutlook(
   const comparisons = crossref(claims);
 
   return {
-    date, bazi: dv, liuyao: { gua, judgement: j },
+    date, bazi: dv,
+    liuyao: {
+      gua, judgement: j,
+      yaoci: yaociReading(gua, ys.value, { locale: p.report.locale, layer: "technical" }),
+    },
     claims: Object.freeze(claims),
     comparisons: Object.freeze(comparisons),
     summary: summarizeCrossref(comparisons),

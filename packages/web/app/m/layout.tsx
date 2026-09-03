@@ -22,7 +22,7 @@ const TABS: readonly (readonly [string, string, string])[] = [
   ["/m/time", "时间", "◷"],
   ["/m/recall", "回看", "◈"],
   ["/m/ask", "问事", "◇"],
-  ["/m/about", "关于", "◌"],
+  // ["/m/about", "关于", "◌"],
 ];
 
 export default function MobileLayout({ children }: { children: ReactNode }) {

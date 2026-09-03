@@ -27,6 +27,7 @@ import type { Judgement } from "./judge.js";
 import { CAST_METHOD_LABEL } from "./cast.js";
 import { yingqiWindows, monthLabel, type YingqiResult } from "./yingqi.js";
 import { strengthOf } from "./strength.js";
+import { yaociReading, collectYaociText, type YaociReading } from "./yaoci.js";
 
 export interface QuestionReport {
   readonly meta: {
@@ -48,6 +49,14 @@ export interface QuestionReport {
   readonly topic: { readonly narrative: readonly NarrativeLine[] };
   readonly judgement: { readonly narrative: readonly NarrativeLine[] };
   readonly yingqi: { readonly narrative: readonly NarrativeLine[]; readonly result: YingqiResult };
+  /**
+   * 指事 —— 爻辞一路。
+   *
+   * ⚠️ `reading` 里的字**已经是目标语言的**：繁体取的是繁体语料原文，
+   * 不经 `toHant`。这与报告其余部分相反，是刻意的 —— 那些是本项目自己写的话，
+   * 机械转换是本分；这些是引文，代人改写不是。
+   */
+  readonly yaoci: { readonly narrative: readonly NarrativeLine[]; readonly reading: YaociReading };
   readonly disclaimerBottom: string;
   readonly guard: { readonly scanned: number; readonly violations: readonly GuardViolation[] };
 }
@@ -190,6 +199,22 @@ export function buildQuestionReport(
   }
   L3.add("liuyao.disclaimer.question", {}, 1, "disclaimer");
 
+  // ── 指事 ──
+  // locale 直接交给语料，不走 T() —— 引文按原文发，不代为转写。
+  const L4 = new Lines(locale);
+  const yc = yaociReading(gua, ys, { locale, layer: "technical" });
+  if (yc.method === "动爻") {
+    L4.add("liuyao.yaoci.moving", {
+      positions: yc.picks.map((x) => x.pos).join("、"),
+    }, 1, "yaoci");
+  } else {
+    L4.add("liuyao.yaoci.shiying", { shi: gua.shi, ying: gua.ying }, 1, "yaoci");
+  }
+  L4.add("liuyao.yaoci.yongshen", { state: yc.hitsYongshen ? "含" : "不含" }, 1, "yaoci");
+  if (yc.withheldCount > 0) {
+    L4.add("liuyao.yaoci.withheld", { n: yc.withheldCount, quoted: yc.quoted }, 1, "yaoci");
+  }
+
   const report: QuestionReport = {
     meta: {
       engineVersion: ENGINE_VERSION,
@@ -204,6 +229,7 @@ export function buildQuestionReport(
     topic: { narrative: L1.items },
     judgement: { narrative: L2.items },
     yingqi: { narrative: L3.items, result: yq },
+    yaoci: { narrative: L4.items, reading: yc },
     disclaimerBottom: T(localeText(QUESTION_DISCLAIMER, locale, "QUESTION_DISCLAIMER")),
     guard: { scanned: 0, violations: [] },
   };
@@ -229,5 +255,9 @@ export function collectQuestionText(r: QuestionReport): { text: string; where: s
   for (const w of r.yingqi.result.windows) {
     for (const reason of w.reasons) push(reason, `yingqi.${w.year}.${w.branch}`);
   }
+  // 引文与叙述一并扫。`screen` 已在取用时逐条筛过，此处是**第二道**：
+  // 没有它，「引文过了闸」就只是 yaoci.ts 自己说了算。
+  for (const l of r.yaoci.narrative) push(l.text, `yaoci.${l.templateId}`);
+  for (const q of collectYaociText(r.yaoci.reading)) push(q.text, q.where);
   return out;
 }

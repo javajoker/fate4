@@ -13,5 +13,6 @@
   },
   "dependencies": {
     "@fate/data": "workspace:*"
-  }
+  },
+  "sideEffects": false
 }

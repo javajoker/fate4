@@ -13,10 +13,11 @@ fate/
 │   └── default.yaml              # 默认值的**平行文档**，真源在 core/params/defaults.ts
 ├── docs/                         # 本文档集
 ├── scripts/
-│   └── generate-vsop87.mjs       # 由官方数据生成截断级数，校验 SHA256
+│   ├── generate-vsop87.mjs       # 由官方数据生成截断级数，校验 SHA256
+│   └── generate-yaoci.mjs        # 由原型项目生成爻辞语料，校验 SHA256
 └── packages/
     ├── core/                     # 推演内核 —— 零运行时依赖
-    ├── data/                     # 静态数据（VSOP87 截断级数）
+    ├── data/                     # 静态数据（VSOP87 截断级数、爻辞语料）
     ├── web/                      # Next.js 应用（静态导出）
     ├── cli/                      # 命令行，Skill 的执行后端
     └── skill/                    # Claude Agent Skill 载荷
@@ -165,6 +166,21 @@ export function buildFindings(S: SeriesSet,
 120 年逐年 = 120 次 `evaluate` ≈ 2 毫秒。无需缓存、无需 Worker、无需增量更新。
 
 节气是唯一需要预计算的部分：`packages/data` 内置 1900–2100 的 4824 个节气时刻静态表（约 40 KB gzip）。区间外走实时 VSOP87 计算。
+
+### 2.3 爻辞语料只落在用得到它的那几页
+
+`packages/data/yaoci` 是仓库里最大的一块数据：64 卦 × 7 格 × 四类文字 × 简繁英三份，
+约 500 KB 原文。它**不经 `@fate/data` 的根 index 转出**，而走子路径
+`@fate/data/yaoci`；两个包都声明 `sideEffects: false`。
+
+实测（`next build`）：语料落在单独一个 503 KB（gzip 188 KB / brotli 134 KB）的 chunk 里，
+只有 `/ask`、`/chart/daily`、`/m/ask`、`/m/time` 四页引到它 —— `/chart`、`/m`、`/cross`
+与首页都不加载。
+这四页的内容**本身就是这批文字**，故这个代价是花在正地方的。
+
+其中英文那份约占三分之一，而中文界面用不到它。按 locale 动态引入能省下这部分，
+但会把 `yaociOf` 变成异步，进而把整条同步的报告构建链染成异步 ——
+为省 60 KB 付这个代价不值。记在此处，不装作没有。
 
 ---
 

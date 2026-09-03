@@ -283,6 +283,8 @@ function QuestionView(
         </div>
       ))}
 
+      <YaociView r={r} />
+
       {r.yingqi.result.windows.length > 0 && (
         <div className="card">
           <h3>候选时段</h3>
@@ -324,5 +326,54 @@ function QuestionView(
 
       <p className="sub">{r.disclaimerBottom}</p>
     </>
+  );
+}
+
+/**
+ * 指事 —— 爻辞一路。
+ *
+ * 与上面几块**分开摆**，因为它不是本引擎写的话。引文用 blockquote 排，
+ * 让「这是引来的」在视觉上也成立，而不只是在文案里声明一句。
+ */
+function YaociView({ r }: { r: ReturnType<typeof buildQuestionReport> }) {
+  const y = r.yaoci.reading;
+  const q = (x: { text: string | null; withheld: readonly string[] } | null) =>
+    x === null ? null : x.text !== null
+      ? <span>{x.text}</span>
+      : <span className="dim">未通过措辞检查（{x.withheld.join("、")}）</span>;
+
+  return (
+    <div className="card">
+      <h3>指事</h3>
+      <ul>
+        {r.yaoci.narrative.map((l, i) => <li key={i}>{l.text}</li>)}
+      </ul>
+      <p>
+        本卦 <strong>{y.gua.ben.name}</strong>：{q(y.gua.ben.classic)}
+        {y.gua.bian !== null && (
+          <>　→　变卦 <strong>{y.gua.bian.name}</strong>：{q(y.gua.bian.classic)}</>
+        )}
+      </p>
+      <table>
+        <thead><tr><th>爻</th><th>位</th><th>爻辞</th><th>指事</th></tr></thead>
+        <tbody>
+          {y.picks.flatMap((pk) => [
+            <tr key={`${pk.pos}-ben`}>
+              <td>{pk.pos}</td>
+              <td>{pk.role}{pk.isYongshen && "・用神位"}</td>
+              <td>{q(pk.ben.classic)}</td>
+              <td>{q(pk.ben.gist)}</td>
+            </tr>,
+            ...(pk.bian === null ? [] : [
+              <tr key={`${pk.pos}-bian`}>
+                <td>{pk.pos}</td><td className="dim">变出</td>
+                <td>{q(pk.bian.classic)}</td>
+                <td>{q(pk.bian.gist)}</td>
+              </tr>,
+            ]),
+          ])}
+        </tbody>
+      </table>
+    </div>
   );
 }

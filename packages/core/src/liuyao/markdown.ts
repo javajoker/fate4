@@ -10,6 +10,7 @@ import { toHant } from "../report/hant.js";
 import type { QuestionReport } from "./report.js";
 import type { DailyOutlook } from "./daily.js";
 import { dailyNarrative } from "./daily.js";
+import { relayerYaoci } from "./yaoci.js";
 import type { NarrativeLine } from "../report/render.js";
 import type { Locale } from "../report/templates.js";
 import { monthLabel } from "./yingqi.js";
@@ -21,8 +22,23 @@ const nl = (lines: readonly NarrativeLine[]): string =>
     ? `- ${l.text}　_(低置信度，已改用留有余地的措辞)_`
     : `- ${l.text}`)).join("\n");
 
+/**
+ * 引文的占位符。
+ *
+ * 本函数末尾把整份 Markdown 过一遍 `toHant` —— 那是给函数里硬写的简体标题、
+ * 表头兜底的。而爻辞引文**已经是目标语言的原文**，不能再转一次：
+ * 转了也许无害，但那是运气，不是保证。故先换成占位符，转完再换回来。
+ *
+ * 占位符取非汉字符号，`toHant` 原样放行。
+ */
+const QUOTE_SLOT = (i: number) => `⟦q${i}⟧`;
+const QUOTE_SLOT_RE = /⟦q(\d+)⟧/g;
+
 export function renderQuestionMarkdown(r: QuestionReport): string {
   const out: string[] = [];
+  const quotes: string[] = [];
+  /** 存起来，返回占位符。 */
+  const keep = (s: string): string => `${QUOTE_SLOT(quotes.push(s) - 1)}`;
   const h = (n: number, t: string) => out.push(`${"#".repeat(n)} ${t}\n`);
   const p = (t: string) => out.push(`${t}\n`);
   // 表格行直接 push —— p() 会多带一个换行，join 之后行间就空出一行，表就散了。
@@ -76,7 +92,29 @@ export function renderQuestionMarkdown(r: QuestionReport): string {
     out.push("");
   }
 
-  h(2, "§6 方法");
+  h(2, "§6 指事");
+  p(nl(r.yaoci.narrative));
+  {
+    const y = r.yaoci.reading;
+    const q = (x: { text: string | null; withheld: readonly string[] } | null): string =>
+      x === null ? "" : x.text === null
+        ? `_（未通过措辞检查：${x.withheld.join("、")}）_`
+        : keep(x.text);
+    p(`本卦 **${y.gua.ben.name}**：${q(y.gua.ben.classic)}`
+      + (y.gua.bian === null ? "" : `　→　变卦 **${y.gua.bian.name}**：${q(y.gua.bian.classic)}`));
+    row("| 爻 | 位 | 爻辞 | 指事 |");
+    row("| --- | --- | --- | --- |");
+    for (const pk of y.picks) {
+      const tag = pk.role + (pk.isYongshen ? "・用神位" : "");
+      row(`| ${pk.pos} | ${tag} | ${q(pk.ben.classic)} | ${q(pk.ben.gist)} |`);
+      if (pk.bian !== null) {
+        row(`| ${pk.pos} | 变出 | ${q(pk.bian.classic)} | ${q(pk.bian.gist)} |`);
+      }
+    }
+    out.push("");
+  }
+
+  h(2, "§7 方法");
   row("| 项 | 值 |");
   row("| --- | --- |");
   row(`| 起卦法 | ${r.meta.castMethod} |`);
@@ -89,11 +127,14 @@ export function renderQuestionMarkdown(r: QuestionReport): string {
   p(`> ${r.disclaimerBottom}`);
 
   const md = out.join("\n");
-  return r.meta.locale === "zh-Hant" ? toHant(md) : md;
+  const conv = r.meta.locale === "zh-Hant" ? toHant(md) : md;
+  return conv.replace(QUOTE_SLOT_RE, (_m, i: string) => quotes[Number(i)] ?? "");
 }
 
 export function renderDailyMarkdown(o: DailyOutlook, locale: Locale = "zh-Hans"): string {
   const out: string[] = [];
+  const quotes: string[] = [];
+  const keep = (s: string): string => `${QUOTE_SLOT(quotes.push(s) - 1)}`;
   const h = (n: number, t: string) => out.push(`${"#".repeat(n)} ${t}\n`);
   const p = (t: string) => out.push(`${t}\n`);
   const row = (t: string) => out.push(t);
@@ -130,8 +171,38 @@ export function renderDailyMarkdown(o: DailyOutlook, locale: Locale = "zh-Hans")
   }
   out.push("");
 
+  h(2, "指事");
+  {
+    // ⚠️ 引文按**渲染时**要的语言重取，不能直接用 `o.liuyao.yaoci`。
+    //
+    // `DailyOutlook` 是数据，它里面那份读法建于 `params.report.locale`；
+    // 而本函数的 `locale` 是调用方当场指定的（`fate daily --locale zh-Hant`）。
+    // 两者不一致时，下面的占位符会忠实地保护住**简体**引文，让它原样穿过
+    // 繁体转换 —— 于是繁体文档里嵌着简体爻辞。实测逮到，故在此对齐。
+    const y = o.liuyao.yaoci.locale === locale
+      ? o.liuyao.yaoci
+      : relayerYaoci(o.liuyao.yaoci, o.liuyao.yaoci.layer, locale);
+    const q = (x: { text: string | null; withheld: readonly string[] } | null): string =>
+      x === null ? "" : x.text === null
+        ? `_（未通过措辞检查：${x.withheld.join("、")}）_`
+        : keep(x.text);
+    p("以下是爻辞一路的说法 —— 引文，与上面的纳甲断法各说各的，不互相印证。");
+    p(`${y.gua.ben.name}：${q(y.gua.ben.classic)}`
+      + (y.gua.bian === null ? "" : `　→　${y.gua.bian.name}：${q(y.gua.bian.classic)}`));
+    row("| 爻 | 位 | 爻辞 | 指事 |");
+    row("| --- | --- | --- | --- |");
+    for (const pk of y.picks) {
+      row(`| ${pk.pos} | ${pk.role} | ${q(pk.ben.classic)} | ${q(pk.ben.gist)} |`);
+      if (pk.bian !== null) {
+        row(`| ${pk.pos} | 变出 | ${q(pk.bian.classic)} | ${q(pk.bian.gist)} |`);
+      }
+    }
+    out.push("");
+  }
+
   const md = out.join("\n");
-  return locale === "zh-Hant" ? toHant(md) : md;
+  const conv = locale === "zh-Hant" ? toHant(md) : md;
+  return conv.replace(QUOTE_SLOT_RE, (_m, i: string) => quotes[Number(i)] ?? "");
 }
 
 /** 四家合参的 Markdown。与 Web 共用 —— 两处结论逐字一致是构造保证。 */

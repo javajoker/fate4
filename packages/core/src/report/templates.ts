@@ -831,6 +831,22 @@ const liuyaoTemplates: NarrativeTemplate[] = [
     zhHans: "未产出候选时段：{why}",
     en: "No candidate window is produced: {why}",
   }),
+  T("liuyao.yaoci.moving", "data", "liuyaoYaoci", ["positions"], {
+    zhHans: "指事取法：动爻。传统于此取动爻的爻辞，本卦第 {positions} 爻至变卦同位 —— 由此及彼。爻辞属象辞一路，与上面的纳甲断法是两套系统；此处只作所指，不改动任何一条断论。",
+    en: "Indication method: moving lines. The tradition reads the line statements of the moving lines here, from line {positions} of the primary hexagram to the same position in the derived one. Line statements belong to the image-and-word tradition, a system separate from the stem-branch reading above; they supply reference, not judgement, and change none of the findings.",
+  }),
+  T("liuyao.yaoci.shiying", "data", "liuyaoYaoci", ["shi", "ying"], {
+    zhHans: "指事取法：六爻皆静，传统改看世应 —— 世爻在第 {shi} 位，应爻在第 {ying} 位。世为我方、应为他方，这是一组位置关系，不是先后关系。爻辞只作所指，不改动任何一条断论。",
+    en: "Indication method: all six lines still, so the tradition turns to the self and other lines — self at position {shi}, other at position {ying}. These are two places, not two moments. The line statements supply reference, not judgement.",
+  }),
+  T("liuyao.yaoci.yongshen", "data", "liuyaoYaoci", ["state"], {
+    zhHans: "取到的爻位{state}用神位。两套取法各自成立，此处只作记录 —— 相符不算互证，故不因此加重任何一条。",
+    en: "The positions taken {state} the position of the useful god. The two selection rules stand on their own; this is recorded, not scored — agreement is not corroboration, so nothing is weighted up by it.",
+  }),
+  T("liuyao.yaoci.withheld", "data", "liuyaoYaoci", ["n", "quoted"], {
+    zhHans: "所引 {quoted} 条中有 {n} 条未通过本项目的措辞检查，未予显示。语料是外来的，不为它开豁免。",
+    en: "Of {quoted} passages quoted, {n} did not pass this project's wording guard and are not shown. The corpus comes from outside; it gets no exemption.",
+  }),
   T("liuyao.disclaimer.question", "data", "disclaimer", [], {
     zhHans: "以上为对卦象结构的描述，不构成对结果的预言，也不构成医疗、法律、财务或任何专业建议。同一时辰内所有问事得到同一个卦 —— 卦属于时刻，区分不同的事靠取不同的用神。",
     en: "The above describes the structure of the hexagram. It is not a prediction of outcomes, nor medical, legal, financial, or any other professional advice. All questions asked within the same two-hour period yield the same hexagram: the hexagram belongs to the moment, and different questions are distinguished by which line is taken as the subject.",
