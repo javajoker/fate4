@@ -6,6 +6,7 @@ import {
   monthLabel, pickYongshen, TOPICS, TOPIC_CATEGORIES,
   type CastInput, type CoinThrow, type Liuqin, type TopicCategory,
 } from "@fate/core";
+import { CoinCast } from "../../components/CoinCast";
 
 /**
  * 问事页 —— 不挂在 /chart 之下。
@@ -48,7 +49,8 @@ export default function AskPage() {
   const [method, setMethod] = useState<"time" | "number" | "coin">("time");
   const [numA, setNumA] = useState("27");
   const [numB, setNumB] = useState("");
-  const [coins, setCoins] = useState("121212");
+  // 掷钱：六掷齐备才是一个合法输入，故未齐时为 null，而不是一串半成品字符串。
+  const [coins, setCoins] = useState<readonly CoinThrow[] | null>(null);
   const [result, setResult] = useState<{
     md: ReturnType<typeof buildQuestionReport>; replayed: boolean;
   } | null>(null);
@@ -88,12 +90,12 @@ export default function AskPage() {
           ? { method: "number", value: a }
           : { method: "number", value: a, second: b };
       } else {
-        if (!/^[0-3]{6}$/.test(coins)) {
-          throw new Error("钱象须为六位数字，每位是三枚铜钱中的阳面数（0–3）。");
+        if (coins === null || coins.length !== 6) {
+          throw new Error("六爻须掷齐六次，每次记下三枚铜钱的阴阳。");
         }
         input = {
           method: "coin",
-          throws: [...coins].map((c) => Number(c) as CoinThrow) as [
+          throws: coins as [
             CoinThrow, CoinThrow, CoinThrow, CoinThrow, CoinThrow, CoinThrow],
         };
       }
@@ -195,19 +197,19 @@ export default function AskPage() {
               <input value={numB} onChange={(e) => setNumB(e.target.value)} placeholder="第二个数（可留空）" />
             </div>
           )}
-          {method === "coin" && (
-            <div className="row">
-              <input value={coins} onChange={(e) => setCoins(e.target.value)} placeholder="121212" />
-              <span className="dim">自初爻起六次，每位为三枚铜钱中的阳面数（0–3）</span>
-            </div>
-          )}
+          {method === "coin" && <CoinCast onChange={setCoins} />}
           {method === "number" && (
             <p className="dim">
               单数法在一个时辰内只有 24 种结果 —— 上卦、下卦、动爻位全由这个数决定，
               而 8 与 6 不互素。要全覆盖，给第二个数或改用掷钱。
             </p>
           )}
-          <button onClick={() => { void ask(); }}>起卦</button>
+          <button
+            onClick={() => { void ask(); }}
+            disabled={method === "coin" && coins === null}
+          >
+            起卦
+          </button>
         </div>
 
         {err !== null && <div className="card"><p>{err}</p></div>}
@@ -234,29 +236,31 @@ function QuestionView(
       )}
       <div className="card">
         <h3>卦象</h3>
-        <table>
-          <thead><tr>
-            <th>爻</th><th>六神</th><th>六亲</th><th>干支</th>
-            <th>世应</th><th>动静</th><th>月建</th><th>空破</th><th>变爻</th>
-          </tr></thead>
-          <tbody>
-            {[...r.gua.yaos].reverse().map((y) => (
-              <tr key={y.pos}>
-                <td>{y.pos}</td><td>{y.liushen}</td><td>{y.liuqin}</td>
-                <td>{y.stem}{y.branch}</td>
-                <td>{y.isShi ? "世" : y.isYing ? "应" : ""}</td>
-                <td>{y.moving ? "○ 动" : y.chongState === "暗动" ? "暗动" : ""}</td>
-                <td>{y.monthPhase}</td>
-                <td>{[
-                  y.xunkong ? `空${y.xunkongNullified === null ? "" : `(${y.xunkongNullified})`}` : "",
-                  y.yuepo ? `破${y.yuepoNullified === null ? "" : `(${y.yuepoNullified})`}` : "",
-                ].filter((x) => x !== "").join(" ")}</td>
-                <td>{y.bian === null ? ""
-                  : `${y.bian.liuqin}${y.bian.stem}${y.bian.branch} ${y.bian.shengke}`}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="scroll">
+          <table>
+            <thead><tr>
+              <th>爻</th><th>六神</th><th>六亲</th><th>干支</th>
+              <th>世应</th><th>动静</th><th>月建</th><th>空破</th><th>变爻</th>
+            </tr></thead>
+            <tbody>
+              {[...r.gua.yaos].reverse().map((y) => (
+                <tr key={y.pos}>
+                  <td>{y.pos}</td><td>{y.liushen}</td><td>{y.liuqin}</td>
+                  <td>{y.stem}{y.branch}</td>
+                  <td>{y.isShi ? "世" : y.isYing ? "应" : ""}</td>
+                  <td>{y.moving ? "○ 动" : y.chongState === "暗动" ? "暗动" : ""}</td>
+                  <td>{y.monthPhase}</td>
+                  <td>{[
+                    y.xunkong ? `空${y.xunkongNullified === null ? "" : `(${y.xunkongNullified})`}` : "",
+                    y.yuepo ? `破${y.yuepoNullified === null ? "" : `(${y.yuepoNullified})`}` : "",
+                  ].filter((x) => x !== "").join(" ")}</td>
+                  <td>{y.bian === null ? ""
+                    : `${y.bian.liuqin}${y.bian.stem}${y.bian.branch} ${y.bian.shengke}`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {r.gua.fushen.length > 0 && (
           <p className="dim">
             伏神：{r.gua.fushen.map(
@@ -288,18 +292,20 @@ function QuestionView(
       {r.yingqi.result.windows.length > 0 && (
         <div className="card">
           <h3>候选时段</h3>
-          <table>
-            <thead><tr><th>时段</th><th>距今</th><th>取候之由</th></tr></thead>
-            <tbody>
-              {r.yingqi.result.windows.map((w) => (
-                <tr key={`${w.year}-${w.branch}`}>
-                  <td>{monthLabel(w)}</td>
-                  <td>{w.monthsAhead} 个月</td>
-                  <td>{w.reasons.join("；")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="scroll">
+            <table>
+              <thead><tr><th>时段</th><th>距今</th><th>取候之由</th></tr></thead>
+              <tbody>
+                {r.yingqi.result.windows.map((w) => (
+                  <tr key={`${w.year}-${w.branch}`}>
+                    <td>{monthLabel(w)}</td>
+                    <td>{w.monthsAhead} 个月</td>
+                    <td>{w.reasons.join("；")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -310,16 +316,18 @@ function QuestionView(
         {open && (
           <>
             <ul>{r.casting.narrative.map((l, i) => <li key={i}>{l.text}</li>)}</ul>
-            <table>
-              <tbody>
-                <tr><td>起卦法</td><td>{r.meta.castMethod}</td></tr>
-                <tr><td>引擎版本</td><td>{r.meta.engineVersion}</td></tr>
-                <tr><td>参数指纹</td><td>{r.meta.paramsHash}</td></tr>
-                {r.meta.questionFingerprint !== null && (
-                  <tr><td>问题指纹</td><td>{r.meta.questionFingerprint}</td></tr>
-                )}
-              </tbody>
-            </table>
+            <div className="scroll">
+              <table>
+                <tbody>
+                  <tr><td>起卦法</td><td>{r.meta.castMethod}</td></tr>
+                  <tr><td>引擎版本</td><td>{r.meta.engineVersion}</td></tr>
+                  <tr><td>参数指纹</td><td>{r.meta.paramsHash}</td></tr>
+                  {r.meta.questionFingerprint !== null && (
+                    <tr><td>问题指纹</td><td>{r.meta.questionFingerprint}</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
       </div>
@@ -354,26 +362,28 @@ function YaociView({ r }: { r: ReturnType<typeof buildQuestionReport> }) {
           <>　→　变卦 <strong>{y.gua.bian.name}</strong>：{q(y.gua.bian.classic)}</>
         )}
       </p>
-      <table>
-        <thead><tr><th>爻</th><th>位</th><th>爻辞</th><th>指事</th></tr></thead>
-        <tbody>
-          {y.picks.flatMap((pk) => [
-            <tr key={`${pk.pos}-ben`}>
-              <td>{pk.pos}</td>
-              <td>{pk.role}{pk.isYongshen && "・用神位"}</td>
-              <td>{q(pk.ben.classic)}</td>
-              <td>{q(pk.ben.gist)}</td>
-            </tr>,
-            ...(pk.bian === null ? [] : [
-              <tr key={`${pk.pos}-bian`}>
-                <td>{pk.pos}</td><td className="dim">变出</td>
-                <td>{q(pk.bian.classic)}</td>
-                <td>{q(pk.bian.gist)}</td>
+      <div className="scroll">
+        <table>
+          <thead><tr><th>爻</th><th>位</th><th>爻辞</th><th>指事</th></tr></thead>
+          <tbody>
+            {y.picks.flatMap((pk) => [
+              <tr key={`${pk.pos}-ben`}>
+                <td>{pk.pos}</td>
+                <td>{pk.role}{pk.isYongshen && "・用神位"}</td>
+                <td>{q(pk.ben.classic)}</td>
+                <td>{q(pk.ben.gist)}</td>
               </tr>,
-            ]),
-          ])}
-        </tbody>
-      </table>
+              ...(pk.bian === null ? [] : [
+                <tr key={`${pk.pos}-bian`}>
+                  <td>{pk.pos}</td><td className="dim">变出</td>
+                  <td>{q(pk.bian.classic)}</td>
+                  <td>{q(pk.bian.gist)}</td>
+                </tr>,
+              ]),
+            ])}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

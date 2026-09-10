@@ -6,6 +6,7 @@ import { Card } from "./Card";
 import { CITIES, clearBirth, loadBirth, loadPlainSource, savePlainSource, saveBirth,
   type PlainSource } from "./store";
 import { AiHandoff } from "./AiHandoff";
+import { Profile } from "./Profile";
 import { Share } from "./Share";
 
 /**
@@ -17,6 +18,9 @@ import { Share } from "./Share";
 export default function MePage() {
   const [birth, setBirth] = useState<BirthInput | null>(null);
   const [ready, setReady] = useState(false);
+  // 改资料：把采集表重新调出来，带上现有的值。与「清除」不同 ——
+  // 后者是破坏性的，写错一位数字不该要人从头再来。
+  const [editing, setEditing] = useState(false);
   const [sec, setSec] = useState<PlainSection>("性格");
   const [src, setSrc] = useState<PlainSource>("code");
 
@@ -38,7 +42,15 @@ export default function MePage() {
   const plain = useMemo(() => (report === null ? null : plainCards(report)), [report]);
 
   if (!ready) return <p className="m-lede">载入中…</p>;
-  if (birth === null) return <BirthForm onDone={(b) => { saveBirth(b); setBirth(b); }} />;
+  if (birth === null || editing) {
+    return (
+      <BirthForm
+        {...(birth === null ? {} : { initial: birth })}
+        onDone={(b) => { saveBirth(b); setBirth(b); setEditing(false); }}
+        {...(birth === null ? {} : { onCancel: () => setEditing(false) })}
+      />
+    );
+  }
   if (plain === null) return <p className="m-lede">算不出来，请检查出生信息。</p>;
 
   const sections = [...new Set(plain.cards.map((c) => c.section))]
@@ -49,6 +61,11 @@ export default function MePage() {
     <>
       <h1 className="m-h1">关于你</h1>
       <p className="m-lede">{plain.framing}</p>
+
+      {report !== null && (
+        <Profile birth={birth} pillars={report.chart.pillars}
+          onEdit={() => setEditing(true)} />
+      )}
 
       <div className="m-chips" style={{ display: src === "code" ? undefined : "none" }}>
         {sections.map((s) => (
@@ -107,12 +124,28 @@ export function Disclaimer({ plain, technical }: { plain: string; technical: str
   );
 }
 
-function BirthForm({ onDone }: { onDone: (b: BirthInput) => void }) {
-  const [date, setDate] = useState("1990-05-12");
-  const [time, setTime] = useState("14:30");
-  const [unknownHour, setUnknownHour] = useState(false);
-  const [city, setCity] = useState(0);
-  const [gender, setGender] = useState<"male" | "female">("male");
+const two = (n: number) => String(n).padStart(2, "0");
+
+/** 采集表。给了 `initial` 即为「改」，否则为首次采集。 */
+function BirthForm(
+  { onDone, initial, onCancel }: {
+    onDone: (b: BirthInput) => void;
+    initial?: BirthInput;
+    onCancel?: () => void;
+  },
+) {
+  const [date, setDate] = useState(initial === undefined
+    ? "1990-05-12"
+    : `${initial.year}-${two(initial.month)}-${two(initial.day)}`);
+  const [time, setTime] = useState(initial === undefined
+    ? "14:30"
+    : `${two(initial.hour)}:${two(initial.minute)}`);
+  const [unknownHour, setUnknownHour] = useState(initial?.unknownHour === true);
+  const [city, setCity] = useState(initial === undefined ? 0
+    : Math.max(0, CITIES.findIndex(
+      (c) => c[1] === initial.timeZone && c[2] === initial.longitude)));
+  const [gender, setGender] = useState<"male" | "female">(
+    initial?.gender === "female" ? "female" : "male");
 
   const submit = () => {
     const [Y, M, D] = date.split("-").map(Number);
@@ -128,7 +161,7 @@ function BirthForm({ onDone }: { onDone: (b: BirthInput) => void }) {
 
   return (
     <>
-      <h1 className="m-h1">先说说你的出生信息</h1>
+      <h1 className="m-h1">{initial === undefined ? "先说说你的出生信息" : "改一下出生信息"}</h1>
       <p className="m-lede">
         只存在这台设备上，不会上传。出生时间越准，结果越细 ——
         差一个小时可能就是另一套说法。
@@ -162,7 +195,12 @@ function BirthForm({ onDone }: { onDone: (b: BirthInput) => void }) {
             <option value="female">女</option>
           </select>
         </div>
-        <button className="m-btn" onClick={submit}>开始</button>
+        <button className="m-btn" onClick={submit}>
+          {initial === undefined ? "开始" : "存下来"}
+        </button>
+        {onCancel !== undefined && (
+          <button className="m-btn ghost" onClick={onCancel}>不改了</button>
+        )}
       </div>
       {unknownHour && (
         <p className="m-note">

@@ -120,3 +120,33 @@ pre.export { background: var(--surface-2); border: 1px solid var(--line); paddin
 svg text { font-family: -apple-system, "PingFang SC", sans-serif; }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2); margin-top: 8px; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; }
+
+/* ── 掷钱起卦 ────────────────────────────────────────────
+ * 铜钱只标阴阳，不标字背 —— 哪一面算阳由门派定，见 CoinCast.tsx。
+ * 爻线用中性单色：卦画不是有序量也不是吉凶量，故不着色相。
+ */
+.coincast .coin-grid { display: flex; flex-direction: column; gap: 6px; }
+.coin-row { display: grid; grid-template-columns: 24px auto 62px 1fr; align-items: center; gap: 12px;
+  padding: 5px 8px; border-radius: var(--radius); }
+.coin-row.next { background: var(--surface-2); }
+.coin-pos { font-family: var(--serif); font-size: 15px; color: var(--ink-2); text-align: center; }
+.coins { display: inline-flex; gap: 6px; }
+.coin { width: 30px; height: 30px; padding: 0; border-radius: 50%; font-size: 12px;
+  background: var(--surface); color: var(--ink-2); border: 1px solid var(--line-strong); }
+.coin.yang { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+.coin.yin { background: var(--surface-2); color: var(--ink-2); border-color: var(--line-strong); }
+.coin.blank { border-style: dashed; color: var(--ink-3); }
+.coin:disabled { opacity: 1; cursor: default; }
+.yaoline { display: inline-flex; gap: 5px; align-items: center; }
+.yaoline .seg { display: block; height: 6px; width: 62px; border-radius: 1px; background: var(--ink-2); }
+.yaoline .seg.half { width: 28.5px; }
+.yaoline .seg.pending { background: none; border-top: 1px dashed var(--line-strong); height: 0; }
+.coin-note { font-size: 12px; }
+
+@media (max-width: 520px) {
+  .coin-row { grid-template-columns: 20px auto 44px 1fr; gap: 8px; }
+  .yaoline .seg { width: 44px; }
+  .yaoline .seg.half { width: 19.5px; }
+  .coin { width: 27px; height: 27px; }
+  .coin-note { font-size: 11px; }
+}
