@@ -41,7 +41,7 @@ import { DEFAULT_PARAMS } from "../params/defaults.js";
 import { loadParams, paramsHash } from "../params/load.js";
 import { assignWeights } from "../weights/assign.js";
 import { cloneCarriers, type Carrier } from "../weights/carrier.js";
-import { applyStructure } from "../structure/apply.js";
+// import { applyStructure } from "../structure/apply.js";
 import type { StructureEvent } from "../structure/types.js";
 import { propagate, type PropagationResult } from "../propagate/iterate.js";
 import { conclude } from "../conclude/conclude.js";
@@ -90,7 +90,9 @@ export function buildBaseChart(chart: NatalChart, params: Params = DEFAULT_PARAM
 
   // L2 / L3 就地改写，故另拷一份走管线，`l1` 保持初始态
   const carriers = cloneCarriers(w.carriers);
-  const st = applyStructure(carriers, chart.month.branch, params);
+  // 合化刑冲克害就是五行力量平衡的结果，直接五行平衡即可
+  // const st = applyStructure(carriers, chart.month.branch, params);
+  const st = {carriers, events: []};
   const pr = propagate(st.carriers, params.propagation);
   const conclusions = conclude({
     carriers: pr.carriers, monthBranch: chart.month.branch,
