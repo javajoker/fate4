@@ -58,7 +58,7 @@ const USAGE = `fate —— 四柱推演命令行
               (--city 城市 | --tz 时区 --lon 经度)
               [--at "YYYY-MM-DD HH:MM"] [--method time|number|coin]
               [--number N [--number2 M]] [--coins 121212] [--relation 六亲]
-              [--journal f.json] [--locale …] [--json]
+              [--journal f.json] [--locale …] [--plain] [--json]
 
   fate daily  --chart c.json [--date YYYY-MM-DD] [--locale …] [--json]
 
@@ -69,6 +69,7 @@ const USAGE = `fate —— 四柱推演命令行
   fate plain  --chart c.json [--section 性格|身心|亲近的人|人生轨迹|起伏|今年|本月|今天]
               [--json]
               人话版：把判定换成平常话，每条附技术原文作依据。
+              问事的人话版是 fate ask --plain，那里「说的是什么事」单列一节。
 
   fate topics             列出 32 类占事
   fate cities             列出内置城市表
