@@ -192,6 +192,44 @@ export const PLAIN_DISCLAIMER =
  * 序列 id 形如 `tenGod.正财`、`palace.配偶宫.branch`、`element.水`。
  * 认不出的返回 null —— **不瞎猜**，认不出就不说这一句。
  */
+/**
+ * 整盘指标 → 人话。
+ *
+ * 这几条不指向某一类事，而是**整盘的**：流通顺不顺、力量留不留得住、
+ * 显露得多还是藏得多。照样得给它们一句「哪一类」，否则起伏卡片会只剩
+ * 「这段时间这一项是顺风的」—— 哪一项？读者无从知道。
+ */
+const METRIC_DOMAIN_PLAIN: Readonly<Record<string, string>> = Object.freeze({
+  "metric.vitality": "整盘的力量留不留得住，这一路",
+  "metric.circulation": "整盘转得顺不顺、有没有堵在某一处，这一路",
+  "metric.favorIndex": "整盘与你本命合不合得来，这一路",
+  "innerOuter.revealRatio": "你显露在外的那部分与压在里面的那部分，这一路",
+  "innerOuter.tension": "你对外的样子与内里的状态之间拉不拉扯，这一路",
+});
+
+/**
+ * 扰动 → 人话。
+ *
+ * `agitation.<位>` 说的是该位被冲、刑、合、害引动的程度。位名（命宫、年支……）
+ * 是术语，故不照搬 —— 换成那一位在传统里对应的生活面。
+ */
+const AGITATION_DOMAIN_PLAIN: Readonly<Record<string, string>> = Object.freeze({
+  命宫: "与你整个人的处境被搅动相关的那一路",
+  胎元: "与你的底子、来处被搅动相关的那一路",
+  年支: "与长辈、来处被搅动相关的那一路",
+  月支: "与你所处的环境、工作面被搅动相关的那一路",
+  日支: "与身边最近的人被搅动相关的那一路",
+  时支: "与晚辈、晚年、往后的去向被搅动相关的那一路",
+});
+
+/**
+ * 序列 → 它说的是「哪一类事」。
+ *
+ * **必须覆盖 `buildSeries` 产出的每一个 id。** 漏掉一类，起伏卡片就会退化成
+ * 一句没有主语的「这段时间这一项是顺风的」—— 而「说的是哪一类事」正是这类卡片
+ * 唯一的内容。`metric` / `innerOuter` / `agitation` 三类曾漏在外面，
+ * 直到某张盘的节点排进前八才露出来；现由 plain.spec.ts 逐条穷举断言。
+ */
 export function domainOfSeries(seriesId: string): string | null {
   const [kind, name] = seriesId.split(".");
   if (kind === "tenGod" && name !== undefined) {
@@ -203,6 +241,12 @@ export function domainOfSeries(seriesId: string): string | null {
   }
   if (kind === "dayMaster") return "与你自身状态相关的那一路";
   if (kind === "domain") return "与外部事项相关的那一路";
+  if (kind === "metric" || kind === "innerOuter") {
+    return METRIC_DOMAIN_PLAIN[seriesId] ?? null;
+  }
+  if (kind === "agitation" && name !== undefined) {
+    return AGITATION_DOMAIN_PLAIN[name] ?? null;
+  }
   return null;
 }
 

@@ -270,6 +270,11 @@ describe("输出经措辞扫描", () => {
       for (const line of r.out.split("\n")) {
         // 参数快照、时区标识、出生地经纬本就是标识符与数字
         if (/参数快照|时区|Asia|Europe|America|Australia/.test(line)) continue;
+        // ⚠️ 指纹与版本号是十六进制与 semver，不是「漏出的英文枚举」。
+        // 不排除它们，这条断言就是一枚定时炸弹：八位十六进制里出现三个连续
+        // 字母（a–f）的概率约 21%，故参数一改、哈希一变，它就有五分之一的
+        // 机会无故变红 —— 而红的原因与它要防的东西毫无关系。实测撞上过一次。
+        if (/指纹|引擎版本/.test(line)) continue;
         expect(line, `${argv[0]} 漏出英文：${line}`).not.toMatch(/[A-Za-z]{3,}/);
       }
     }

@@ -59,6 +59,26 @@ export type HeKind = "sanhui" | "sanhe" | "banhe" | "gong" | "liuhe" | "ganhe";
 export interface GainDecay { readonly gain: number; readonly decay: number }
 
 export interface StructureParams {
+  /**
+   * L2 是否**改写载体**。
+   *
+   * `applyStructure` 做两件事，它们可以分开：
+   *
+   * | | 是什么 |
+   * | **察** | 认出会、合、冲、刑、害、破、墓库开闭，产出 `StructureEvent[]` |
+   * | **改** | 据此缩放载体的权重与活性 |
+   *
+   * 「察」是观察，神煞的状态修饰、应期的六条规则、节点的理由都要用它；
+   * 「改」是干预，而有一说认为合化刑冲本就是五行力量消长的**结果**，
+   * 由 L3 传导一并算出即可，不该在 L3 之前先改一道。
+   *
+   * 本开关只关「改」，**不关「察」** —— 关掉时仍照常产出全部事件，
+   * 只是不动权重。两者混为一谈会让整条神煞与应期链路悄悄失效。
+   *
+   * 这是流派差异，不是事实，故进参数（原则 4）。两条路径（`buildBaseChart`
+   * 与 `temporal/evaluate`）共用同一个值，不允许各走各的。
+   */
+  readonly rewriteCarriers: boolean;
   readonly precedence: readonly string[];
   readonly sanhui: GainDecay;
   readonly sanhe: GainDecay;

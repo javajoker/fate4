@@ -34,11 +34,11 @@
 interface Carrier {
   id: string;                    // 稳定标识，如 "month.branch.0"（0 = 本气）
   stem: Stem;                    // 甲…癸
-  element: Element;              // 木火土金水。**只有 L2 的合化可改写它**
+  element: Element;              // 木火土金水。**只有 L2 的合化可改写它**（需 structure.rewriteCarriers）
   polarity: Polarity;            // 阳 | 阴
   origin: "revealed" | "hidden"; // 天干透出 / 地支藏干。人格层的内外之分即取此字段
   position: Position;            // 所属柱与层
-  weight: number;                // 当前权重（L1 初始 → L2 修正 → L3 收敛）
+  weight: number;                // 当前权重（L1 初始 → L2 修正（可关）→ L3 收敛）
   activity: number;              // 活性阻尼 ∈ [0,1]，L2 产出，影响其"施力"能力
   flags: CarrierFlag[];          // 合绊 / 被冲 / 入墓 / 司令 / 透干 …
   trace: TraceEntry[];           // 权重的每一次变更记录

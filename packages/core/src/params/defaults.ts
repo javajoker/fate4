@@ -63,6 +63,9 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
     taiyuanTotal: 40,
   }),
   structure: Object.freeze({
+    // L2 只察不改 —— 见 StructureParams.rewriteCarriers 的说明与
+    // docs/04-structure.md §0「察与改是两件事」里的实测影响。
+    rewriteCarriers: false,
     // 范围大者优先、成局者优先、静者先于动者
     precedence: Object.freeze([
       "sanhui", "sanhe", "banhe", "liuhe", "ganhe",

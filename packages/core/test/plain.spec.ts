@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { buildChart } from "../src/chart/buildChart.js";
-import { buildBaseChart } from "../src/chart/baseChart.js";
+import { buildBaseChart, toBaseChart } from "../src/chart/baseChart.js";
+import { buildSeries } from "../src/temporal/series.js";
 import { plainYear } from "../src/plain/year.js";
 import { buildReport } from "../src/report/assemble.js";
 import { plainCards, type PlainCard } from "../src/plain/cards.js";
 import { scanPlain, PLAIN_RULES } from "../src/plain/guard.js";
 import {
   STRENGTH_PLAIN, GOD_PLAIN, GOD_RELATION_PLAIN, ELEMENT_PLAIN, ELEMENT_BODY_PLAIN,
-  ELEMENT_STATE_PLAIN, QUADRANT_PLAIN, DIRECTION_PLAIN, favorPlain, confidencePlain,
+  ELEMENT_STATE_PLAIN, QUADRANT_PLAIN, DIRECTION_PLAIN, favorPlain, confidencePlain, domainOfSeries,
 } from "../src/plain/vocab.js";
 import { GUARD_RULES, scanText } from "../src/report/guard.js";
 import { toHant, SIMPLIFIED_ONLY } from "../src/report/hant.js";
@@ -426,6 +427,29 @@ describe("问事的人话", () => {
     for (const q of QS) {
       expect(q.framing).toContain("属于那个时刻，不属于你");
       expect(q.framing).toContain("可以展开看");
+    }
+  });
+});
+
+describe("**序列到「哪一类事」必须全覆盖**", () => {
+  it("`buildSeries` 产出的每一个 id 都有人话，一个不漏", () => {
+    // 这一条是穷举，不是抽样。`metric` / `innerOuter` / `agitation` 三类
+    // 曾整类漏在 `domainOfSeries` 之外，而起伏卡片只在某个节点恰好排进前八时
+    // 才会露出来 —— 那时读到的是一句没有主语的「这段时间这一项是顺风的」。
+    const missing: string[] = [];
+    for (const b of CHARTS) {
+      for (const s of buildSeries(toBaseChart(buildChart(b))).series) {
+        if (domainOfSeries(s.id) === null) missing.push(s.id);
+      }
+    }
+    expect([...new Set(missing)].sort(), "以下序列没有对应的人话").toEqual([]);
+  });
+
+  it("给出的话都是「……那一路」或「……这一路」—— 卡片正文靠它做主语", () => {
+    for (const s of buildSeries(toBaseChart(buildChart(CHARTS[0]!))).series) {
+      const d = domainOfSeries(s.id);
+      expect(d, s.id).not.toBeNull();
+      expect(d!, `${s.id}：${d!}`).toMatch(/那一路|这一路/);
     }
   });
 });

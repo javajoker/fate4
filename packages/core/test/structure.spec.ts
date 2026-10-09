@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildChart } from "../src/chart/buildChart.js";
+import { buildBaseChart } from "../src/chart/baseChart.js";
+import { evaluateAt } from "../src/temporal/evaluate.js";
 import { assignWeights } from "../src/weights/assign.js";
 import { applyStructure, slotsOf } from "../src/structure/apply.js";
 import { detectHe, detectClash, detectXing } from "../src/structure/detect.js";
@@ -24,6 +26,41 @@ const EXAMPLE: BirthInput = {
   year: 1990, month: 5, day: 12, hour: 14, minute: 30,
   gender: "male", timeZone: "Asia/Shanghai", longitude: 121.47,
 };
+
+describe("**察与改是两个开关，不是一个**", () => {
+  const CH = buildChart({
+    year: 1990, month: 5, day: 12, hour: 14, minute: 30,
+    gender: "male", timeZone: "Asia/Shanghai", longitude: 121.47,
+  });
+  const ON = loadParams({ structure: { rewriteCarriers: true } });
+  const OFF = loadParams({ structure: { rewriteCarriers: false } });
+
+  it("关掉「改」，事件一条不少 —— 否则神煞、应期、节点会悄悄失效", () => {
+    const a = buildBaseChart(CH, ON);
+    const b = buildBaseChart(CH, OFF);
+    expect(b.events.length).toBeGreaterThan(0);
+    const sig = (x: typeof a) => x.events.map(
+      (e) => `${e.kind}/${e.outcome}/${e.pillars.join("-")}/${e.narrativeTag}`);
+    expect(sig(b)).toEqual(sig(a));
+  });
+
+  it("关掉「改」，载体权重确实不动了 —— 反向对照，否则上一条可能只是开关没接上", () => {
+    const a = buildBaseChart(CH, ON);
+    const b = buildBaseChart(CH, OFF);
+    const l2Of = (x: typeof a) => x.carriers.some((c) => c.trace.some((t) => t.layer === "L2"));
+    expect(l2Of(a), "开着却没有一条 L2 痕迹").toBe(true);
+    expect(l2Of(b), "关了却仍有 L2 痕迹").toBe(false);
+  });
+
+  it("**两条路径共用同一个开关** —— 基础盘与时点盘不允许各走各的", () => {
+    for (const p of [ON, OFF]) {
+      const base = buildBaseChart(CH, p);
+      // 空时点 = 不加大运流年，故事件应与基础盘逐条相同
+      const at = evaluateAt(base);
+      expect(at.events.length, "时点盘的事件数与基础盘不符").toBe(base.events.length);
+    }
+  });
+});
 
 describe("工作例 庚午 辛巳 丁丑 丁未 的结构", () => {
   const f = fresh(EXAMPLE);

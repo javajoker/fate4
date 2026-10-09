@@ -18,7 +18,7 @@ import { FOUR_TOMBS } from "../ganzhi/tables.js";
 import type { Branch } from "../types/ganzhi.js";
 import type { Params } from "../params/types.js";
 import { DEFAULT_PARAMS } from "../params/defaults.js";
-import type { Carrier, PillarKind } from "../weights/carrier.js";
+import { cloneCarriers, type Carrier, type PillarKind } from "../weights/carrier.js";
 import { detectClash, detectHe, detectXing, type ClashCandidate, type HeCandidate } from "./detect.js";
 import { chongDistanceCoef, heDistanceCoef } from "./distance.js";
 import { arbitrate, chongStrength, heStrength } from "./arbitrate.js";
@@ -366,4 +366,23 @@ export function applyStructure(
   }
 
   return { carriers, events };
+}
+
+/**
+ * 按参数决定「察」还是「察 + 改」。
+ *
+ * 关掉改写时，仍在**一份拷贝**上跑完整的 `applyStructure` 来取事件，
+ * 再把拷贝丢掉。这样做而不是另写一条只察不改的路径，是因为事件的产生
+ * 并非全然独立于改写：合化是否成局要看墓库开闭之后的权重
+ * （`apply.ts` 里比较 `wa`/`wb` 的那一处）。跑同一段代码，
+ * 得到的事件才与开着改写时**逐条相同** —— 否则这个开关就成了两套断法。
+ */
+export function structureOf(
+  carriers: readonly Carrier[], monthBranch: Branch, params: Params,
+): StructureResult {
+  if (params.structure.rewriteCarriers) {
+    return applyStructure(carriers, monthBranch, params);
+  }
+  const probe = applyStructure(cloneCarriers(carriers), monthBranch, params);
+  return { carriers, events: probe.events };
 }

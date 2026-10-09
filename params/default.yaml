@@ -83,6 +83,10 @@ weights:
 # L2 · 结构（会合冲刑害破）
 # ═══════════════════════════════════════════════════════════
 structure:
+  # L2 只察不改：仍产出全部结构事件（神煞修饰、应期、节点理由都要用），
+  # 但不据此改写载体权重 —— 合化刑冲的力量消长交给 L3 传导一并算。
+  # 见 docs/04-structure.md §0。
+  rewriteCarriers: false
   precedence: [sanhui, sanhe, banhe, liuhe, ganhe, chong, ganchong, xing, hai, po]
 
   sanhui:

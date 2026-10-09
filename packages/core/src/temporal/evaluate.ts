@@ -35,7 +35,7 @@ import type { Params } from "../params/types.js";
 import { DEFAULT_PARAMS } from "../params/defaults.js";
 import { layExternalCarriers, markFlags } from "../weights/assign.js";
 import { cloneCarriers, type Carrier } from "../weights/carrier.js";
-import { applyStructure } from "../structure/apply.js";
+import { structureOf } from "../structure/apply.js";
 import { propagate } from "../propagate/iterate.js";
 import { conclude } from "../conclude/conclude.js";
 import { scanShensha } from "../shensha/scan.js";
@@ -72,7 +72,8 @@ export function evaluateAt(base: BaseChart, at: Instant = {}): EvaluatedChart {
   // 日主 / 透干 / 引出 —— 在合并后的集合上重标（幂等）
   markFlags(carriers);
 
-  const st = applyStructure(carriers, chart.month.branch, params);
+  // 与 `buildBaseChart` 共用同一个开关 —— 两条路径不允许各走各的。
+  const st = structureOf(carriers, chart.month.branch, params);
   const pr = propagate(st.carriers, params.propagation);
   const conclusions = conclude({
     carriers: pr.carriers, monthBranch: chart.month.branch,

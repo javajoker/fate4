@@ -41,7 +41,7 @@ import { DEFAULT_PARAMS } from "../params/defaults.js";
 import { loadParams, paramsHash } from "../params/load.js";
 import { assignWeights } from "../weights/assign.js";
 import { cloneCarriers, type Carrier } from "../weights/carrier.js";
-// import { applyStructure } from "../structure/apply.js";
+import { structureOf } from "../structure/apply.js";
 import type { StructureEvent } from "../structure/types.js";
 import { propagate, type PropagationResult } from "../propagate/iterate.js";
 import { conclude } from "../conclude/conclude.js";
@@ -90,9 +90,10 @@ export function buildBaseChart(chart: NatalChart, params: Params = DEFAULT_PARAM
 
   // L2 / L3 就地改写，故另拷一份走管线，`l1` 保持初始态
   const carriers = cloneCarriers(w.carriers);
-  // 合化刑冲克害就是五行力量平衡的结果，直接五行平衡即可
-  // const st = applyStructure(carriers, chart.month.branch, params);
-  const st = {carriers, events: []};
+  // 合化刑冲克害就是五行力量平衡的结果，是否在 L3 之前先改写一道，
+  // 由 `params.structure.rewriteCarriers` 决定。**事件照出**，不受开关影响 ——
+  // 神煞状态修饰、应期六条规则、节点理由都要用它。
+  const st = structureOf(carriers, chart.month.branch, params);
   const pr = propagate(st.carriers, params.propagation);
   const conclusions = conclude({
     carriers: pr.carriers, monthBranch: chart.month.branch,
