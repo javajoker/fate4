@@ -128,7 +128,7 @@ export default function AskPage() {
     <>
       <header className="top"><div className="inner">
         <a className="brand" href="/">四柱推演</a>
-        <nav><a href="/">排盘</a><a href="/ask" className="active">问事</a><a href="/cross">合参</a></nav>
+        <nav><a href="/">排盘</a><a href="/ask" className="active">问事</a><a href="/cross">合参</a><a href="/book">书</a></nav>
       </div></header>
       <div className="shell">
         <h1>六爻问事</h1>

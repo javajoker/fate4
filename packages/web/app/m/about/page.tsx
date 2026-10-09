@@ -64,6 +64,19 @@ export default function AboutPage() {
       </div>
 
       <div className="m-card">
+        <h3>想弄懂它在算什么</h3>
+        <p>
+          有一本<a href="/book">《一张盘是怎么算出来的》</a>，十二章，
+          讲这套东西每一步在算什么、凭什么这么算，以及<strong>它算不出什么</strong>。
+          不需要你懂编程，也不预设你信或不信。
+        </p>
+        <p className="dim" style={{ marginTop: 8 }}>
+          网页版是繁体（这个应用是简体，两边不一样，先说在前面）。
+          书里有一页是整本连排的，用浏览器「打印 → 存为 PDF」就能带走。
+        </p>
+      </div>
+
+      <div className="m-card">
         <h3>想看完整版</h3>
         <p>
           带术语的完整报告在<a href="/">桌面版</a>。

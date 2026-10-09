@@ -1,0 +1,193 @@
+/*
+ * 書的版式。
+ *
+ * 全站的中性色板照用（globals.css 的 --ink / --line / --accent 一組），
+ * 但這裡是**讀**的場景，不是工具場景，故另有三條：
+ *
+ *   1. 正文用襯線體 —— 長段中文襯線比無襯線省眼，工具頁的理由（掃讀）在這裡不成立
+ *   2. 行寬收到 34em —— 一行超過四十來個漢字，眼睛回行就會丟行
+ *   3. 標題不用大字號堆出層級，用字重與間距 —— 書裡標題多，字號堆到第四級就沒地方了
+ */
+
+.bk {
+  background: var(--bg);
+  min-height: 100dvh;
+}
+
+.bk-page {
+  max-width: 34em;
+  margin: 0 auto;
+  padding: 44px 24px 96px;
+}
+
+/* ── 正文 ───────────────────────────────────────── */
+
+.bk-body {
+  font-family: var(--serif);
+  font-size: 16.5px;
+  line-height: 1.95;
+  color: var(--ink);
+}
+
+.bk-body h1 {
+  font-size: 26px; font-weight: 600; line-height: 1.4;
+  margin: 0 0 28px; text-wrap: balance;
+}
+.bk-body h2 {
+  font-size: 19px; font-weight: 600; line-height: 1.5;
+  margin: 46px 0 14px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  text-wrap: balance;
+}
+.bk-body h3 {
+  font-size: 16.5px; font-weight: 600;
+  margin: 32px 0 10px; color: var(--ink);
+}
+.bk-body h4 { font-size: 15.5px; font-weight: 600; margin: 24px 0 8px; }
+
+.bk-body p { margin: 0 0 17px; }
+.bk-body strong { font-weight: 600; }
+
+.bk-body a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-soft); }
+.bk-body a:hover { border-bottom-color: var(--accent); }
+
+/* 指向倉庫裡源碼／文檔的引用 —— 網頁上沒有對應頁面，故不是鏈接 */
+.bk-ref {
+  font-family: var(--mono); font-size: .88em;
+  color: var(--ink-2); background: var(--surface-2);
+  padding: 1px 5px; border-radius: 3px;
+}
+
+.bk-body code {
+  font-family: var(--mono); font-size: .86em;
+  background: var(--surface-2); color: var(--ink);
+  padding: 1px 5px; border-radius: 3px;
+}
+
+.bk-body pre {
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px; margin: 0 0 20px;
+  overflow-x: auto;
+}
+.bk-body pre code {
+  background: none; padding: 0; font-size: 13px; line-height: 1.75;
+  white-space: pre;
+}
+
+.bk-body blockquote {
+  margin: 0 0 20px; padding: 2px 0 2px 16px;
+  border-left: 2px solid var(--line-strong);
+  color: var(--ink-2);
+}
+.bk-body blockquote p:last-child { margin-bottom: 0; }
+.bk-body blockquote > *:first-child { margin-top: 0; }
+
+.bk-body ul, .bk-body ol { margin: 0 0 20px; padding-left: 1.5em; }
+.bk-body li { margin-bottom: 8px; }
+
+.bk-body hr {
+  border: none; border-top: 1px solid var(--line);
+  margin: 38px 0;
+}
+
+/* 表在書裡很多，且常有一列是空表頭 —— 空表頭不該佔視覺重量 */
+.bk-body table {
+  width: 100%; border-collapse: collapse;
+  margin: 0 0 22px; font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", sans-serif;
+  font-size: 14px; line-height: 1.7;
+  display: block; overflow-x: auto;
+}
+.bk-body th, .bk-body td {
+  border-bottom: 1px solid var(--line);
+  padding: 9px 12px 9px 0; text-align: left; vertical-align: top;
+}
+.bk-body thead th {
+  color: var(--ink-3); font-weight: 500; font-size: 12.5px;
+  border-bottom-color: var(--line-strong);
+}
+.bk-body thead th:empty { padding: 0; }
+
+/* ── 導航 ───────────────────────────────────────── */
+
+.bk-nav {
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  gap: 16px; align-items: baseline;
+  margin-top: 54px; padding-top: 18px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+}
+.bk-nav > span:last-child { text-align: right; }
+.bk-nav a { color: var(--accent); text-decoration: none; }
+.bk-nav a:hover { text-decoration: underline; }
+.bk-toc-link { color: var(--ink-3) !important; }
+
+.bk-foot {
+  margin-top: 26px; font-size: 12.5px; line-height: 1.8; color: var(--ink-3);
+}
+
+/* ── 全本連排 ───────────────────────────────────── */
+
+.bk-print { max-width: 36em; }
+.bk-cover { padding: 40px 0 56px; border-bottom: 1px solid var(--line); margin-bottom: 40px; }
+.bk-cover h1 { font-family: var(--serif); font-size: 30px; font-weight: 600; margin: 0 0 10px; }
+.bk-sub { color: var(--ink-2); font-size: 15px; margin: 0 0 20px; }
+.bk-cover-note { color: var(--ink-3); font-size: 13px; margin: 0; }
+.bk-chapter + .bk-chapter { margin-top: 56px; }
+
+/* ── 打印 ───────────────────────────────────────────
+ * 倉庫裡不放 .pdf：放了就會過期（書改一行它就不再是書），而構建期生成
+ * 要引一個瀏覽器引擎。故走瀏覽器自己的打印管線，由這一段負責版式。
+ */
+@page {
+  size: A4;
+  margin: 20mm 18mm;
+}
+
+@media print {
+  /* 打印一律用淺底黑字 —— 讀者的系統可能是深色，但紙不是 */
+  :root, :root[data-theme="dark"] {
+    --bg: #ffffff; --surface: #ffffff; --surface-2: #f4f4f2;
+    --line: #d4d4ce; --line-strong: #9a9a93;
+    --ink: #111416; --ink-2: #3c4147; --ink-3: #62686f;
+    --accent: #1f3440; --accent-soft: #dfe5e9;
+  }
+  html, body { background: #fff; }
+
+  .bk-page { max-width: none; padding: 0; }
+  .bk-noprint, .bk-nav { display: none !important; }
+
+  .bk-body { font-size: 10.5pt; line-height: 1.75; }
+  .bk-body pre code { font-size: 8.5pt; }
+  .bk-body table { font-size: 9pt; display: table; overflow: visible; }
+
+  /* 每章另起一頁 */
+  .bk-chapter { break-before: page; margin-top: 0 !important; }
+  .bk-cover { break-after: page; border: none; }
+  .bk-chapter:first-of-type { break-before: auto; }
+
+  /* 標題不許孤懸在頁底 */
+  .bk-body h1, .bk-body h2, .bk-body h3, .bk-body h4 {
+    break-after: avoid; break-inside: avoid;
+  }
+  .bk-body table, .bk-body pre, .bk-body blockquote, .bk-body li { break-inside: avoid; }
+  .bk-body p { orphans: 2; widows: 2; }
+
+  /* 紙上點不動鏈接，故把地址印出來；站內的補全域名 */
+  .bk-body a { color: inherit; border-bottom: none; }
+  .bk-body a[href^="http"]::after {
+    content: "（" attr(href) "）";
+    font-size: .78em; color: #62686f; word-break: break-all;
+  }
+}
+
+/* ── 窄屏 ───────────────────────────────────────── */
+
+@media (max-width: 560px) {
+  .bk-page { padding: 28px 16px 72px; }
+  .bk-body { font-size: 16px; line-height: 1.9; }
+  .bk-body h1 { font-size: 23px; }
+  .bk-body h2 { font-size: 18px; margin-top: 38px; }
+  .bk-nav { grid-template-columns: 1fr; gap: 10px; }
+  .bk-nav > span:last-child { text-align: left; }
+}
