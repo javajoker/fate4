@@ -14,6 +14,11 @@ import { buildChart } from "../src/chart/buildChart.js";
 import { asTT } from "../src/astro/julian.js";
 import { millisToJulianDay } from "../src/time/timezone.js";
 import { YUEJIANG } from "../src/liuren/tables.js";
+import {
+  meanLunarNode, meanLunarPerigee, siyuAt, NODE_PERIOD_YEARS, PERIGEE_PERIOD_YEARS,
+  taisuiDrift, ziweiPalaces, ziweiPalaceSpace, meanVsTrueTerms, solarDailyMotion,
+  DINGQI_REFORM_YEAR,
+} from "../src/compare/correspondence.js";
 import { SOLAR_TERMS } from "../src/astro/solarTerms.js";
 
 describe("**中气与入宫点是同一组时刻** —— 全书最硬的那条连接", () => {
@@ -173,5 +178,140 @@ describe("系统登记表", () => {
     for (const s of stateSpaces()) {
       if (s.basis === "declared") expect(s.note).toMatch(/⚠️|未实现|不给数|连续/);
     }
+  });
+});
+
+// ═════════════════════════════════════════════════════════
+// 数值对应 —— correspondence.ts
+// ═════════════════════════════════════════════════════════
+
+describe("**四余是月亮的交点与远地点** —— 不是类比，是同一批点", () => {
+  const jd = asTT(millisToJulianDay(Date.UTC(2026, 0, 1)) + 69 / 86400);
+
+  it("交点周期 18.6 年、近地点周期 8.85 年 —— 两个独立可查的数", () => {
+    expect(NODE_PERIOD_YEARS).toBeCloseTo(18.61, 2);
+    expect(PERIGEE_PERIOD_YEARS).toBeCloseTo(8.85, 2);
+  });
+
+  it("J2000 当天的平升交点 = 125.0445°（Meeus 的常数项）", () => {
+    expect(meanLunarNode(asTT(2451545.0))).toBeCloseTo(125.0445479, 5);
+  });
+
+  it("**升交点逆行、近地点顺行** —— 方向相反，这是它们最好认的区别", () => {
+    const a = meanLunarNode(jd);
+    const b = meanLunarNode(asTT((jd as number) + 365.25));
+    // 逆行：一年退约 19.35°
+    expect(((a - b) % 360 + 360) % 360).toBeCloseTo(19.34, 1);
+
+    const p1 = meanLunarPerigee(jd);
+    const p2 = meanLunarPerigee(asTT((jd as number) + 365.25));
+    // 顺行：一年进约 40.69°
+    expect(((p2 - p1) % 360 + 360) % 360).toBeCloseTo(40.69, 1);
+  });
+
+  it("计都恒与罗睺相对，月孛恒与近地点相对", () => {
+    const s = siyuAt(jd);
+    expect(((s.ketu - s.rahu) % 360 + 360) % 360).toBeCloseTo(180, 9);
+    expect(((s.yuebei - meanLunarPerigee(jd)) % 360 + 360) % 360).toBeCloseTo(180, 9);
+  });
+
+  it("**反向对照：与 2026 年初的已知值相符** —— 否则上面几条只是自洽", () => {
+    // 自 J2000 的 125.04° 逆行 26 年 × 19.35°/年，绕回来约 342°
+    expect(meanLunarNode(jd)).toBeGreaterThan(341);
+    expect(meanLunarNode(jd)).toBeLessThan(343);
+  });
+});
+
+describe("**太岁：一条已经漂没了的天文连接**", () => {
+  it("木星十二年多走约 4.2°，约 86 年跳一个次 —— 这就是史书里的「超辰」", () => {
+    const d = taisuiDrift(0, 0);
+    expect(d.degreesPer12Years).toBeCloseTo(4.17, 1);
+    expect(d.yearsPerStationSkip).toBeGreaterThan(80);
+    expect(d.yearsPerStationSkip).toBeLessThan(90);
+  });
+
+  it("自太初历（前 104 年）至今已偏二十余个次 —— 名存实亡", () => {
+    const d = taisuiDrift(-104, 2026);
+    expect(d.stationsDrifted).toBeGreaterThan(20);
+    expect(d.stationsDrifted).toBeLessThan(30);
+  });
+
+  it("漂移是线性累积的 —— 年数翻倍，偏差翻倍", () => {
+    const a = taisuiDrift(0, 100).degreesDrifted;
+    const b = taisuiDrift(0, 200).degreesDrifted;
+    expect(b / a).toBeCloseTo(2, 6);
+  });
+});
+
+describe("**紫微的命宫是一个纯算术函数** —— 起法本身就是依据", () => {
+  it("输入只有农历月与时辰两个整数，不查星历", () => {
+    expect(ziweiPalaces(1, 0).ming).toBe("寅");
+    expect(ziweiPalaces(1, 0).shen).toBe("寅");
+    // 正月寅起，顺数到七月是申；午时逆数六位回到寅
+    expect(ziweiPalaces(7, 6).ming).toBe("寅");
+    expect(ziweiPalaces(7, 6).shen).toBe("寅");
+  });
+
+  it("越界输入抛错，不静默取模", () => {
+    expect(() => ziweiPalaces(0, 0)).toThrow();
+    expect(() => ziweiPalaces(13, 0)).toThrow();
+    expect(() => ziweiPalaces(1, 12)).toThrow();
+  });
+
+  it("**144 种输入只落到 72 对 (命, 身)** —— 穷举得出，这是该起法的性质", () => {
+    const s = ziweiPalaceSpace();
+    expect(s.inputs).toBe(144);
+    expect(s.distinctMing).toBe(12);
+    expect(s.distinctPairs).toBe(72);
+  });
+
+  it("命宫顺时不变量：命 + 身 恒等于两倍的月宫", () => {
+    for (let m = 1; m <= 12; m++) {
+      for (let h = 0; h < 12; h++) {
+        const p = ziweiPalaces(m, h);
+        const monthPalace = (2 + m - 1) % 12;
+        expect((p.mingIndex + p.shenIndex) % 12).toBe((2 * monthPalace) % 12);
+      }
+    }
+  });
+});
+
+describe("**平气与定气：1645 年那条缝**", () => {
+  const terms = meanVsTrueTerms(2026);
+
+  it("二十四个节气都算到了", () => {
+    expect(terms.length).toBe(24);
+  });
+
+  it("**最大可差两天以上** —— 这足以改掉一个人的月柱", () => {
+    const max = Math.max(...terms.map((t) => Math.abs(t.diffDays)));
+    expect(max).toBeGreaterThan(2);
+  });
+
+  it("差值在二至附近近零、在二分附近最大 —— 椭圆轨道的直接后果", () => {
+    const at = (n: string) => terms.find((t) => t.term === n)!;
+    expect(Math.abs(at("夏至").diffDays)).toBeLessThan(1.2);
+    expect(Math.abs(at("清明").diffDays)).toBeGreaterThan(2);
+  });
+
+  it("近日点附近太阳走得快，远日点附近走得慢，差约 7%", () => {
+    const jd = (mo: number, d: number) =>
+      asTT(millisToJulianDay(Date.UTC(2026, mo, d)) + 69 / 86400);
+    const peri = solarDailyMotion(jd(0, 3));
+    const apo = solarDailyMotion(jd(6, 5));
+    expect(peri).toBeGreaterThan(apo);
+    expect(peri / apo - 1).toBeCloseTo(0.069, 2);
+    expect(peri).toBeCloseTo(1.019, 2);
+    expect(apo).toBeCloseTo(0.953, 2);
+  });
+
+  it("**反向对照：平气的间隔确实是等的** —— 否则上面比的是两个定气", () => {
+    const sorted = [...terms].sort((a, b) => a.meanJd - b.meanJd);
+    const gaps = sorted.slice(1).map((t, i) => t.meanJd - sorted[i]!.meanJd);
+    for (const g of gaps) expect(g).toBeCloseTo(365.2421897 / 24, 6);
+  });
+
+  it("改历之年记在案", () => {
+    expect(DINGQI_REFORM_YEAR).toBe(1645);
   });
 });

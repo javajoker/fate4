@@ -42,6 +42,13 @@ VSOP87 的系数记了 SHA256；爻辞语料记了源文件校验和；
 | [西方-占星.md](西方-占星.md) | 从巴比伦到现代，以及回归／恒星之争 |
 | [西方-塔罗.md](西方-塔罗.md) | 它的真实来历，以及那层后加的占星对应 |
 | [天文历法.md](天文历法.md) | 算法与星历的来源 —— 这一类**有**权威版本，故记得最细 |
+| [vendor/](vendor/) | 第三方代码（git submodule）。目前只有一个：Astronomy Engine（MIT），**只用于测试里的交叉校验** |
+
+> **为什么没有收录典籍原文的子模块：** 查过 GitHub，候选的三个古籍语料仓库
+> （殆知阁 2.1 GB、buyiwang-tech/books 2.0 GB、youngzs/xuanxue 35 MB）
+> **都没有 LICENSE 文件**。没有许可证默认是保留全部权利 —— 底层古籍多半已入
+> 公有领域，但数字化整理本身可以另有权利，而没有许可证就无从判断。
+> 详见 [vendor/README.md](vendor/README.md)。
 
 ## 与 `packages/core/src/compare/` 的关系
 

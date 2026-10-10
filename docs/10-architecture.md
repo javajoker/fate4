@@ -19,6 +19,7 @@ fate/
 ├── book/                         # 《一张盘是怎么算出来的》简体源，十二章 + 附录
 ├── book-compare/                 # 《测天，还是约定》简体源，九章
 ├── reference/                    # 参考书目 —— 托名与可考分两栏记
+│   └── vendor/astronomy-engine   # git submodule（MIT），**只用于测试交叉校验**
 └── packages/
     ├── core/                     # 推演内核 —— 零运行时依赖
     ├── data/                     # 静态数据（VSOP87 截断级数、爻辞语料）

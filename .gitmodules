@@ -1,0 +1,3 @@
+[submodule "reference/vendor/astronomy-engine"]
+	path = reference/vendor/astronomy-engine
+	url = https://github.com/cosinekitty/astronomy.git

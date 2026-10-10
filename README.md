@@ -164,6 +164,12 @@ Web 应用全部计算在浏览器内完成，**生辰数据不出本机**：记
 pnpm install && pnpm test && pnpm typecheck
 ```
 
+可选：拉下交叉校验用的天文库子模块（MIT，只在测试里用，不拉也不会变红）：
+
+```bash
+git submodule update --init --depth 1
+```
+
 Web 应用与命令行：
 
 ```bash
