@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { toHant, unclassifiedOf, SIMPLIFIED_ONLY } from "../src/report/hant.js";
+import { toHant, unclassifiedOf, SIMPLIFIED_ONLY, TERMS } from "../src/report/hant.js";
 
 /**
  * 《一张盘是怎么算出来的》的简繁转换。
@@ -12,13 +12,42 @@ import { toHant, unclassifiedOf, SIMPLIFIED_ONLY } from "../src/report/hant.js";
  * 当场逮到新冒出来的未归类字：网页版的繁体是构建期转的，
  * 转不动就是构建失败，而不是读者打开页面才白屏。
  */
-const DIR = resolve(import.meta.dirname, "../../../book");
-const FILES = readdirSync(DIR).filter((f) => f.endsWith(".md"));
-const read = (f: string) => readFileSync(resolve(DIR, f), "utf8");
+const DIRS = ["book", "book-compare", "reference"] as const;
+const ROOT = resolve(import.meta.dirname, "../../..");
+/** `<目录>/<文件>` 的扁平清单 —— 三处共用同一套断言。 */
+const FILES: string[] = DIRS.flatMap((d) =>
+  readdirSync(resolve(ROOT, d)).filter((f) => f.endsWith(".md")).map((f) => `${d}/${f}`));
+const read = (f: string) => readFileSync(resolve(ROOT, f), "utf8");
 
 describe("书的简繁转换", () => {
-  it("书在那儿，且不止一两篇", () => {
-    expect(FILES.length).toBeGreaterThanOrEqual(13);
+  it("两本书与书目都在，且不止一两篇", () => {
+    expect(FILES.length).toBeGreaterThanOrEqual(30);
+    for (const d of DIRS) {
+      expect(FILES.filter((f) => f.startsWith(`${d}/`)).length, d).toBeGreaterThan(5);
+    }
+  });
+
+  it("**词条不得被软换行切断** —— 切断了就转不出来，而且错得很隐蔽", () => {
+    // `toHant` 逐字扫，词条匹配不跨换行。正文是硬折行的散文，
+    // 「农历」「星历」这种词一旦恰好折在中间，前半留在上一行、后半在下一行，
+    // 两边各自都不构成词条 —— 于是「历」落单，当场抛错。
+    // 实测撞上过一次（reference/中土-星命.md 的「农历」）。
+    const bad: string[] = [];
+    for (const f of FILES) {
+      const lines = read(f).split("\n");
+      for (let i = 0; i + 1 < lines.length; i++) {
+        const a = lines[i]!; const b = lines[i + 1]!;
+        if (a.trim() === "" || b.trim() === "") continue;   // 空行不是软换行
+        const seam = a.slice(-6) + b.slice(0, 6);
+        for (const k of Object.keys(TERMS)) {
+          if (k.length < 2) continue;
+          if (seam.includes(k) && !a.includes(k) && !b.includes(k)) {
+            bad.push(`${f}:${i + 1} 「${k}」`);
+          }
+        }
+      }
+    }
+    expect(bad, "以下词条被折行切断，把那一行重排即可").toEqual([]);
   });
 
   it("**每一个汉字都已归类** —— 新字出现时这里会指名道姓", () => {
@@ -80,13 +109,15 @@ describe("书的结构", () => {
   });
 
   it("**章节之间的链接都指向真实的文件**", () => {
-    const names = new Set(FILES);
     const bad: string[] = [];
     for (const f of FILES) {
-      for (const m of read(f).matchAll(/\]\(([^)#]+\.md)(?:#[^)]*)?\)/g)) {
+      const dir = resolve(ROOT, f, "..");
+      for (const m of read(f).matchAll(/\]\(([^)#]+)(?:#[^)]*)?\)/g)) {
         const t = m[1]!;
-        if (t.startsWith("../")) continue;       // 指向仓库别处，另有校验
-        if (!names.has(t)) bad.push(`${f} → ${t}`);
+        if (t.startsWith("http")) continue;
+        // 以 / 开头的是**站内路由**（应用里的页面），不是文件
+        if (t.startsWith("/")) continue;
+        if (!existsSync(resolve(dir, t))) bad.push(`${f} → ${t}`);
       }
     }
     expect(bad, "断链").toEqual([]);

@@ -45,7 +45,7 @@ export default function Home() {
   return (
     <>
       <header className="top"><div className="inner"><span className="brand">四柱推演</span>
-        <nav><a href="/" className="active">排盘</a><a href="/ask">问事</a><a href="/cross">合参</a><a href="/book">书</a></nav></div></header>
+        <nav><a href="/" className="active">排盘</a><a href="/ask">问事</a><a href="/cross">合参</a><a href="/book">书</a><a href="/compare-book">比较</a></nav></div></header>
       <div className="shell">
         <h1>排盘</h1>
         <p className="sub">

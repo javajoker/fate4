@@ -52,7 +52,7 @@ export default function CrossPage() {
         <nav>
           <a href="/">排盘</a><a href="/ask">问事</a>
           <a href="/cross" className="active">合参</a>
-          <a href="/book">书</a>
+          <a href="/book">书</a><a href="/compare-book">比较</a>
         </nav>
       </div></header>
       <div className="shell">

@@ -1,9 +1,8 @@
 /**
- * 《一張盤是怎麼算出來的》—— 網頁版正文。
+ * 網頁版正文 —— 由 book/*.md（簡體源）生成，**請勿手改**。
  *
- * 由 scripts/build-book.mjs 從 book/*.md（簡體源）生成，**請勿手改**。
- * 繁體由 @fate/core 的 toHant 轉出；它遇到無法定奪的字會抛錯，
- * 故這一步放在構建期：抛錯即構建失敗，而不是讀者打開頁面才白屏。
+ * 見 scripts/build-book.mjs。繁體由 @fate/core 的 toHant 轉出；
+ * 它遇到無法定奪的字會抛錯，故這一步放在構建期：抛錯即構建失敗。
  */
 
 export interface Chapter {
@@ -12,6 +11,8 @@ export interface Chapter {
   readonly title: string;
   readonly html: string;
 }
+
+export const ROUTE = "/book";
 
 export const CHAPTERS: readonly Chapter[] = Object.freeze([
   { slug: "index", file: "README.md", title: "一張盤是怎麼算出來的",

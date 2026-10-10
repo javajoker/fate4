@@ -17,6 +17,8 @@ fate/
 │   ├── generate-yaoci.mjs        # 由原型项目生成爻辞语料，校验 SHA256
 │   └── build-book.mjs            # 由 book/ 生成网页版繁体正文（构建期转，抛错即失败）
 ├── book/                         # 《一张盘是怎么算出来的》简体源，十二章 + 附录
+├── book-compare/                 # 《测天，还是约定》简体源，九章
+├── reference/                    # 参考书目 —— 托名与可考分两栏记
 └── packages/
     ├── core/                     # 推演内核 —— 零运行时依赖
     ├── data/                     # 静态数据（VSOP87 截断级数、爻辞语料）

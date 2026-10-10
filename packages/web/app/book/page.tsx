@@ -7,7 +7,7 @@ export default function BookIndex() {
     <main className="bk-page">
       <article className="bk-body" dangerouslySetInnerHTML={{ __html: idx.html }} />
       <nav className="bk-nav">
-        <span />
+        <span><a href="/compare-book">另一本 · 測天，還是約定</a></span>
         <a className="bk-toc-link" href="/book/print">整本連排（可打印成 PDF）</a>
         <span><a href="/book/01">開始讀 →</a></span>
       </nav>
