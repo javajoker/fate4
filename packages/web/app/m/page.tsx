@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { buildChart, buildReport, plainCards, type BirthInput , type PlainSection } from "@fate/core";
+import {
+  buildChart, buildReport, loadParams, plainCards,
+  type Audience, type BirthInput, type PlainSection,
+} from "@fate/core";
 import { Card } from "./Card";
 import { CITIES, clearBirth, loadBirth, loadPlainSource, savePlainSource, saveBirth,
-  type PlainSource } from "./store";
+  loadAudience, saveAudience, type PlainSource } from "./store";
+import { AudiencePicker, ProvenanceWarnings } from "./Audience";
 import { AiHandoff } from "./AiHandoff";
 import { Profile } from "./Profile";
 import { Share } from "./Share";
@@ -23,8 +27,11 @@ export default function MePage() {
   const [editing, setEditing] = useState(false);
   const [sec, setSec] = useState<PlainSection>("性格");
   const [src, setSrc] = useState<PlainSource>("code");
+  const [aud, setAud] = useState<Audience>("lay");
 
-  useEffect(() => { setBirth(loadBirth()); setSrc(loadPlainSource()); setReady(true); }, []);
+  useEffect(() => {
+    setBirth(loadBirth()); setSrc(loadPlainSource()); setAud(loadAudience()); setReady(true);
+  }, []);
 
   // 报告只算一次，人话与 AI 交接共用 —— 算两遍不但慢，
   // 两份报告的 now 还可能跨过午夜落在不同的一天上。
@@ -33,11 +40,12 @@ export default function MePage() {
     try {
       return buildReport(buildChart(birth), {
         includeNodes: true,
+        params: loadParams({ report: { audience: aud } }),
         now: (() => { const d = new Date();
           return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() }; })(),
       });
     } catch { return null; }
-  }, [birth]);
+  }, [birth, aud]);
 
   const plain = useMemo(() => (report === null ? null : plainCards(report)), [report]);
 
@@ -67,6 +75,11 @@ export default function MePage() {
           onEdit={() => setEditing(true)} />
       )}
 
+      {/* 盘的来历 —— 任何读者档都出，它说的是盘本身，不是对盘的解读 */}
+      <ProvenanceWarnings warnings={plain.provenanceWarnings} />
+
+      <AudiencePicker value={aud} onChange={(a) => { setAud(a); saveAudience(a); }} />
+
       <div className="m-chips" style={{ display: src === "code" ? undefined : "none" }}>
         {sections.map((s) => (
           <button key={s} className={`m-chip${s === sec ? " on" : ""}`} onClick={() => setSec(s)}>
@@ -91,6 +104,10 @@ export default function MePage() {
       )}
 
       {src === "code" && shown.map((c) => <Card key={c.id} card={c} />)}
+
+      {src === "code" && sec === "起伏" && plain.withheldNote !== null && (
+        <p className="m-note">{plain.withheldNote}</p>
+      )}
 
       {src === "code" && shown.length > 0 && (
         <Share title={`关于我 · ${sec}`} lines={shown.map((c) => `${c.title}：${c.body}`)} />

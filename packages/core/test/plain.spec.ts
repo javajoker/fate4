@@ -6,6 +6,7 @@ import { plainYear } from "../src/plain/year.js";
 import { buildReport } from "../src/report/assemble.js";
 import { plainCards, type PlainCard } from "../src/plain/cards.js";
 import { scanPlain, PLAIN_RULES } from "../src/plain/guard.js";
+import { AUDIENCES, discloses, showsProvenanceWarnings } from "../src/report/audience.js";
 import {
   STRENGTH_PLAIN, GOD_PLAIN, GOD_RELATION_PLAIN, ELEMENT_PLAIN, ELEMENT_BODY_PLAIN,
   ELEMENT_STATE_PLAIN, QUADRANT_PLAIN, DIRECTION_PLAIN, favorPlain, confidencePlain, domainOfSeries,
@@ -36,7 +37,7 @@ const CHARTS: readonly BirthInput[] = [
 const REPORTS = CHARTS.map((b) => buildReport(buildChart(b), {
   includeNodes: true, now: { year: 2026, month: 9, day: 2 },
 }));
-const PLAINS = REPORTS.map(plainCards);
+const PLAINS = REPORTS.map((r) => plainCards(r));
 const allCards = (): PlainCard[] => PLAINS.flatMap((p) => p.cards);
 
 describe("词表完备", () => {
@@ -533,5 +534,120 @@ describe("**回看用的逐年人话**", () => {
     for (let y = 2005; y <= 2035; y++) {
       expect(plainYear(BASE, y).domains.length).toBeLessThanOrEqual(3);
     }
+  });
+});
+
+// ═════════════════════════════════════════════════════════
+// 读者档
+// ═════════════════════════════════════════════════════════
+
+describe("**读者档控制披露，不控制断言**", () => {
+  const CH = CHARTS[0]!;
+  // 记忆化：三份带节点的报告各约 1.3 秒（要按月跑满六十年），
+  // 而下面有七条测试要用。每条各算一遍会把这一组推到默认超时之外 ——
+  // 实测撞上过，且表现为「偶发超时」而不是「算错了」，最难查的那一种。
+  const CACHE = new Map<string, ReturnType<typeof buildReport>>();
+  const reportFor = (a: "lay" | "student" | "practitioner") => {
+    const hit = CACHE.get(a);
+    if (hit !== undefined) return hit;
+    const r = buildReport(buildChart(CH), {
+      includeNodes: true, now: { year: 2026, month: 9, day: 2 },
+      params: loadParams({ report: { audience: a } }),
+    });
+    CACHE.set(a, r);
+    return r;
+  };
+
+  it("**三档的守卫结果完全相同** —— 这是整个开关的前提", () => {
+    const texts = AUDIENCES.map((a) => {
+      const p = plainCards(reportFor(a));
+      return p.cards.map((c) => `${c.title}。${c.body}`).join("\n");
+    });
+    // 每一档都零违规
+    for (const [i, t] of texts.entries()) {
+      expect(scanPlain(t, `audience.${AUDIENCES[i]!}`), AUDIENCES[i]).toEqual([]);
+    }
+    // 且技术层报告本身在三档下同样零违规
+    for (const a of AUDIENCES) {
+      const r = reportFor(a);
+      expect(r.guard.violations, a).toEqual([]);
+    }
+  });
+
+  it("**盘的来历警告，三档都出** —— 它不是细节，是这张盘凭什么长这样", () => {
+    for (const a of AUDIENCES) {
+      const p = plainCards(reportFor(a));
+      expect(p.provenanceWarnings.length, a).toBeGreaterThan(0);
+      expect(showsProvenanceWarnings(a)).toBe(true);
+    }
+  });
+
+  it("晚子时出生的盘，警告里写明日柱已进位 —— 日干就是日主，换了一个", () => {
+    const late = buildReport(buildChart({
+      year: 1988, month: 11, day: 3, hour: 23, minute: 30,
+      gender: "female", timeZone: "Asia/Shanghai", longitude: 121.47,
+    }), { now: { year: 2026, month: 9, day: 2 } });
+    expect(late.meta.warnings.join("")).toContain("晚子");
+    expect(late.meta.warnings.join("")).toContain("日柱");
+  });
+
+  it("**普通读者档不给今年之后的起伏段，另两档给**", () => {
+    const yearOf = (t: string) => Number(/^(\d{4})/.exec(t)?.[1] ?? 0);
+    const lay = plainCards(reportFor("lay")).cards.filter((c) => c.section === "起伏");
+    const stu = plainCards(reportFor("student")).cards.filter((c) => c.section === "起伏");
+    expect(stu.length).toBeGreaterThan(lay.length);
+    for (const c of lay) expect(yearOf(c.title), `${c.title} 落在今年之后`).toBeLessThanOrEqual(2026);
+    expect(Math.max(...stu.map((c) => yearOf(c.title)))).toBeGreaterThan(2026);
+  });
+
+  it("关掉了就说出来，不默默少几条", () => {
+    expect(plainCards(reportFor("lay")).withheldNote).not.toBeNull();
+    expect(plainCards(reportFor("student")).withheldNote).toBeNull();
+  });
+
+  it("**问事：健康类的限制先于读者档** —— 理由不能说错", () => {
+    const mo = castMomentOf({
+      year: 2026, month: 9, day: 2, hour: 14, minute: 30,
+      timeZone: "Asia/Shanghai", longitude: 121.47,
+    });
+    for (const a of AUDIENCES) {
+      const P = loadParams({ report: { audience: a } });
+      const gua = dress(cast(mo, { method: "time" }, P.liuyao), P.liuyao);
+      const rep = buildQuestionReport(
+        judge(gua, pickYongshen(gua, "health.body"), P.liuyao), P);
+      const w = plainQuestion(rep).cards.find((c) => c.id === "q.window")!;
+      // 任何档都不给时段，且说明「换一档也看不到」
+      expect(w.body, a).toContain("任何读者档都一样");
+      expect(w.body, a).not.toMatch(/\d{4} 年的/);
+    }
+  });
+
+  it("**问事：非健康类，普通读者档不给时段、命理师给**", () => {
+    const mo = castMomentOf({
+      year: 2026, month: 9, day: 2, hour: 14, minute: 30,
+      timeZone: "Asia/Shanghai", longitude: 121.47,
+    });
+    const windowFor = (a: "lay" | "practitioner") => {
+      const P = loadParams({ report: { audience: a } });
+      const gua = dress(cast(mo, { method: "time" }, P.liuyao), P.liuyao);
+      const rep = buildQuestionReport(
+        judge(gua, pickYongshen(gua, "career.promotion"), P.liuyao), P);
+      return plainQuestion(rep).cards.find((c) => c.id === "q.window")!.body;
+    };
+    expect(windowFor("lay")).toContain("这一档不显示指向未来的时段");
+    expect(windowFor("practitioner")).toMatch(/\d{4} 年的|没有指向特定的时段/);
+  });
+
+  it("披露表里没有「守卫」这一项，而且永远不该有", () => {
+    // 若日后有人往 Disclosure 里加了一个 guard 之类的键，这条会红。
+    const keys: string[] = [];
+    for (const a of AUDIENCES) {
+      for (const d of ["numbers", "numberGloss", "futureWindows",
+        "shenshaRaw", "fullDerivation", "calibrationNotes"] as const) {
+        expect(typeof discloses(a, d)).toBe("boolean");
+        keys.push(d);
+      }
+    }
+    expect([...new Set(keys)].some((k) => /guard|守卫|scan/i.test(k))).toBe(false);
   });
 });

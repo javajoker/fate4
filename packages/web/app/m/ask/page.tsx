@@ -8,7 +8,7 @@ import {
 } from "@fate/core";
 import { Card } from "../Card";
 import { Disclaimer } from "../page";
-import { CITIES, loadMarks, saveMark, type Mark, type Verdict } from "../store";
+import { CITIES, loadAudience, loadMarks, saveMark, type Mark, type Verdict } from "../store";
 
 /**
  * 「问事」页 —— 就一件具体的事起一卦。
@@ -34,7 +34,8 @@ const readJournal = (): Entry[] => {
 };
 
 export default function AskPage() {
-  const params = useMemo(() => loadParams({}), []);
+  // 读者档影响应期那一张卡 —— 普通读者档不给指向未来的时段
+  const params = useMemo(() => loadParams({ report: { audience: loadAudience() } }), []);
   const [cat, setCat] = useState<TopicCategory>("财");
   const [topicId, setTopicId] = useState("wealth.seek");
   const [relation, setRelation] = useState<Liuqin>("父母");

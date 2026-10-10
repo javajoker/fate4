@@ -16,6 +16,9 @@ import type { QuestionReport } from "../liuyao/report.js";
 import { relayerYaoci, type Quote, type YaociPick, type YaociReading } from "../liuyao/yaoci.js";
 import type { NarrativeLine } from "../report/render.js";
 import type { PlainCard } from "./cards.js";
+import {
+  discloses, FUTURE_WITHHELD_NOTE, type Audience,
+} from "../report/audience.js";
 import { confidencePlain, PLAIN_DISCLAIMER } from "./vocab.js";
 
 /** 用神力量五档 → 人话。**不说成败**，只说这件事在卦里的分量。 */
@@ -58,6 +61,7 @@ export const GUA_FLAG_PLAIN: Readonly<Record<string, string>> = Object.freeze({
 
 export interface PlainQuestion {
   readonly cards: readonly PlainCard[];
+  readonly audience: Audience;
   /** 指事一路的卡片。与 `cards` 分开，因为它是**引文**，不是本系统的话。 */
   readonly yaoci: readonly PlainCard[];
   readonly framing: string;
@@ -182,7 +186,10 @@ const line = (id: string, title: string, body: string,
   id, section: "今天", title, body: body + confidencePlain(conf), evidence: ev, confidence: conf,
 });
 
-export function plainQuestion(r: QuestionReport): PlainQuestion {
+export function plainQuestion(
+  r: QuestionReport, options: { readonly audience?: Audience } = {},
+): PlainQuestion {
+  const audience = options.audience ?? r.meta.audience;
   const cards: PlainCard[] = [];
   const nar = r.judgement.narrative;
 
@@ -231,19 +238,36 @@ export function plainQuestion(r: QuestionReport): PlainQuestion {
   }
 
   const yq = r.yingqi.result;
-  cards.push(line("q.window", "传统上指向的时段",
-    yq.suppressed !== null
-      ? "这一类不给时段。「什么时候会怎样」是这套方法给不出的东西，"
-        + "在健康这类事情上尤其不该给。"
-      : yq.windows.length === 0
+  // ⚠️ 次序要紧：健康类的限制**先于**读者档。
+  //
+  // 两者都会导致不出时段，但理由不同，而理由必须说对：
+  //   健康类   任何档都不给 —— 这是领域限制，命理师那一档也不放开
+  //   读者档   普通读者不给 —— 这是披露深度，换一档就能看
+  //
+  // 先判档位的话，健康类在普通读者档下会被说成「换一档可以看到」——
+  // 那是错的，而且正好错在最不该错的那一类上。
+  if (yq.suppressed !== null) {
+    cards.push(line("q.window", "关于时间",
+      "这一类不给时段。「什么时候会怎样」是这套方法给不出的东西，"
+      + "在健康这类事情上尤其不该给。**任何读者档都一样**，换一档也看不到。",
+      r.yingqi.narrative));
+  } else if (!discloses(audience, "futureWindows")) {
+    // 候选就在 `r.yingqi.result` 里，不是算不出来。只是隔着一个时间差，
+    // 「传统取法列出的候选」会被记成「一件将要发生的事」。
+    cards.push(line("q.window", "关于时间", FUTURE_WITHHELD_NOTE, r.yingqi.narrative));
+  } else {
+    cards.push(line("q.window", "传统上指向的时段",
+      yq.windows.length === 0
         ? "这一卦没有指向特定的时段。"
         : `${yq.windows.map((w) => `${w.year} 年的${w.branch}月前后`).join("、")}。`
           + "这是按传统取法列出的候选，按远近排 —— 方法本身给不出哪一段更可能，"
           + "所以不作这种排序。",
-    r.yingqi.narrative));
+      r.yingqi.narrative));
+  }
 
   return {
     cards: Object.freeze(cards),
+    audience,
     yaoci: Object.freeze(plainYaoci(r)),
     framing: PLAIN_QUESTION_FRAMING,
     disclaimer: PLAIN_DISCLAIMER,

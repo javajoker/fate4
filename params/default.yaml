@@ -418,6 +418,15 @@ report:
   showConvergenceHistory: false
   showParamsSnapshot: true
 
+  # 读者档 —— 同一份推演给三种人看三种深度。
+  #   lay          普通读者：平常话为主，不出量化数字，不给指向未来的时段
+  #   student      学习中：完整推导链与数字，每个数附一句它是什么意思
+  #   practitioner 命理师：原始数值直出，不加解释
+  # ⚠️ 它控制**披露**，不控制**断言** —— 措辞守卫在三档下完全相同。
+  # 默认取最严的一档：反过来（默认全给、让人自己关）等于默认把最容易被
+  # 读成预告的东西端出去。见 packages/core/src/report/audience.ts
+  audience: lay
+
   # 原有两项已删除，理由记在此处，免得日后被当成疏漏补回来：
   #
   # hedgeBelowConfidence —— 被模板自带的 confidenceFloor 取代。

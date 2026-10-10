@@ -35,6 +35,7 @@ import { renderChart, renderDay, renderLuck, renderMonth, renderYear } from "./r
 
 const COMMON = {
   params: { type: "string" as const },
+  audience: { type: "string" as const },
   json: { type: "boolean" as const },
   out: { type: "string" as const, short: "o" },
 };
@@ -76,6 +77,9 @@ const USAGE = `fate —— 四柱推演命令行
   fate --help
 
 选项
+  --audience 读者档：lay（默认）| student | practitioner。
+            决定**给看多少**，不决定**能说什么** —— 措辞守卫三档相同。
+            lay 不出量化数字，也不给指向未来的时段（应期、未到来的起伏段）。
   --params  参数覆盖文件（.json，或 .yaml/.yml）。覆盖项与默认深合并后校验。
   --json    输出结构化 JSON，供程序消费。
   --nodes   加算 §6.5 统计节点。默认关闭 —— 它要按月跑满六十年，
@@ -99,6 +103,21 @@ const USAGE = `fate —— 四柱推演命令行
  * 无论哪种格式，读进来之后都要过一遍 `loadParams` 的完整校验：
  * 区间、枚举、以及结构不变量。外部文件是不可信输入，没有例外。
  */
+/**
+ * `--audience` 合进参数覆盖。
+ *
+ * 放在这里而不是各子命令里，是因为它对**每一个**出文字的子命令都有意义，
+ * 而忘记接上某一个，用户就会看到那个命令「不认这个开关」—— 而不是报错。
+ */
+function withAudience(base: PartialParams, raw: unknown): PartialParams {
+  if (raw === undefined) return base;
+  const a = String(raw);
+  if (a !== "lay" && a !== "student" && a !== "practitioner") {
+    throw new UsageError(`--audience 须为 lay | student | practitioner，实为 ${a}`);
+  }
+  return { ...base, report: { ...base.report, audience: a } };
+}
+
 function loadOverrides(io: Io, path: string | undefined): PartialParams {
   if (path === undefined) return {};
   const text = io.readFile(path);
@@ -124,10 +143,19 @@ function emit(io: Io, v: Record<string, unknown> | string, asJson: boolean, out?
   else io.writeFile(out, text.endsWith("\n") ? text : `${text}\n`);
 }
 
+/**
+ * 读命盘文件，并把 `--audience` 合进它自带的参数。
+ *
+ * ⚠️ 合并发生在**这里**，不在各子命令里。命盘文件自带一份参数覆盖，
+ * 若各子命令各自处理，漏掉一个的后果不是报错而是**静默忽略**那个开关 ——
+ * 用户看到的是「这条命令不认 --audience」，而不是任何提示。
+ * 实测漏过一次（`plain` 与 `report` 都没接上）。
+ */
 function loadChart(io: Io, v: Record<string, string | boolean | undefined>) {
   const path = req(v, "chart");
   const f = readChartFile(io.readFile(path), path);
-  return { file: f, ...rebuild(f) };
+  const withAud = { ...f, overrides: withAudience(f.overrides, v["audience"]) };
+  return { file: withAud, ...rebuild(withAud) };
 }
 
 // ─────────────────────────────────────────────────────────
@@ -361,7 +389,7 @@ function cmdAsk(argv: readonly string[], io: Io): void {
   if (topic === undefined) {
     throw new UsageError(`未知占事 ${JSON.stringify(topicId)}。fate topics 可列出全部三十二类。`);
   }
-  const params = loadParams(loadOverrides(io, v["params"] as string | undefined));
+  const params = loadParams(withAudience(loadOverrides(io, v["params"] as string | undefined), v["audience"]));
   const locale = oneOf(v, "locale", ["zh-Hans", "zh-Hant", "en"] as const, params.report.locale);
 
   // 问题文本只用于就地算指纹 —— 不落盘、不打印、不进报告
@@ -480,7 +508,7 @@ function cmdCross(argv: readonly string[], io: Io): void {
   const withChart = typeof v["chart"] === "string";
   const params = withChart
     ? loadChart(io, v).params
-    : loadParams(loadOverrides(io, v["params"] as string | undefined));
+    : loadParams(withAudience(loadOverrides(io, v["params"] as string | undefined), v["audience"]));
   const chart = withChart ? loadChart(io, v).chart : undefined;
   const locale = oneOf(v, "locale", ["zh-Hans", "zh-Hant", "en"] as const, params.report.locale);
   const { timeZone, longitude } = placeOf(v);

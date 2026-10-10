@@ -158,7 +158,7 @@ Web 应用全部计算在浏览器内完成，**生辰数据不出本机**：记
 | **P28** | 移动版留存 —— 回看 / 标注 / 我的账 / 复盘 | ✅ 完成 —— 标注只存本机，**不回流引擎** |
 | **P30** | 掷钱交互 + 移动版资料卡与八字 | ✅ 完成 |
 
-全部 1006 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
+全部 1074 项断言通过，`tsc --strict`（含 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）零错误。
 
 ```bash
 pnpm install && pnpm test && pnpm typecheck

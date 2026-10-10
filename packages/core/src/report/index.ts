@@ -1,4 +1,5 @@
 export * from "./guard.js";
+export * from "./audience.js";
 export * from "./screen.js";
 export * from "./labels.js";
 export * from "./templates.js";

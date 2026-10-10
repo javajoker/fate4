@@ -486,6 +486,16 @@ export interface NodesParams {
 
 export interface ReportParams {
   readonly locale: "zh-Hans" | "zh-Hant" | "en";
+  /**
+   * 读者档 —— 同一份推演给三种人看三种深度。
+   *
+   * **它控制披露，不控制断言**：措辞守卫在三档下完全相同。
+   * 往上给命理师数（权重、比值、z、置信度小数、候选时段），
+   * 往下给普通读者关掉指向未来的时段。
+   *
+   * 见 `report/audience.ts`。
+   */
+  readonly audience: "lay" | "student" | "practitioner";
   readonly showConvergenceHistory: boolean;
   readonly showParamsSnapshot: boolean;
   readonly guard: {

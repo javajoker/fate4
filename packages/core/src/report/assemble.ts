@@ -733,6 +733,7 @@ export function buildReport(
   const raw: Report = {
     meta: {
       engineVersion, paramsHash: hash, locale, subject,
+      audience: params.report.audience,
       warnings: chart.warnings,
     },
     disclaimerTop: disclaimerText(locale),

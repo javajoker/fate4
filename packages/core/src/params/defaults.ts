@@ -258,6 +258,10 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
   }),
   report: Object.freeze({
     locale: "zh-Hans",
+    // 默认取最严的一档：不给数字、不给未来时段。
+    // 调用方知道自己是谁时再往上调 —— 反过来（默认全给、让人自己关）
+    // 等于默认把最容易被读成预告的东西端出去。
+    audience: "lay",
     showConvergenceHistory: false,
     showParamsSnapshot: true,
     guard: Object.freeze({

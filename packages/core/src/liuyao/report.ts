@@ -18,6 +18,7 @@ import type { Locale } from "../report/templates.js";
 import { renderTemplate, localeText, type NarrativeLine } from "../report/render.js";
 import { QUESTION_DISCLAIMER } from "../report/templates.js";
 import { scanText, type GuardViolation } from "../report/guard.js";
+import type { Audience } from "../report/audience.js";
 import { toHant } from "../report/hant.js";
 import { ENGINE_VERSION } from "../report/assemble.js";
 import { paramsHash } from "../params/load.js";
@@ -34,6 +35,8 @@ export interface QuestionReport {
     readonly engineVersion: string;
     readonly paramsHash: string;
     readonly locale: Locale;
+    /** 读者档 —— 与四柱报告同一个口径，见 `report/audience.ts`。 */
+    readonly audience: Audience;
     readonly castMethod: string;
     /** 问题文本的指纹 —— **只存哈希不存原文**，与生辰数据同一条隐私纪律。 */
     readonly questionFingerprint: string | null;
@@ -220,6 +223,7 @@ export function buildQuestionReport(
       engineVersion: ENGINE_VERSION,
       paramsHash: paramsHash(params),
       locale,
+      audience: params.report.audience,
       castMethod: T(CAST_METHOD_LABEL[gua.casting.method]),
       questionFingerprint: options.questionFingerprint ?? null,
     },

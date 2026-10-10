@@ -11,6 +11,7 @@ import type { Conclusions, KinReading } from "../conclude/types.js";
 import type { BodyCorrespondence, Persona } from "../conclude/persona.js";
 import type { ShenshaHit, PalaceName } from "../shensha/scan.js";
 import type { DayView, LuckStep, MonthView, YearView } from "../temporal/types.js";
+import type { Audience } from "./audience.js";
 import type { Locale } from "./templates.js";
 import type { NarrativeLine } from "./render.js";
 import type { GuardViolation } from "./guard.js";
@@ -180,6 +181,14 @@ export interface ReportMeta {
   readonly paramsHash: string;
   readonly locale: Locale;
   readonly subject: "self" | "other";
+  /** 生成这份报告时用的读者档 —— 同一份推演三种深度，故要记在案。 */
+  readonly audience: Audience;
+  /**
+   * 盘的来历警告：夏令时扣除、晚子换日、农历边界存疑一类。
+   *
+   * **任何读者档都必出。** 它不是细节，是这张盘凭什么长这样 ——
+   * 「晚子换日」意味着日柱换了一个，而日干就是日主。
+   */
   readonly warnings: readonly string[];
 }
 

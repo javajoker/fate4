@@ -30,6 +30,24 @@ export default function ChartPage() {
         年柱月柱以绝对时刻与节气比较定；时支与日界以真太阳时定。两把尺子量两件事，不可混用。
       </p>
 
+      {r.meta.warnings.length > 0 && (
+
+        <div className="card">
+
+          <h3>这张盘是怎么定下来的</h3>
+
+          <p className="dim">
+
+            下面几条影响的是盘本身，不是对盘的解读 —— 换一条规则，盘就不是这一张了。
+
+          </p>
+
+          <ul>{r.meta.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
+
+        </div>
+
+      )}
+
       <PillarTable cells={r.chart.pillars} />
 
       <div className="grid3">

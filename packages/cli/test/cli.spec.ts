@@ -681,3 +681,49 @@ describe("fate plain —— 人话版", () => {
       .toEqual(direct.cards.map((c) => c.id));
   });
 });
+
+describe("**读者档** —— 控制披露，不控制断言", () => {
+  const files = withChart();
+  for (const a of ["lay", "student", "practitioner"] as const) {
+    it(`${a} 档的输出照样过守卫`, () => {
+      const r = cli(["plain", "--chart", "c.json", "--audience", a], files);
+      expect(r.code, r.err).toBe(0);
+      expect(guardOutput(r.out, "plain").clean, `${a} 被守卫拦下`).toBe(true);
+    });
+  }
+
+  it("**普通读者档的起伏段少于命理师档** —— 未到来的那些不出", () => {
+    const count = (a: string) =>
+      (cli(["plain", "--chart", "c.json", "--section", "起伏", "--audience", a], files)
+        .out.match(/^### /gm) ?? []).length;
+    expect(count("lay")).toBeLessThan(count("practitioner"));
+    expect(count("student")).toBe(count("practitioner"));
+  });
+
+  it("**`--audience` 对带 --chart 的命令也生效** —— 命盘文件自带参数，曾把它盖掉", () => {
+    // 合并发生在 loadChart 里。各子命令各自处理的话，漏掉一个的后果
+    // 不是报错而是静默忽略 —— 用户看到的是「这条命令不认这个开关」。
+    const lay = cli(["plain", "--chart", "c.json", "--audience", "lay"], files).out;
+    const pro = cli(["plain", "--chart", "c.json", "--audience", "practitioner"], files).out;
+    expect(lay).not.toBe(pro);
+  });
+
+  it("坏值报用法错误，不静默忽略", () => {
+    const r = cli(["plain", "--chart", "c.json", "--audience", "乱写"], files);
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain("--audience");
+  });
+
+  it("不给 --audience 时取默认的最严一档", () => {
+    const def = cli(["plain", "--chart", "c.json", "--section", "起伏"], files).out;
+    const lay = cli(["plain", "--chart", "c.json", "--section", "起伏",
+      "--audience", "lay"], files).out;
+    expect(def).toBe(lay);
+  });
+
+  it("**帮助里有它** —— 不在帮助里的开关等于不存在", () => {
+    const h = cli(["--help"], files).out;
+    expect(h).toContain("--audience");
+    expect(h).toContain("practitioner");
+  });
+});

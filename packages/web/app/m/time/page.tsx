@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  buildChart, buildReport, dailyOutlook, plainCards, plainYaociCards, dailyNarrative,
+  buildChart, buildReport, dailyOutlook, loadParams, plainCards, plainYaociCards, dailyNarrative,
   AXIS_DIRECTIONAL, favorPlain, SYSTEM_LABEL, type BirthInput,
 } from "@fate/core";
 import { Card } from "../Card";
-import { loadBirth } from "../store";
+import { loadAudience, loadBirth } from "../store";
 import { Disclaimer } from "../page";
 
 /**
@@ -30,8 +30,9 @@ export default function TimePage() {
     const now = { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
     try {
       const chart = buildChart(birth);
-      const r = buildReport(chart, { includeNodes: true, now });
-      return { plain: plainCards(r), report: r, daily: dailyOutlook(chart, now) };
+      const params = loadParams({ report: { audience: loadAudience() } });
+      const r = buildReport(chart, { includeNodes: true, now, params });
+      return { plain: plainCards(r), report: r, daily: dailyOutlook(chart, now, params) };
     } catch { return null; }
   }, [birth]);
 

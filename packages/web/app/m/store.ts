@@ -1,6 +1,6 @@
 "use client";
 
-import type { BirthInput } from "@fate/core";
+import type { Audience, BirthInput } from "@fate/core";
 
 /**
  * 移动版只记一份出生信息，存在本机。
@@ -59,6 +59,28 @@ export function loadPlainSource(): PlainSource {
 
 export function savePlainSource(v: PlainSource): void {
   try { localStorage.setItem(SRC_KEY, v); } catch { /* 同上 */ }
+}
+
+/**
+ * 读者档。
+ *
+ * **它控制披露，不控制断言** —— 措辞守卫在三档下完全相同，
+ * 见 `packages/core/src/report/audience.ts`。
+ *
+ * 默认取最严的 `lay`：反过来（默认全给、让人自己关）等于默认把最容易
+ * 被读成预告的东西端出去。
+ */
+const AUD_KEY = "fate.m.audience.v1";
+
+export function loadAudience(): Audience {
+  try {
+    const v = localStorage.getItem(AUD_KEY);
+    return v === "student" || v === "practitioner" ? v : "lay";
+  } catch { return "lay"; }
+}
+
+export function saveAudience(v: Audience): void {
+  try { localStorage.setItem(AUD_KEY, v); } catch { /* 同上 */ }
 }
 
 // ─────────────────────────────────────────────────────────

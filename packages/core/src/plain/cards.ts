@@ -19,6 +19,9 @@
  */
 
 import type { Report } from "../report/types.js";
+import {
+  discloses, isFutureWindow, FUTURE_WITHHELD_NOTE, type Audience,
+} from "../report/audience.js";
 import type { NarrativeLine } from "../report/render.js";
 import { ELEMENTS } from "../types/ganzhi.js";
 import {
@@ -42,6 +45,18 @@ export interface PlainCard {
 
 export interface PlainReport {
   readonly cards: readonly PlainCard[];
+  /**
+   * 这张盘的来历警告 —— **任何读者档都必出**。
+   *
+   * 「出生于晚子时，日柱已进位」这一条意味着日柱换了一个，而日干就是日主。
+   * 读者不知道它，就不知道自己看的是三张盘里的哪一张。
+   * ⚠️ 此前这些警告在网页与移动版里一次都没显示过，只有 Markdown 与命令行有。
+   */
+  readonly provenanceWarnings: readonly string[];
+  /** 当前读者档。界面据它决定要不要给切换入口。 */
+  readonly audience: Audience;
+  /** 因档位而未显示的东西的交代。没有被关掉的东西时为 null。 */
+  readonly withheldNote: string | null;
   /** 小节级的说明。放在小节开头说一次，不在每张卡片上重复。 */
   readonly sectionNotes: Readonly<Partial<Record<PlainSection, string>>>;
   /** 每一页都要挂的框定语。 */
@@ -65,8 +80,18 @@ const card = (
 const linesOf = (ls: readonly NarrativeLine[], ...prefixes: string[]): NarrativeLine[] =>
   ls.filter((l) => prefixes.some((p) => l.templateId.startsWith(p)));
 
-export function plainCards(r: Report): PlainReport {
+export interface PlainCardsOptions {
+  /** 读者档。不给则取报告自己带的那一个。 */
+  readonly audience?: Audience;
+  /** 判断「未来」用的当前年。不给则取报告的 `current` 年，再不给取系统年。 */
+  readonly nowYear?: number;
+}
+
+export function plainCards(r: Report, options: PlainCardsOptions = {}): PlainReport {
+  const audience = options.audience ?? r.meta.audience;
+  const nowYear = options.nowYear ?? r.current?.year.year ?? new Date().getFullYear();
   const cards: PlainCard[] = [];
+  let withheld = 0;
 
   // ── 性格 ──
   const band = r.strength.strength.value;
@@ -177,6 +202,13 @@ export function plainCards(r: Report): PlainReport {
       const ref = f.detail.evidence.find((e) => e.ref.startsWith("node:"))?.ref ?? "";
       const domain = domainOfSeries(ref.slice("node:".length));
 
+      // 指向未来的时段：普通读者档不出。不是算不出来，是候选读起来太像预告。
+      if (from !== undefined && !discloses(audience, "futureWindows")
+        && isFutureWindow(Number(from), nowYear)) {
+        withheld++;
+        continue;
+      }
+
       cards.push(card(`node.${f.id}`, "起伏",
         span === "" ? "一段值得留意的时期" : span,
         // 那段「这是排序不是概率」的话只在小节说一次 —— 八张卡各说一遍，
@@ -228,6 +260,10 @@ export function plainCards(r: Report): PlainReport {
 
   return {
     cards: Object.freeze(cards),
+    provenanceWarnings: Object.freeze([...r.meta.warnings]),
+    audience,
+    withheldNote: withheld === 0 ? null
+      : `另有 ${withheld} 段落在今年之后。${FUTURE_WITHHELD_NOTE}`,
     sectionNotes: Object.freeze({
       起伏: "下面说的是「哪一类事」在某段时间里起伏大，不是会发生什么事 ——"
         + "这套模型给不出具体的事件。它把六十年的曲线拉出来，"
