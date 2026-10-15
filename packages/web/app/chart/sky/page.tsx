@@ -118,7 +118,7 @@ const DIGNITY_LABEL: Readonly<Record<string, string>> = {
 };
 
 export default function SkyPage() {
-  const { chart, record, audience } = useChart();
+  const { chart, record, audience, params } = useChart();
 
   const sky = useMemo(() => {
     if (chart === null) return null;
@@ -156,7 +156,9 @@ export default function SkyPage() {
 
   if (sky === null) return <p className="sub">计算中…</p>;
 
-  const aspects = aspectsOf(sky).filter((a) => a.orb <= 8);
+  // 容许度取自参数（sky.maxOrb）—— 它是流派，会改变成相与否，
+  // 故在参数里而且进指纹。此处不再硬写 8。
+  const aspects = aspectsOf(sky, undefined, params);
   const sameTable = compareWithHellenistic();
   const allSame = sameTable.every((r) => r.domicileSame && r.exaltationSame);
 
@@ -254,7 +256,7 @@ export default function SkyPage() {
           两样分开标注，合成一套会让人以为古典占星有现代那种精确的 orb。
         </p>
         {aspects.length === 0
-          ? <p className="sub">容许度 8° 之内没有成相的。</p>
+          ? <p className="sub">容许度 {params.sky.maxOrb}° 之内没有成相的。</p>
           : (
             <table>
               <thead>

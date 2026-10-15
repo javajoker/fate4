@@ -92,6 +92,9 @@ const RANGES: readonly RangeRule[] = [
   { path: "nodes.maxShown", min: 1, max: 200 },
 
   { path: "liuyao.yingqi.horizonMonths", min: 1, max: 120 },
+  // 相位容许度：各家 6°–10°。放到 0 等于关掉按度成相（只剩整宫），
+  // 放到 30 等于每两颗星都成相 —— 两头都允许，但出了这个范围是手滑。
+  { path: "sky.maxOrb", min: 0, max: 30 },
 ];
 
 const ENUMS: readonly EnumRule[] = [
@@ -121,6 +124,12 @@ const ENUMS: readonly EnumRule[] = [
   { path: "liuyao.yingqi.granularity", values: ["month"] },
   { path: "qimen.juMethod", values: ["chaibu", "zhirun"] },
   { path: "qimen.plate", values: ["zhuan", "fei"] },
+  { path: "ziwei.leapMonth", values: ["asIs", "splitHalf"] },
+  { path: "ziwei.huoLing", values: ["conventional"] },
+  { path: "sky.houseSystem", values: ["wholeSign"] },
+  { path: "sky.triplicity", values: ["dorothean"] },
+  { path: "tarot.numbering", values: ["marseille", "rws"] },
+  { path: "tarot.suitElement", values: ["goldenDawn", "swordsFire"] },
 ];
 
 function at(obj: unknown, path: string): unknown {
@@ -218,6 +227,13 @@ function validateInvariants(p: Params): string[] {
     errors.push("temporal.dayLayer.recomputeWeights 必须为 false（硬约束）");
   }
 
+  // [硬约束] 紫微的时辰不做真太阳时校正 —— 它的传统起法不涉及经度。
+  // 替它加一道四柱才有的校正，是拿一套的规矩改另一套。
+  if (p.ziwei.trueSolarTimeHour !== false) {
+    errors.push("ziwei.trueSolarTimeHour 必须为 false（硬约束）："
+      + "紫微的传统起法不涉及经度");
+  }
+
   // ── 未实现的开关必须锁在默认值上 ──
   //
   // 这几项在 params/default.yaml 里有条目、在 Params 里有字段，但引擎尚未实现。
@@ -225,6 +241,10 @@ function validateInvariants(p: Params): string[] {
   //   删掉它们 → 丢掉路线图，日后会被当作疏漏补回来
   //   静默忽略 → 用户改了值、以为生效了，而盘面纹丝不动
   //   锁在默认值上并说明 → 条目还在，但改不动，且改的时候会告诉你为什么
+  if (p.ziwei.leapMonth !== "asIs") {
+    errors.push("ziwei.leapMonth 目前只实现 asIs（闰月归本月）。"
+      + "splitHalf 是真实存在的另一派，条目留着是路线图，但引擎尚未实现");
+  }
   if (p.chart.hiddenStemVariant !== "standard") {
     errors.push("chart.hiddenStemVariant 目前只支持 standard —— 申/亥的藏干别本尚未录入（待校准 #5）");
   }

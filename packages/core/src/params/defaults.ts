@@ -256,6 +256,26 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
     juMethod: "chaibu" as const,   // ⚠️[流派] 另有置闰法（超神接气），未实现
     plate: "zhuan" as const,       // ⚠️[流派] 另有飞盘法，未实现
   }),
+  ziwei: Object.freeze({
+    leapMonth: "asIs",
+    huoLing: "conventional",
+    trueSolarTimeHour: false,
+  }),
+
+  sky: Object.freeze({
+    houseSystem: "wholeSign",
+    maxOrb: 8,
+    triplicity: "dorothean",
+  }),
+
+  tarot: Object.freeze({
+    // 默认马赛系：韦特系对调 8 与 11 是为迁就一套后加的黄道对应，
+    // 而默认值该取更早的那一支
+    numbering: "marseille",
+    suitElement: "goldenDawn",
+    withReversals: false,
+  }),
+
   report: Object.freeze({
     locale: "zh-Hans",
     // 默认取最严的一档：不给数字、不给未来时段。

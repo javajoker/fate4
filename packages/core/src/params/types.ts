@@ -507,6 +507,72 @@ export interface ReportParams {
   };
 }
 
+/**
+ * 紫微斗数的流派开关。
+ *
+ * 与 `liuyao`、`qimen` 同列，不是函数参数 —— 这几样改的是**盘本身**，
+ * 换一个值得到的是另一张盘。本项目对这类分歧一向的做法是：
+ * 做成参数、随结果声明、**计入参数指纹**。
+ *
+ * 此前它们散在函数参数与硬编码里，于是两张用不同取法排出来的盘
+ * 会得到同一个指纹 —— 而指纹的用处只有一个：指纹相同，两份才可比。
+ */
+export interface ZiweiParams {
+  /**
+   * ⚠️ [流派] 闰月归哪一个月。
+   *
+   * 默认闰月归本月（闰四月当四月论）。另有按下半月归次月者 ——
+   * 换一种，月系的左辅右弼与整个十二宫都会移位。
+   */
+  readonly leapMonth: "asIs" | "splitHalf";
+  /** ⚠️ [流派] 火星铃星起例。各家分歧最大，见 docs/17-ziwei §8。 */
+  readonly huoLing: "conventional";
+  /**
+   * [硬约束] 时辰取当地钟表时，不做真太阳时校正。
+   *
+   * 紫微的传统起法不涉及经度。替它加一道四柱才有的校正，
+   * 是拿一套的规矩改另一套。设为 true 即构建期报错。
+   */
+  readonly trueSolarTimeHour: false;
+}
+
+/**
+ * 星盘（七政四余与西洋古典）的流派开关。
+ */
+export interface SkyParams {
+  /**
+   * ⚠️ [流派] 分宫制。
+   *
+   * 只实现整宫（whole-sign）—— 它是希腊化原本用的那一种，
+   * 在高纬度不需要特例，且让「宫」与「宫位」成为同一件事。
+   * 别的分宫制日后应作为此处的新取值加入，**不是替换**。
+   */
+  readonly houseSystem: "wholeSign";
+  /**
+   * ⚠️ [流派] 相位的容许度，度。
+   *
+   * 各家 6°–10°，传统上还按星分别取。默认 8。
+   */
+  readonly maxOrb: number;
+  /** ⚠️ [流派] 三分主星取哪一系。目前只实现 Dorothean。 */
+  readonly triplicity: "dorothean";
+}
+
+/**
+ * 塔罗的流派开关。
+ *
+ * ⚠️ 这三样**真的会改变结果**，所以它们必须进指纹：
+ * 同一次洗牌在马赛系与韦特系下，8 号与 11 号是两张不同的牌。
+ */
+export interface TarotParams {
+  /** ⚠️ [流派] 大牌序号：马赛系 8 正义 11 力量 / 韦特系相反。 */
+  readonly numbering: "marseille" | "rws";
+  /** ⚠️ [流派] 花色元素：金色黎明杖火剑风 / 另一系相反。 */
+  readonly suitElement: "goldenDawn" | "swordsFire";
+  /** ⚠️ [流派] 用不用逆位。马赛系传统上不强调。 */
+  readonly withReversals: boolean;
+}
+
 export interface Params {
   readonly version: number;
   readonly chart: ChartParams;
@@ -521,6 +587,9 @@ export interface Params {
   readonly nodes: NodesParams;
   readonly liuyao: LiuyaoParams;
   readonly qimen: QimenParams;
+  readonly ziwei: ZiweiParams;
+  readonly sky: SkyParams;
+  readonly tarot: TarotParams;
   readonly report: ReportParams;
 }
 

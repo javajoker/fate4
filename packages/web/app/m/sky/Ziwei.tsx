@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { buildZiweiChart, readZiwei, type BirthInput } from "@fate/core";
+import {
+  buildZiweiChart, readZiwei, loadParams, type BirthInput,
+} from "@fate/core";
 
 /**
  * 移动版紫微盘。
@@ -34,7 +36,8 @@ const GRID: Readonly<Record<number, readonly [number, number]>> = {
 
 export function Ziwei({ birth }: { birth: BirthInput }) {
   const zw = useMemo(() => {
-    try { return buildZiweiChart(birth); } catch { return null; }
+    try { return buildZiweiChart(birth, { params: loadParams({}) }); }
+    catch { return null; }
   }, [birth]);
 
   if (zw === null) return <p className="m-lede">这张生辰排不出紫微盘。</p>;

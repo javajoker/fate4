@@ -24,6 +24,8 @@
  */
 
 import { norm360 } from "../astro/angles.js";
+import type { Params } from "../params/types.js";
+import { DEFAULT_PARAMS } from "../params/defaults.js";
 import { signIndexOf, wholeSignHouse } from "../sky/angles.js";
 import { ASPECT_ANGLE, ASPECT_NAME, type AspectKind, type SkyChart } from "../sky/chart.js";
 import { BODY_NAME, type ClassicalBody } from "../sky/dignities.js";
@@ -71,10 +73,12 @@ const SIGN_NAMES: readonly string[] = Object.freeze([
 /**
  * 两张星盘之间的相位与落宫。
  *
- * @param maxOrb 按度数成相的容许度。默认 8° —— 与单盘一致，
- *   而它是**约定**：各家 6°–10°，传统上还按星分别取。
+ * @param maxOrb 覆盖容许度；不给则取 `Params.sky.maxOrb` —— 与单盘同源。
  */
-export function synastry(a: SkyChart, b: SkyChart, maxOrb = 8): Synastry {
+export function synastry(
+  a: SkyChart, b: SkyChart, maxOrb?: number, params?: Params,
+): Synastry {
+  const orb = maxOrb ?? (params ?? DEFAULT_PARAMS).sky.maxOrb;
   const crossAspects: CrossAspect[] = [];
   for (const pa of a.bodies) {
     for (const pb of b.bodies) {
@@ -82,13 +86,13 @@ export function synastry(a: SkyChart, b: SkyChart, maxOrb = 8): Synastry {
       const signGap = Math.abs(((pa.signIndex - pb.signIndex + 18) % 12) - 6);
       for (const kind of Object.keys(ASPECT_ANGLE) as AspectKind[]) {
         const exact = ASPECT_ANGLE[kind];
-        const orb = Math.abs(sep - exact);
+        const gap = Math.abs(sep - exact);
         const byWholeSign = signGap * 30 === exact;
-        if (orb <= maxOrb || byWholeSign) {
+        if (gap <= orb || byWholeSign) {
           crossAspects.push({
             a: pa.body, b: pb.body,
             aName: BODY_NAME[pa.body], bName: BODY_NAME[pb.body],
-            kind, kindName: ASPECT_NAME[kind], orb, byWholeSign,
+            kind, kindName: ASPECT_NAME[kind], orb: gap, byWholeSign,
           });
         }
       }

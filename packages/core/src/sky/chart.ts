@@ -29,6 +29,8 @@
  */
 
 import { norm360 } from "../astro/angles.js";
+import type { Params } from "../params/types.js";
+import { DEFAULT_PARAMS } from "../params/defaults.js";
 import type { JulianDay, JulianDayTT } from "../astro/julian.js";
 import { apparentSolarLongitude } from "../astro/sun.js";
 import { vsop87 } from "../astro/vsop87.js";
@@ -216,7 +218,12 @@ export interface Aspect {
  *   各家取 6°–10°，且传统上还按星分别取（日月宽、余星窄）。
  *   故它是参数，不是常数。
  */
-export function aspectsOf(chart: SkyChart, maxOrb = 8): readonly Aspect[] {
+export function aspectsOf(
+  chart: SkyChart, maxOrb?: number, params?: Params,
+): readonly Aspect[] {
+  // 容许度的真源在 Params.sky.maxOrb —— 它是流派，会改变成相与否，
+  // 故必须进参数指纹。位置参数留着作覆盖，便于界面上拖着看。
+  const orb = maxOrb ?? (params ?? DEFAULT_PARAMS).sky.maxOrb;
   const out: Aspect[] = [];
   const bs = chart.bodies;
   for (let i = 0; i < bs.length; i++) {
@@ -226,10 +233,10 @@ export function aspectsOf(chart: SkyChart, maxOrb = 8): readonly Aspect[] {
       const signGap = Math.abs(((a.signIndex - b.signIndex + 18) % 12) - 6);
       for (const kind of Object.keys(ASPECT_ANGLE) as AspectKind[]) {
         const exact = ASPECT_ANGLE[kind];
-        const orb = Math.abs(sep - exact);
+        const gap = Math.abs(sep - exact);
         const byWholeSign = signGap * 30 === exact;
-        if (orb <= maxOrb || byWholeSign) {
-          out.push({ a: a.body, b: b.body, kind, byWholeSign, orb });
+        if (gap <= orb || byWholeSign) {
+          out.push({ a: a.body, b: b.body, kind, byWholeSign, orb: gap });
         }
       }
     }

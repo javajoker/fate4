@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useMemo } from "react";
 import {
   drawSpread, SPREADS, spreadStateSpace, SUIT_NAME, SCHOOL_NOTE,
-  TAROT_PENDING_CALIBRATION,
+  TAROT_PENDING_CALIBRATION, loadParams, paramsHash,
   type MajorNumbering, type SuitElementSchool, type TarotReading,
 } from "@fate/core";
 import { SiteNav } from "../../components/SiteNav";
@@ -26,9 +27,13 @@ export default function TarotPage() {
   const [withReversals, setWithReversals] = useState(false);
   const [reading, setReading] = useState<TarotReading | null>(null);
 
-  const draw = () => setReading(drawSpread({
-    spreadId, numbering, suitElement, withReversals,
-  }));
+  // 三个开关走参数，而不是直接传给 drawSpread —— 它们会改变结果，
+  // 故必须进参数指纹。指纹就显示在下面，换一个开关当场能看见它变。
+  const params = useMemo(
+    () => loadParams({ tarot: { numbering, suitElement, withReversals } }),
+    [numbering, suitElement, withReversals]);
+
+  const draw = () => setReading(drawSpread({ spreadId, params }));
 
   const spread = SPREADS.find((s) => s.id === spreadId)!;
 
@@ -102,6 +107,12 @@ export default function TarotPage() {
             三个开关都是<strong>流派选择，没有正确答案</strong>，
             故不替你定，并随结果声明用的是哪一系。
             {SCHOOL_NOTE[numbering]}；{SCHOOL_NOTE[suitElement]}。
+          </p>
+          <p className="sub">
+            参数指纹 <span className="mono">{paramsHash(params)}</span>
+            {" "}—— 这三个开关会改变结果，所以它们<strong>进指纹</strong>。
+            换一个试试：指纹当场就变。
+            两份塔罗记录只有指纹相同，才谈得上是在同一套流派下抽的。
           </p>
           <p className="sub">
             这个牌阵的状态数：

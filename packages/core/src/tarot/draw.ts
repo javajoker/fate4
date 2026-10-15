@@ -27,6 +27,8 @@
  * 故本模块**不记录、不限制重抽**，并在结果里明写这一点。
  */
 
+import type { Params } from "../params/types.js";
+import { DEFAULT_PARAMS } from "../params/defaults.js";
 import {
   deck, DECK_SIZE, majorNumber, SUIT_ELEMENT,
   type Card, type DeckSchools, type MajorNumbering, type SuitElementSchool,
@@ -169,6 +171,13 @@ export interface TarotReading {
 
 export interface DrawOptions {
   readonly spreadId?: string;
+  /**
+   * 流派取自 `Params.tarot`。
+   *
+   * 下面三个单项仍然留着，但它们是**覆盖**，不是真源 ——
+   * 真源在参数里，因为这三样会改变结果，必须进参数指纹。
+   */
+  readonly params?: Params;
   readonly numbering?: MajorNumbering;
   readonly suitElement?: SuitElementSchool;
   readonly withReversals?: boolean;
@@ -185,9 +194,12 @@ export interface DrawOptions {
  */
 export function drawSpread(options: DrawOptions = {}): TarotReading {
   const spread = spreadById(options.spreadId ?? "three") ?? SPREADS[1]!;
-  const numbering = options.numbering ?? "marseille";
-  const suitElement = options.suitElement ?? "goldenDawn";
-  const withReversals = options.withReversals ?? false;
+  // 次序：单项覆盖 > 参数 > 默认参数。三者都不给时走 DEFAULT_PARAMS，
+  // 故「默认值的真源」仍只有 params/defaults.ts 一处。
+  const t = (options.params ?? DEFAULT_PARAMS).tarot;
+  const numbering = options.numbering ?? t.numbering;
+  const suitElement = options.suitElement ?? t.suitElement;
+  const withReversals = options.withReversals ?? t.withReversals;
   const rnd = options.random ?? cryptoRandom;
 
   const shuffled = shuffle(deck(), rnd);

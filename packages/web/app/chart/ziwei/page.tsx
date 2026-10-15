@@ -37,12 +37,12 @@ const GRID: Readonly<Record<number, readonly [number, number]>> = {
 };
 
 export default function ZiweiPage() {
-  const { record, audience } = useChart();
+  const { record, audience, params } = useChart();
 
   const zw = useMemo(() => {
     if (record === null) return null;
-    try { return buildZiweiChart(record.input); } catch { return null; }
-  }, [record]);
+    try { return buildZiweiChart(record.input, { params }); } catch { return null; }
+  }, [record, params]);
 
   const reading = useMemo(() => (zw === null ? null : readZiwei(zw)), [zw]);
   const space = useMemo(() => ziweiStateSpace(), []);

@@ -179,3 +179,103 @@ describe("参数指纹", () => {
     }
   });
 });
+
+describe("**四柱之外几套的流派也归参数管** —— 指纹相同，两份才可比", () => {
+  /**
+   * 此前紫微、星盘、塔罗的流派散在函数参数与硬编码里，于是两张用不同
+   * 取法排出来的盘会得到**同一个指纹**。而指纹的用处只有一个：
+   * 指纹相同，两份报告的数才可比。
+   */
+  it("三节都在 Params 上，与 liuyao / qimen 同列", () => {
+    const p = loadParams({});
+    for (const k of ["ziwei", "sky", "tarot", "liuyao", "qimen"] as const) {
+      expect(p[k], k).toBeDefined();
+    }
+  });
+
+  it("**改任何一处流派，指纹都变**", () => {
+    const base = paramsHash(loadParams({}));
+    const changes = [
+      { tarot: { numbering: "rws" } },
+      { tarot: { suitElement: "swordsFire" } },
+      { tarot: { withReversals: true } },
+      { sky: { maxOrb: 6 } },
+    ] as const;
+    for (const c of changes) {
+      expect(paramsHash(loadParams(c)), JSON.stringify(c)).not.toBe(base);
+    }
+  });
+
+  it("**而改呈现仍不变** —— 这几节是计算参数，report 不是", () => {
+    const base = paramsHash(loadParams({}));
+    expect(paramsHash(loadParams({ report: { audience: "practitioner" } })))
+      .toBe(base);
+    expect(paramsHash(loadParams({ report: { locale: "zh-Hant" } }))).toBe(base);
+  });
+
+  it("枚举越界报错，不静默取默认", () => {
+    expect(() => loadParams({ tarot: { numbering: "乱写" } as never })).toThrow();
+    expect(() => loadParams({ sky: { houseSystem: "placidus" } as never })).toThrow();
+    expect(() => loadParams({ ziwei: { leapMonth: "乱写" } as never })).toThrow();
+    expect(() => loadParams({ sky: { maxOrb: 99 } })).toThrow();
+  });
+
+  it("**两条硬约束锁死** —— 它们不是偏好", () => {
+    // 紫微的时辰不做真太阳时校正：它的传统起法不涉及经度
+    expect(() => loadParams({ ziwei: { trueSolarTimeHour: true } as never })).toThrow();
+    // 未实现的派别锁在默认值上，且报错里说明为什么
+    expect(() => loadParams({ ziwei: { leapMonth: "splitHalf" } }))
+      .toThrow(/尚未实现/);
+  });
+
+  it("**参数真的被读到** —— 不是只存着好看", async () => {
+    const { drawSpread } = await import("../src/tarot/index.js");
+    const rnd = { id: "fixed", int: () => 0 };
+    const a = drawSpread({ params: loadParams({ tarot: { numbering: "marseille" } }), random: rnd });
+    const b = drawSpread({ params: loadParams({ tarot: { numbering: "rws" } }), random: rnd });
+    expect(a.schools.numbering).toBe("marseille");
+    expect(b.schools.numbering).toBe("rws");
+    // 同一副牌、同一个随机源 → 同一批牌，但 8/11 的序号不同
+    expect(a.cards.map((c) => c.card.id)).toEqual(b.cards.map((c) => c.card.id));
+    const major8 = drawSpread({
+      params: loadParams({ tarot: { numbering: "rws" } }),
+      spreadId: "celtic", random: rnd,
+    });
+    expect(major8.schools.numbering).toBe("rws");
+  });
+
+  it("**星盘容许度确实管用** —— 按度成相必须守住它", async () => {
+    const { skyChart, aspectsOf } = await import("../src/sky/chart.js");
+    const { buildChart } = await import("../src/chart/buildChart.js");
+    const { asTT } = await import("../src/astro/julian.js");
+    const { deltaTSeconds } = await import("../src/astro/deltaT.js");
+    const skyOf = (y: number, mo: number, d: number) => {
+      const c = buildChart({
+        year: y, month: mo, day: d, hour: 12, minute: 0,
+        gender: "male", timeZone: "Asia/Shanghai", longitude: 121.47, latitude: 31.23,
+      });
+      return skyChart(c.birthJdUT as never,
+        asTT(c.birthJdUT + deltaTSeconds(y, mo).seconds / 86400), 121.47, 31.23);
+    };
+
+    // 契约：每一条要么整宫成相，要么角距在容许度之内。两者之外不得出现。
+    let differed = 0;
+    for (const [y, mo, d] of [[1990, 5, 12], [1995, 8, 3], [2001, 2, 20],
+      [2010, 11, 7], [2020, 6, 15]] as const) {
+      const sky = skyOf(y, mo, d);
+      for (const orb of [2, 6, 10]) {
+        for (const a of aspectsOf(sky, undefined, loadParams({ sky: { maxOrb: orb } }))) {
+          expect(a.byWholeSign || a.orb <= orb, `${y}-${mo} orb=${orb}`).toBe(true);
+        }
+      }
+      const narrow = aspectsOf(sky, undefined, loadParams({ sky: { maxOrb: 1 } })).length;
+      const wide = aspectsOf(sky, undefined, loadParams({ sky: { maxOrb: 12 } })).length;
+      expect(wide).toBeGreaterThanOrEqual(narrow);
+      if (wide > narrow) differed++;
+    }
+    // 反向对照：样本里确实有盘在放宽后多出条目，
+    // 否则上面那条可能只是在比两个相等的数
+    expect(differed, "五张盘里总该有几张在放宽容许度后多出按度成相的条目")
+      .toBeGreaterThan(0);
+  });
+});

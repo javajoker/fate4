@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  drawSpread, SPREADS, spreadStateSpace, SUIT_NAME,
+  drawSpread, SPREADS, spreadStateSpace, SUIT_NAME, loadParams,
   type TarotReading,
 } from "@fate/core";
 
@@ -68,7 +68,9 @@ export function Tarot() {
           </label>
         </div>
         <button className="m-btn"
-          onClick={() => setReading(drawSpread({ spreadId, withReversals }))}>
+          onClick={() => setReading(drawSpread({
+            spreadId, params: loadParams({ tarot: { withReversals } }),
+          }))}>
           {reading === null ? "抽牌" : "再抽一次"}
         </button>
       </div>

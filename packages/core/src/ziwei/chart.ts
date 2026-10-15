@@ -31,6 +31,8 @@ import { BRANCHES, STEMS, type Branch, type Stem } from "../types/ganzhi.js";
 import { branchAt, stemAt } from "../ganzhi/algebra.js";
 import { lunarDateOf, type LunarDate, type LunarOptions } from "../chart/lunar.js";
 import { toJulianDay, type JulianDay } from "../astro/julian.js";
+import type { Params } from "../params/types.js";
+import { DEFAULT_PARAMS } from "../params/defaults.js";
 import type { BirthInput } from "../chart/types.js";
 import {
   palaceLayout, bureauOf, PALACE_NAMES,
@@ -80,6 +82,13 @@ export interface ZiweiChart {
 export interface ZiweiOptions extends LunarOptions {
   /** 四柱那一侧的立春年干支，用于比对。不给则不比。 */
   readonly solarYearStem?: Stem;
+  /**
+   * 流派取自 `Params.ziwei`：闰月归属、火铃起例、时辰是否做真太阳时校正。
+   *
+   * 这几样改的是**盘本身**，故在参数里而不是函数参数里 ——
+   * 它们必须进参数指纹，否则两张用不同取法排出来的盘会得到同一个指纹。
+   */
+  readonly params?: Params;
 }
 
 /**
@@ -100,6 +109,12 @@ export function buildZiweiChart(
 
   // 时辰：子时跨日，23 时起即次日子时 —— 与四柱的「晚子」处理同一条线，
   // 但此处只影响时辰序，不影响日序（紫微的日用农历日，不随时辰进位）
+  const p = (options.params ?? DEFAULT_PARAMS).ziwei;
+  if (p.trueSolarTimeHour !== false) {
+    throw new Error(
+      "ziwei.trueSolarTimeHour 只能是 false。紫微的传统起法不涉及经度，"
+      + "替它加一道四柱才有的真太阳时校正，是拿一套的规矩改另一套。");
+  }
   const hourBranch = Math.floor(((input.hour + 1) % 24) / 2);
 
   return assembleZiwei(lunar, hourBranch, input.gender, options);
@@ -158,10 +173,12 @@ export function assembleZiwei(
   }
 
   const warnings: string[] = [];
+  const zp = (options.params ?? DEFAULT_PARAMS).ziwei;
   if (lunar.isLeap) {
     warnings.push(
-      `生于闰${lunar.month}月。本项目按「闰月归本月」排盘（各家一致），`
-      + "但另有按下半月归次月的说法 —— 换一种，月系的左辅右弼与十二宫全体移位。");
+      `生于闰${lunar.month}月。本盘按「`
+      + (zp.leapMonth === "asIs" ? "闰月归本月" : "下半月归次月")
+      + "」排（ziwei.leapMonth）—— 换一种，月系的左辅右弼与十二宫全体移位。");
   }
   if (lunar.boundaryUncertain) {
     warnings.push(
