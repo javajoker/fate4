@@ -13,6 +13,10 @@
     "./sky": {
       "types": "./dist/src/sky/index.d.ts",
       "default": "./dist/src/sky/index.js"
+    },
+    "./sky-pair": {
+      "types": "./dist/src/pair/sky.d.ts",
+      "default": "./dist/src/pair/sky.js"
     }
   },
   "dependencies": {

@@ -26,7 +26,7 @@
  * 而且不会有任何测试发现。
  */
 
-export type NavKey = "chart" | "ask" | "cross" | "tarot" | "book" | "compare";
+export type NavKey = "chart" | "pair" | "ask" | "cross" | "tarot" | "book" | "compare";
 
 interface Item {
   readonly key: NavKey;
@@ -39,6 +39,7 @@ interface Item {
 /** 主线。四柱排盘，要生辰。 */
 const PRIMARY: readonly Item[] = [
   { key: "chart", href: "/", label: "排盘", title: "四柱八字 —— 要出生年月日时与地点" },
+  { key: "pair", href: "/pair", label: "合盘", title: "两张盘的结构关系 —— 不给分数，也不给对任何一方的描述" },
 ];
 
 /** 另几套占法。输入各不相同，故各自注明。 */
