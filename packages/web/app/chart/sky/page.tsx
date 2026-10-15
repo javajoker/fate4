@@ -7,6 +7,7 @@ import {
   SKY_PENDING_CALIBRATION, SIYU_DIGNITY_NOT_INCLUDED, BODY_NAME,
 } from "@fate/core/sky";
 import { useChart } from "../../../lib/chartContext";
+import { SkyWheel, SkyWheelLegend } from "../../../components/SkyWheel";
 
 /**
  * 星盘页 —— 同一个出生时刻的另一套读法。
@@ -166,6 +167,31 @@ export default function SkyPage() {
         但这不是四柱的又一个视图 —— 是另一套占法。
         它的输入里多了一样东西：纬度。
       </p>
+
+      <div className="card wheelcard">
+        <div>
+          <SkyWheel chart={sky} aspects={aspects} />
+          <SkyWheelLegend />
+        </div>
+        <div>
+          <h2>这张圆图怎么读</h2>
+          <p className="sub">
+            <strong>上升点在左</strong>（九点钟），黄经逆时针增加 ——
+            这是星盘圆图两千年来的画法，不是任选的。
+            于是第一宫自上升点向下展开，中天落在顶上附近。
+          </p>
+          <p className="sub">
+            外环是宫名（七政四余那一套叫法），内环是整宫制的宫位号。
+            整宫制下这两环是对齐的：<strong>一宫就是一宫位</strong>，
+            宫界即每宫的 0°，不另算。
+          </p>
+          <p className="sub">
+            星旁的小字是宫内度数与七政四余的庙旺（平者不标）。
+            几颗星挤在一起时标签会往外挪一圈，但<strong>角度不动</strong> ——
+            挪角度会让图上的位置与表里的度数对不上，那是在图上说谎。
+          </p>
+        </div>
+      </div>
 
       <div className="card">
         <h2>四角与昼夜</h2>

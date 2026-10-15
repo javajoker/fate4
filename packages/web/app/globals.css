@@ -199,3 +199,21 @@ td.split, th.split { border-left: 1px solid var(--line-strong); }
 
 /* 表单项下面的一句说明：哪一栏不填会少掉什么 */
 .birth .hint { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.5; }
+
+/* 星盘圆图与它的说明并排；窄屏下自动叠起来 */
+/*
+ * 圆图一栏固定 460（与 SkyWheel 的默认 size 相同），说明栏吃剩下的。
+ * 不要写 `auto 1fr`：auto 会取 max-content，而图例里那句长话的 max-content
+ * 有八百多像素，于是说明栏被挤成一个字宽。实测撞上过。
+ */
+.wheelcard { display: grid; grid-template-columns: 460px minmax(0, 1fr);
+  gap: 24px; align-items: start; }
+.wheelcard > div:first-child { width: 460px; }
+@media (max-width: 820px) {
+  .wheelcard { grid-template-columns: minmax(0, 1fr); }
+  .wheelcard > div:first-child { width: 100%; max-width: 460px; }
+}
+.wheel-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center;
+  margin-top: 10px; font-size: 11.5px; color: var(--ink-2); }
+.wheel-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.wheel-legend .dim { flex: 1 1 100%; font-size: 11px; line-height: 1.6; }
