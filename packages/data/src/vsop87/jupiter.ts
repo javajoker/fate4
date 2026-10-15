@@ -9,7 +9,7 @@
  *   · IMCCE (Observatoire de Paris)
  *     ftp://ftp.imcce.fr/pub/ephem/planets/vsop87/VSOP87D.jup
  * 原文件 SHA256：3f3dfbc7d117ecad2b2dadf2fc626b260a3cd5efa98e7d4c6b26cd682fc48090
- * 实际核验：CDS 单源 + sha256 + 声明项数逐一核对 + Astronomy Engine 逐点对照
+ * 实际核验：CDS 与 IMCCE 两处取得，逐字节相同 + 声明项数逐一核对 + Astronomy Engine 逐点对照
  *
  * 每项形如 [A, B, C]，取值 A·cos(B + C·τ)，τ 为自 J2000 起算的儒略千年。
  * L、B 的单位是弧度，R 的单位是天文单位。坐标系为 VSOP87D 的

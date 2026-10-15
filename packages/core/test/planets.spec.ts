@@ -21,9 +21,9 @@ import { VSOP87_PROVENANCE } from "@fate/data";
  * **我用它用对了** —— 截断阈值取错、τ 的历元弄混、光行时迭代写反、
  * 章动符号颠倒，这些都不会动一个字节，却会让黄经错出几十角秒。
  *
- * 本次生成时 IMCCE 的 ftp 反复中断，五星里只有金星取到了第二份做字节比对
- * （见 `VSOP87_PROVENANCE` 逐天体的 `verifiedBy`）。于是这一条就是
- * 其余四颗的主要保证 —— 而它本来也比字节比对强：它校验的是整条链。
+ * 六份文件最终都在 CDS 与 IMCCE 两处取到并逐字节比对过（见
+ * `VSOP87_PROVENANCE` 逐天体的 `verifiedBy`），但那仍只是字节层的保证。
+ * 这一条是另一层，而且更强：它校验的是整条链。
  *
  * ## 判据取多少 —— 以及为什么不是 2″
  *
@@ -186,9 +186,17 @@ describe("五星级数的出处记录", () => {
       expect(bodies[id]!.sha256, id).toMatch(/^[0-9a-f]{64}$/);
       expect(bodies[id]!.verifiedBy.length, id).toBeGreaterThan(10);
     }
-    // 金星是本次唯一真取到两份的，别让它日后被含糊成和其余一样
-    expect(bodies["VENUS"]!.verifiedBy).toContain("逐字节相同");
-    expect(bodies["MARS"]!.verifiedBy).toContain("单源");
+    // 六份都在两处取到并逐字节比对过。这条锁住的是「写的是实际做到的」：
+    // 日后若某一份只取到一处，它就该如实写成单源，而不是跟着一起含糊。
+    for (const id of ["MERCURY", "VENUS", "MARS", "JUPITER", "SATURN", "EARTH"]) {
+      expect(bodies[id]!.verifiedBy, id).toContain("逐字节相同");
+    }
+    // 五星另有逐点对照；地球不在这一条里 —— 它的独立对照是太阳黄经那一侧
+    // （crossvalidate.spec.ts），不是这里。别让它被顺手写上。
+    for (const id of ["MERCURY", "VENUS", "MARS", "JUPITER", "SATURN"]) {
+      expect(bodies[id]!.verifiedBy, id).toContain("Astronomy Engine");
+    }
+    expect(bodies["EARTH"]!.verifiedBy).not.toContain("Astronomy Engine");
   });
 
   it("截断残差是算出来的，且都在 1 角秒以下", () => {

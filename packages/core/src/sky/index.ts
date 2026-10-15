@@ -13,3 +13,6 @@
  */
 
 export * from "./planets.js";
+export * from "./angles.js";
+export * from "./dignities.js";
+export * from "./chart.js";

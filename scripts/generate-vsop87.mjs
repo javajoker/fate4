@@ -31,17 +31,17 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = resolve(HERE, "../packages/data/src/vsop87");
 
 /**
- * 两个互相独立的权威来源。
+ * 两个互相独立的权威来源。六份文件在两处取得，逐字节相同。
  *
- * ⚠️ **不是每个天体都真的两处都取到了。** IMCCE 的 ftp 在本次生成时
- * 反复中断，只有金星取全。于是逐天体记录实际核验到什么程度（`verifiedBy`），
- * 而不是笼统写一句「两处独立档案，字节完全相同」—— 那句话对其中四个
- * 天体并不成立，而一份说得比做到的多的出处记录，比没有出处记录更坏。
+ * IMCCE 的 ftp 极不稳定（单次请求常中途断流），故取全靠的是带续传的
+ * 重试循环，不是一次成功。逐天体记录实际核验到什么程度（`verifiedBy`）
+ * 而不是笼统写一句，理由仍在：若日后某一份只取到一处，
+ * 那一份就该如实写成单源，而不是跟着其余几份一起被含糊过去。
  *
- * 字节比对取不到的那几个，由**另一套独立实现**兜底：
- * `test/planets.spec.ts` 拿 Astronomy Engine 逐点对照算出来的黄经。
- * 那比比对同一份上游文件更强 —— 它校验的是整条链（解析→截断→求值→
- * 地心变换），而不只是字节。
+ * 字节比对之外另有一层：`test/planets.spec.ts` 拿 Astronomy Engine
+ * 逐点对照算出来的黄经。那一层比字节比对**更强** —— 字节比对只能证明
+ * 「我读到的和官方发布的是同一份」，证明不了我用对了它；
+ * 逐点对照校验的是整条链（解析→截断→求值→地心变换）。
  */
 const SOURCES = [
   { name: "CDS/VizieR VI/81 (Strasbourg)", base: "https://cdsarc.cds.unistra.fr/ftp/cats/VI/81" },
@@ -62,7 +62,7 @@ const BODIES = [
   { file: "ear", id: "EARTH", cn: "地球", vars: ["L", "R"], cutoff: { L: 1e-9, R: 1e-8 },
     sha256: "8b160c859136d467f2be7fc29efa8a9652e95516dfbde00e4c739d7ddc90ca91",
     out: "earth.ts", root: true,
-    verifiedBy: "sha256 与既有常量相符（该常量的双源来历见 git 历史）+ 声明项数逐一核对" },
+    verifiedBy: "CDS 与 IMCCE 两处取得，逐字节相同，且与既有常量相符 + 声明项数逐一核对" },
   { file: "ear", id: "EARTH", cn: "地球（黄纬）", vars: ["B"], cutoff: { B: 1e-8 },
     sha256: "8b160c859136d467f2be7fc29efa8a9652e95516dfbde00e4c739d7ddc90ca91",
     out: "earthLatitude.ts",
@@ -70,7 +70,7 @@ const BODIES = [
   { file: "mer", id: "MERCURY", cn: "水星", vars: ["L", "B", "R"], cutoff: PLANET_CUTOFF(),
     sha256: "f468481b5a05080a943ad4746ff7ea7e0ff6652b71a46d83c9c636cb69485e34",
     out: "mercury.ts",
-    verifiedBy: "CDS 单源 + sha256 + 声明项数逐一核对 + Astronomy Engine 逐点对照" },
+    verifiedBy: "CDS 与 IMCCE 两处取得，逐字节相同 + 声明项数逐一核对 + Astronomy Engine 逐点对照" },
   { file: "ven", id: "VENUS", cn: "金星", vars: ["L", "B", "R"], cutoff: PLANET_CUTOFF(),
     sha256: "cb2f3a738289ed45f69fec1845e480baf4b32d481eccc21b8629a2d0d10e8261",
     out: "venus.ts",
@@ -78,15 +78,15 @@ const BODIES = [
   { file: "mar", id: "MARS", cn: "火星", vars: ["L", "B", "R"], cutoff: PLANET_CUTOFF(),
     sha256: "b1184df9553d85ffcf904c16bd437ab668804fa98859f27fe2e7bf6cfa6bc07e",
     out: "mars.ts",
-    verifiedBy: "CDS 单源 + sha256 + 声明项数逐一核对 + Astronomy Engine 逐点对照" },
+    verifiedBy: "CDS 与 IMCCE 两处取得，逐字节相同 + 声明项数逐一核对 + Astronomy Engine 逐点对照" },
   { file: "jup", id: "JUPITER", cn: "木星", vars: ["L", "B", "R"], cutoff: PLANET_CUTOFF(),
     sha256: "3f3dfbc7d117ecad2b2dadf2fc626b260a3cd5efa98e7d4c6b26cd682fc48090",
     out: "jupiter.ts",
-    verifiedBy: "CDS 单源 + sha256 + 声明项数逐一核对 + Astronomy Engine 逐点对照" },
+    verifiedBy: "CDS 与 IMCCE 两处取得，逐字节相同 + 声明项数逐一核对 + Astronomy Engine 逐点对照" },
   { file: "sat", id: "SATURN", cn: "土星", vars: ["L", "B", "R"], cutoff: PLANET_CUTOFF(),
     sha256: "2e49e19396f24c17298f0b667e7763ee5c28b60d549c89d72a17dfd5f8d46b05",
     out: "saturn.ts",
-    verifiedBy: "CDS 单源 + sha256 + 声明项数逐一核对 + Astronomy Engine 逐点对照" },
+    verifiedBy: "CDS 与 IMCCE 两处取得，逐字节相同 + 声明项数逐一核对 + Astronomy Engine 逐点对照" },
 ];
 
 /**
