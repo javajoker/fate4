@@ -6,6 +6,16 @@ import { AUDIENCE_LABEL, AUDIENCE_NOTE, AUDIENCES } from "@fate/core";
 import { ChartProvider, useChart, useFragment } from "../../lib/chartContext";
 import { withFrag } from "../../lib/format";
 
+/**
+ * 顶栏分两组，而且**必须分**。
+ *
+ * 前十二页读的是同一张八字；「星盘」读的是同一个时刻的星空 ——
+ * 它不是四柱的又一个视图，是另一套占法。混在一排里，
+ * 读者会把它当成四柱的一个分支，而那正好说反了。
+ *
+ * 四柱在前、占多数、不加标记；另一套在后、单独一条、带组名。
+ * 主次由位置与数量定，不靠加粗。
+ */
 const TABS: readonly [string, string][] = [
   ["/chart", "盘面 · 力量"],
   ["/chart/persona", "性格 · 偏好"],
@@ -19,6 +29,11 @@ const TABS: readonly [string, string][] = [
   ["/chart/daily", "当日运程"],
   ["/chart/report", "完整报告"],
   ["/chart/params", "参数校准"],
+];
+
+/** 同一个时刻的另一套占法。要的输入多一样：纬度。 */
+const OTHER_TABS: readonly [string, string][] = [
+  ["/chart/sky", "星盘 · 七政四余与西洋古典"],
 ];
 
 function Shell({ children }: { children: ReactNode }) {
@@ -35,6 +50,13 @@ function Shell({ children }: { children: ReactNode }) {
           <nav>
             {TABS.map(([href, name]) => (
               <a key={href} href={withFrag(href, frag)} className={path === href ? "active" : undefined}>
+                {name}
+              </a>
+            ))}
+            <span className="navgroup">另一套占法</span>
+            {OTHER_TABS.map(([href, name]) => (
+              <a key={href} href={withFrag(href, frag)}
+                className={path === href ? "active other" : "other"}>
                 {name}
               </a>
             ))}

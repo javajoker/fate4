@@ -7,6 +7,7 @@ import {
   type CastInput, type CoinThrow, type Liuqin, type TopicCategory,
 } from "@fate/core";
 import { CoinCast } from "../../components/CoinCast";
+import { SiteNav } from "../../components/SiteNav";
 
 /**
  * 问事页 —— 不挂在 /chart 之下。
@@ -126,10 +127,7 @@ export default function AskPage() {
 
   return (
     <>
-      <header className="top"><div className="inner">
-        <a className="brand" href="/">四柱推演</a>
-        <nav><a href="/">排盘</a><a href="/ask" className="active">问事</a><a href="/cross">合参</a><a href="/book">书</a><a href="/compare-book">比较</a></nav>
-      </div></header>
+      <SiteNav active="ask" />
       <div className="shell">
         <h1>六爻问事</h1>
         <p className="sub">

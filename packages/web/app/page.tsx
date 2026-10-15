@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { disclaimerText, type BirthInput } from "@fate/core";
 import { allCharts, deleteChart, newId, putChart, type ChartRecord } from "../lib/storage";
+import { SiteNav } from "../components/SiteNav";
+import { SystemsTable } from "../components/SystemsTable";
 
 const TZ = [
   "Asia/Shanghai", "Asia/Taipei", "Asia/Hong_Kong", "Asia/Macau",
@@ -44,8 +46,7 @@ export default function Home() {
 
   return (
     <>
-      <header className="top"><div className="inner"><span className="brand">四柱推演</span>
-        <nav><a href="/" className="active">排盘</a><a href="/ask">问事</a><a href="/cross">合参</a><a href="/book">书</a><a href="/compare-book">比较</a></nav></div></header>
+      <SiteNav active="chart" />
       <div className="shell">
         <h1>排盘</h1>
         <p className="sub">
@@ -81,9 +82,12 @@ export default function Home() {
             <input type="number" step="0.01" value={f.longitude} required
               onChange={(e) => setF({ ...f, longitude: e.target.value })} />
           </label>
-          <label>出生地纬度（可选）
+          <label>出生地纬度
             <input type="number" step="0.01" value={f.latitude}
               onChange={(e) => setF({ ...f, latitude: e.target.value })} />
+            <span className="hint">
+              四柱用不到；<a href="/compare-book/02">星盘</a>要它才起得了上升点
+            </span>
           </label>
           <label style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 18 }}>
             <input type="checkbox" checked={f.unknownHour} style={{ width: 16 }}
@@ -99,6 +103,8 @@ export default function Home() {
           时辰未知时，时柱与命宫缺省，依赖时柱的判定一律留白 —— 不作猜测。
           时刻按当地钟表时输入，引擎自行处理历史夏令时、经度时差与均时差。
         </p>
+
+        <SystemsTable />
 
         {saved.length > 0 && (
           <>

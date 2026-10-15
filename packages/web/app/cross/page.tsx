@@ -5,6 +5,7 @@ import {
   crossReading, loadParams, AXIS_DIRECTIONAL, SYSTEM_LABEL,
   TOPICS, TOPIC_CATEGORIES, type TopicCategory,
 } from "@fate/core";
+import { SiteNav } from "../../components/SiteNav";
 
 /**
  * 四家合参页 —— 与问事页一样不挂在 /chart 之下。
@@ -47,14 +48,7 @@ export default function CrossPage() {
 
   return (
     <>
-      <header className="top"><div className="inner">
-        <a className="brand" href="/">四柱推演</a>
-        <nav>
-          <a href="/">排盘</a><a href="/ask">问事</a>
-          <a href="/cross" className="active">合参</a>
-          <a href="/book">书</a><a href="/compare-book">比较</a>
-        </nav>
-      </div></header>
+      <SiteNav active="cross" />
       <div className="shell">
         <h1>三家合参</h1>
         <p className="sub">
