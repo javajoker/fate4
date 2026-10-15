@@ -237,3 +237,37 @@ td.split, th.split { border-left: 1px solid var(--line-strong); }
 .tarot-card .meta { font-size: 11.5px; color: var(--ink-2); }
 .tarot-card .q { font-size: 12px; color: var(--ink-2); margin-top: 7px;
   padding-top: 7px; border-top: 1px solid var(--line); line-height: 1.6; }
+
+/*
+ * 紫微的四方十二宫。
+ *
+ * 用方图而不是列表：对宫（相隔六位）与三方四正（相隔四位）在方图上
+ * 一眼可见，在列表里要数行数 —— 而那些关系正是这套东西的全部。
+ */
+.zw-grid { display: grid; grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, minmax(104px, auto)); gap: 1px;
+  background: var(--line); border: 1px solid var(--line); margin-top: 10px; }
+.zw-cell { background: var(--surface); padding: 6px 7px;
+  display: flex; flex-direction: column; justify-content: space-between; min-width: 0; }
+.zw-center { grid-row: 2 / 4; grid-column: 2 / 4; background: var(--surface-2);
+  padding: 14px; display: flex; flex-direction: column; justify-content: center;
+  align-items: center; gap: 3px; text-align: center; font-size: 13px; }
+.zw-stars { display: flex; flex-wrap: wrap; gap: 2px 7px; align-content: flex-start; }
+.zw-star { font-size: 12.5px; white-space: nowrap; }
+/* 星曜分组用字重与深浅区分，不用色相 —— 吉凶不配色 */
+.zw-star.g紫微系, .zw-star.g天府系 { color: var(--ink); font-weight: 600; }
+.zw-star.g六吉 { color: var(--ink-2); }
+.zw-star.g六煞 { color: var(--ink-2); font-style: italic; }
+.zw-star.g禄马 { color: var(--ink-2); }
+.zw-hua { font-size: 9px; color: var(--accent); margin-left: 1px; }
+.zw-foot { display: flex; justify-content: space-between; align-items: baseline;
+  gap: 4px; margin-top: 6px; padding-top: 4px; border-top: 1px solid var(--line);
+  font-size: 10.5px; color: var(--ink-3); }
+.zw-name { color: var(--ink-2); }
+.zw-name em { font-style: normal; color: var(--accent); margin-left: 3px; }
+.zw-gz { font-family: var(--mono); }
+.zw-gz.on { color: var(--accent); font-weight: 600; }
+@media (max-width: 720px) {
+  .zw-grid { grid-template-rows: repeat(4, minmax(86px, auto)); }
+  .zw-star { font-size: 11px; }
+}

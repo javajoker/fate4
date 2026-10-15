@@ -21,6 +21,7 @@
  */
 
 import type { CoinThrow } from "../liuyao/cast.js";
+import { ziweiStateSpace } from "../ziwei/chart.js";
 
 export interface StateSpace {
   readonly system: string;
@@ -172,9 +173,14 @@ export function stateSpaces(): readonly StateSpace[] {
         + "本项目已实现其机制（`tarot/`），这个数与 `spreadStateSpace` 同源。",
     },
     {
-      system: "紫微斗数", kind: "离散", size: null, basis: "declared",
-      note: "⚠️ 本项目未实现，故不给数。输入的基数倒是可数："
-        + "农历年干支 60 × 月 12 × 日 30 × 时辰 12 × 性别 2。",
+      system: "紫微斗数", kind: "离散", size: ziweiStateSpace().distinctCharts,
+      basis: "computed",
+      note: "输入基数 60 × 12 × 30 × 12 × 2 = 518,400（农历年干支、月、日、时辰、性别），"
+        + "穷举后**落到 34,560 张不同的盘** —— 恰好 15 个输入合成一张。"
+        + "坍缩主要来自「日 → 紫微落点」是多对一：一局之内三十天只摊到十二宫。"
+        + "另一个穷举得出的结果：星曜布局**唯一决定**命宫位置与年干四化，"
+        + "故把它们加进比对的键，一张盘都没有多分出来。"
+        + "⚠️ 这个数属于**本实现所收星曜**，收更多杂曜会让盘更易区分。",
     },
     {
       system: "西洋占星 / 七政四余", kind: "连续", size: null, basis: "computed",

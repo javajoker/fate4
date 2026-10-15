@@ -124,7 +124,10 @@ export const SYSTEMS: readonly SystemProfile[] = Object.freeze([
       + "真正的紫微垣（北极一带）一次都不进计算。它的天文含量全在农历："
       + "朔日定初一要真算合朔，置闰要看中气，而中气是太阳黄经的 30° 整数倍。",
     determinism: "确定",
-    implemented: false,
+    // 整张盘由五个整数推出（农历年干支、月、日、时辰、性别），
+    // 一次星历都不查，连地点都不要 —— `ziwei/` 把这件事做实了。
+    // ⚠️ 星曜偏移表为凭记忆转录，见 ZIWEI_PENDING_CALIBRATION。
+    implemented: true,
   },
   {
     id: "liuyao",

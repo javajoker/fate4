@@ -31,9 +31,15 @@ const TABS: readonly [string, string][] = [
   ["/chart/params", "参数校准"],
 ];
 
-/** 同一个时刻的另一套占法。要的输入多一样：纬度。 */
+/**
+ * 同一个出生时刻的另外两套占法。
+ *
+ * 两者要的输入正相反，摆在一起读者自己就看得出来：
+ * 星盘要经纬度（真天体，算星历），紫微连地点都不要（虚星，纯算术）。
+ */
 const OTHER_TABS: readonly [string, string][] = [
   ["/chart/sky", "星盘 · 七政四余与西洋古典"],
+  ["/chart/ziwei", "紫微斗数"],
 ];
 
 function Shell({ children }: { children: ReactNode }) {

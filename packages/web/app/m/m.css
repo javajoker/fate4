@@ -92,3 +92,9 @@
   border: 1px solid var(--line); border-radius: 8px;
 }
 .m-seg button.on { background: var(--accent-soft); color: var(--ink); border-color: var(--line-strong); }
+
+/* 手机上的四方十二宫：字压小，格子矮一点，仍不换成列表 */
+.zw-grid.zw-m { grid-template-rows: repeat(4, minmax(74px, auto)); }
+.zw-grid.zw-m .zw-star { font-size: 10px; }
+.zw-grid.zw-m .zw-foot { font-size: 9px; }
+.zw-grid.zw-m .zw-cell { padding: 4px 5px; }
