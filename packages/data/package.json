@@ -13,6 +13,10 @@
     "./yaoci": {
       "types": "./dist/src/yaoci/index.d.ts",
       "default": "./dist/src/yaoci/index.js"
+    },
+    "./vsop87-planets": {
+      "types": "./dist/src/vsop87/planets.d.ts",
+      "default": "./dist/src/vsop87/planets.js"
     }
   },
   "sideEffects": false

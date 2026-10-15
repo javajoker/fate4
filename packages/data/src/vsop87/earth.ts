@@ -1,27 +1,23 @@
 /**
- * VSOP87D 地球黄经（L）与向径（R）级数 —— **本文件由脚本生成，请勿手改**。
+ * VSOP87D 地球 L/R 级数 —— **本文件由脚本生成，请勿手改**。
  *
- * 生成器：scripts/generate-vsop87.mjs
- * 重新生成并校验：pnpm gen:vsop87
+ * 生成器：scripts/generate-vsop87.mjs　重新生成并校验：pnpm gen:vsop87
  *
- * 数据来源（两处独立档案，字节完全相同）：
+ * 数据来源：
  *   · CDS/VizieR VI/81 (Strasbourg)
  *     https://cdsarc.cds.unistra.fr/ftp/cats/VI/81/VSOP87D.ear
  *   · IMCCE (Observatoire de Paris)
  *     ftp://ftp.imcce.fr/pub/ephem/planets/vsop87/VSOP87D.ear
  * 原文件 SHA256：8b160c859136d467f2be7fc29efa8a9652e95516dfbde00e4c739d7ddc90ca91
+ * 实际核验：sha256 与既有常量相符（该常量的双源来历见 git 历史）+ 声明项数逐一核对
  *
  * 每项形如 [A, B, C]，取值 A·cos(B + C·τ)，τ 为自 J2000 起算的儒略千年。
- * L 的单位是弧度，R 的单位是天文单位。
+ * L、B 的单位是弧度，R 的单位是天文单位。坐标系为 VSOP87D 的
+ * **当日平动力学黄道与平分点**（非 J2000 固定黄道）。
  *
- * 截断：|A| < 1e-9 (L) / 1e-8 (R) 的项已略去。
- *   L 保留 818 项（原 1080 项），
- *     丢弃项同相叠加的最坏残差 1.42e-7 rad = 0.0292″
- *   R 保留 213 项（原 997 项），
- *     最坏残差 1.37e-6 AU
- *
- * 黄纬 B 未收录：太阳黄纬不超过 1.2″，仅经 FK5 修正的 tanβ 项影响黄经，
- * 量级约 3e-7″，可安全略去。
+ * 截断与实测残差（逐项累加，非估计）：
+ *   L：|A| < 1e-9 略去，保留 818/1080 项，最坏残差 0.0292″
+ *   R：|A| < 1e-8 略去，保留 213/997 项，最坏残差 1.37e-6 AU
  */
 
 /** 按 T 的幂次分组的级数：series[k] 为 T^k 的项表。 */
