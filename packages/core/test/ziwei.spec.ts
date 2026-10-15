@@ -4,6 +4,7 @@ import {
   ziweiIndex, tianfuIndex, majorStars, luckyStars, unluckyStars,
   luMaStars, sihuaOf, SIHUA_ORDER, STEM_TABLES_COVER_ALL,
   buildZiweiChart, ziweiStateSpace, ZIWEI_PENDING_CALIBRATION,
+  readZiwei, readPalace, sanfangSizheng, gejuOf, MAJOR_STAR_NAMES,
 } from "../src/ziwei/index.js";
 import { STEMS, BRANCHES } from "../src/types/ganzhi.js";
 import { scanText } from "../src/report/guard.js";
@@ -317,6 +318,123 @@ describe("诚实性约束", () => {
       gender: "male", timeZone: "Asia/Shanghai", longitude: 121.47,
     });
     for (const t of [...CH.warnings, ...ZIWEI_PENDING_CALIBRATION, CH.yearBasis]) {
+      expect(t.includes("**"), t.slice(0, 36)).toBe(false);
+    }
+  });
+});
+
+describe("盘面的解读", () => {
+  const CH = buildZiweiChart({
+    year: 1990, month: 5, day: 12, hour: 14, minute: 30,
+    gender: "male", timeZone: "Asia/Shanghai", longitude: 121.47,
+  });
+  const R = readZiwei(CH);
+
+  it("三方四正恒为本宫、对宫（+6）、三合二宫（±4）", () => {
+    for (let i = 0; i < 12; i++) {
+      const sf = sanfangSizheng(i);
+      expect(sf.opposite).toBe((i + 6) % 12);
+      expect(new Set(sf.trine)).toEqual(new Set([(i + 4) % 12, (i + 8) % 12]));
+      expect(new Set(sf.all).size, "四宫互不相同").toBe(4);
+    }
+  });
+
+  it("**命宫的三合二宫恰是财帛与官禄** —— 十二宫逆行排布的直接后果", () => {
+    const sf = sanfangSizheng(CH.layout.mingIndex);
+    const names = sf.trine.map((i) => CH.palaces[i]!.name).sort();
+    expect(names).toEqual(["官禄", "财帛"].sort());
+    // 对宫必是迁移
+    expect(CH.palaces[sf.opposite]!.name).toBe("迁移");
+  });
+
+  it("**空宫借对宫的主星**，不空则不借", () => {
+    expect(R.ming.isEmpty).toBe(true);
+    expect(R.ming.majors).toHaveLength(0);
+    expect(R.ming.borrowed.map((s) => s.name).sort()).toEqual(["太阳", "太阴"]);
+    expect(R.ming.why).toContain("借对宫");
+    // 反向对照：找一个有主星的宫，它不该借
+    const filled = CH.palaces.find((p) =>
+      p.stars.some((s) => MAJOR_STAR_NAMES.includes(s.name)))!;
+    const r = readPalace(CH, filled.index);
+    expect(r.isEmpty).toBe(false);
+    expect(r.borrowed).toHaveLength(0);
+  });
+
+  it("**杀破狼恒互为三合** —— 排布的直接后果，不是巧合", () => {
+    for (let z = 0; z < 12; z++) {
+      const s = majorStars(z);
+      const at = (n: string) => s.find((x) => x.name === n)!.index;
+      const gap = (a: string, b: string) => ((at(a) - at(b)) % 12 + 12) % 12;
+      expect(gap("七杀", "贪狼"), `紫微 ${z}`).toBe(4);
+      expect(gap("破军", "七杀"), `紫微 ${z}`).toBe(4);
+    }
+  });
+
+  it("**杀破狼在三方四正里只能见三颗或一颗，绝不会是两颗**", () => {
+    // 三颗恒占一条三合线 {k, k+4, k+8}。命宫的三方四正是
+    // {m, m+4, m+8}（另一条三合线）加对宫 m+6。
+    // 于是只有两种命中方式：命宫那条线就是杀破狼线（见三颗），
+    // 或者对宫落在杀破狼线上（见一颗）。两者不可能同时发生。
+    const counts = new Set<number>();
+    for (let hour = 0; hour < 24; hour += 2) {
+      for (const day of [3, 9, 15, 21, 27]) {
+        const c = buildZiweiChart({
+          year: 1990, month: 5, day, hour, minute: 0,
+          gender: "male", timeZone: "Asia/Shanghai", longitude: 121.47,
+        });
+        const g = gejuOf(c, c.layout.mingIndex).find((x) => x.name === "杀破狼");
+        const n = g?.seen.length ?? 0;
+        counts.add(n);
+        expect([0, 1, 3], `${day} 日 ${hour} 时：见 ${g?.seen.join("、") ?? "无"}`)
+          .toContain(n);
+        if (n === 3) expect(g!.complete).toBe(true);
+      }
+    }
+    // 反向对照：样本里三种情形都出现过，否则上面那条可能只验到一种
+    expect(counts.size, `实际出现的命中数：${[...counts].join("/")}`)
+      .toBeGreaterThan(1);
+  });
+
+  it("四化落宫带宫名，并标出是否在命宫三方四正内", () => {
+    expect(R.sihua).toHaveLength(4);
+    for (const h of R.sihua) {
+      expect(typeof h.inMingSanfang).toBe("boolean");
+      if (h.palace !== null) {
+        expect(CH.palaces.some((p) => p.name === h.palace)).toBe(true);
+      }
+    }
+    // 这张盘上确有四化落在命宫三方四正内，否则这条断言是空的
+    expect(R.sihua.some((h) => h.inMingSanfang)).toBe(true);
+  });
+
+  it("**不收庙旺表，而且明说那是缺口不是取舍**", () => {
+    const n = R.notes.join("\n");
+    expect(n).toContain("168 格");
+    expect(n).toContain("真实的缺口");
+    expect(n).toContain("不是取舍");
+    // 查**字段名**而不是文本 —— notes 里正解释着「为什么不收庙旺」，
+    // 拿字符串去扫会把那句解释当成违例。（合盘那边先踩过一次。）
+    const keys = new Set<string>();
+    const walk = (x: unknown): void => {
+      if (Array.isArray(x)) { x.forEach(walk); return; }
+      if (x === null || typeof x !== "object") return;
+      for (const [k, v] of Object.entries(x)) { keys.add(k); walk(v); }
+    };
+    walk(R);
+    for (const k of keys) {
+      expect(/庙旺|miaowang|dignit/i.test(k), `字段 ${k}`).toBe(false);
+    }
+    expect(keys.has("sanfangStars"), "反向对照：确实遍历到了嵌套字段").toBe(true);
+  });
+
+  it("**不出断语** —— 解读全文过措辞守卫", () => {
+    const texts = [
+      ...R.notes, R.ming.why, R.shen.why,
+      ...R.geju.map((g) => g.why),
+      ...R.ming.sanfangStars.map((s) => `${s.palace}${s.majors.join("")}`),
+    ];
+    for (const t of texts) {
+      expect(scanText(t, "ziwei.reading"), t.slice(0, 40)).toEqual([]);
       expect(t.includes("**"), t.slice(0, 36)).toBe(false);
     }
   });

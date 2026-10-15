@@ -34,7 +34,7 @@ const WHERE: Readonly<Record<string, { readonly href?: string; readonly text: st
   qimen: { href: "/cross", text: "合参" },
   qizheng: { href: "/chart/sky", text: "排盘后的「星盘」页" },
   astrology: { href: "/chart/sky", text: "排盘后的「星盘」页" },
-  ziwei: { text: "未实现" },
+  ziwei: { href: "/chart/ziwei", text: "排盘后的「紫微斗数」页" },
   tarot: { href: "/tarot", text: "塔罗" },
 };
 

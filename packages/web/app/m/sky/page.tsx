@@ -5,6 +5,7 @@ import { asTT, buildChart, deltaTSeconds, PLAIN_DISCLAIMER } from "@fate/core";
 import { skyChart, aspectsOf, ASPECT_NAME, BODY_NAME } from "@fate/core/sky";
 import { SkyWheel, SkyWheelLegend } from "../../../components/SkyWheel";
 import { Ziwei } from "./Ziwei";
+import { Pair } from "./Pair";
 import { CITIES, loadBirth } from "../store";
 import { Disclaimer } from "../page";
 
@@ -34,7 +35,7 @@ export default function MobileSkyPage() {
   const [birth, setBirth] = useState<ReturnType<typeof loadBirth>>(null);
   const [ready, setReady] = useState(false);
   // 两套并列，不是同一套东西的两档 —— 故用并列切换而非标签页
-  const [which, setWhich] = useState<"sky" | "ziwei">("sky");
+  const [which, setWhich] = useState<"sky" | "ziwei" | "pair">("sky");
 
   useEffect(() => { setBirth(loadBirth()); setReady(true); }, []);
 
@@ -59,14 +60,16 @@ export default function MobileSkyPage() {
       <button className={which === "sky" ? "on" : undefined}
         onClick={() => setWhich("sky")}>星盘</button>
       <button className={which === "ziwei" ? "on" : undefined}
-        onClick={() => setWhich("ziwei")}>紫微斗数</button>
+        onClick={() => setWhich("ziwei")}>紫微</button>
+      <button className={which === "pair" ? "on" : undefined}
+        onClick={() => setWhich("pair")}>合盘</button>
     </div>
   );
 
   if (birth === null) {
     return (
       <>
-        <h1 className="m-h1">另两套</h1>
+        <h1 className="m-h1">别的盘</h1>
         <p className="m-lede">这一页要先有出生信息。</p>
         <p><a className="m-btn" href="/m" style={{ display: "block", textAlign: "center" }}>
           去填出生信息</a></p>
@@ -76,12 +79,24 @@ export default function MobileSkyPage() {
 
   // ⚠️ 紫微要在纬度判断**之前**分流：它根本不要纬度，
   // 而把它挡在「请补上纬度」后面，等于拿星盘的要求去卡一套不需要它的占法。
+  // ⚠️ 紫微与合盘都要在纬度判断**之前**分流：两者都不要纬度，
+  // 而把它们挡在「请补上纬度」后面，等于拿星盘的要求去卡不需要它的占法。
   if (which === "ziwei") {
     return (
       <>
-        <h1 className="m-h1">另两套</h1>
+        <h1 className="m-h1">别的盘</h1>
         <Switch />
         <Ziwei birth={birth} />
+      </>
+    );
+  }
+
+  if (which === "pair") {
+    return (
+      <>
+        <h1 className="m-h1">别的盘</h1>
+        <Switch />
+        <Pair birth={birth} />
       </>
     );
   }
@@ -89,7 +104,7 @@ export default function MobileSkyPage() {
   if (sky === null) {
     return (
       <>
-        <h1 className="m-h1">另两套</h1>
+        <h1 className="m-h1">别的盘</h1>
         <Switch />
         <p className="m-lede">
           这一页要知道你出生地的<strong>纬度</strong>，而你这份存档里没有。
@@ -113,7 +128,7 @@ export default function MobileSkyPage() {
 
   return (
     <>
-      <h1 className="m-h1">另两套</h1>
+      <h1 className="m-h1">别的盘</h1>
       <Switch />
       <p className="m-lede">
         与「我」那一页<strong>同一个出生时刻</strong>，但换了一套占法：

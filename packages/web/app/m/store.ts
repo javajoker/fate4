@@ -135,3 +135,37 @@ export function clearMarks(): void {
  * 把它写成 57% 会让一个说明不了什么的数字看起来像统计量。
  */
 export const ENOUGH = 30;
+
+/**
+ * 合盘用的第二张盘 —— **与本人的生辰分开存**。
+ *
+ * 分开不是技术需要，是为了让它**看得见、删得掉**：
+ * 它是另一个人的生辰，不该混进「我的资料」里悄悄留着。
+ *
+ * 桌面版的合盘页要求两张盘都已存在，并明说不另开输入表单 ——
+ * 那会让人顺手填进一个随口问来的生辰。移动版只存一个人，
+ * 那条要求没法照搬，故改为：表单在一段说明**之后**才出现，
+ * 并且这一份随时可以单独清掉。
+ */
+const PARTNER_KEY = "fate.m.partner.v1";
+
+export interface PartnerRecord {
+  readonly label: string;
+  readonly input: BirthInput;
+}
+
+export function loadPartner(): PartnerRecord | null {
+  try {
+    const raw = localStorage.getItem(PARTNER_KEY);
+    return raw === null ? null : (JSON.parse(raw) as PartnerRecord);
+  } catch { return null; }
+}
+
+export function savePartner(r: PartnerRecord): void {
+  try { localStorage.setItem(PARTNER_KEY, JSON.stringify(r)); }
+  catch { /* 隐私模式下写不进，无妨 */ }
+}
+
+export function clearPartner(): void {
+  try { localStorage.removeItem(PARTNER_KEY); } catch { /* 同上 */ }
+}

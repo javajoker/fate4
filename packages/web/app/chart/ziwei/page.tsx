@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import { buildZiweiChart, ziweiStateSpace, ZIWEI_PENDING_CALIBRATION, discloses } from "@fate/core";
+import {
+  buildZiweiChart, readZiwei, ziweiStateSpace,
+  ZIWEI_PENDING_CALIBRATION, discloses,
+} from "@fate/core";
 import { useChart } from "../../../lib/chartContext";
 
 /**
@@ -41,6 +44,7 @@ export default function ZiweiPage() {
     try { return buildZiweiChart(record.input); } catch { return null; }
   }, [record]);
 
+  const reading = useMemo(() => (zw === null ? null : readZiwei(zw)), [zw]);
   const space = useMemo(() => ziweiStateSpace(), []);
 
   if (record === null) return null;
@@ -131,6 +135,111 @@ export default function ZiweiPage() {
           星名右上角的单字是四化（禄权科忌）。
         </p>
       </div>
+
+      {reading !== null && (
+        <>
+          <div className="card">
+            <h2>盘面怎么读</h2>
+            <p className="sub">
+              紫微的读法从来<strong>不是一宫一宫单看</strong>，而是成组地看：
+              本宫、对宫，加三合的另两宫 —— 合称<strong>三方四正</strong>，四宫同看。
+              对命宫而言，那三合的两宫恰是<strong>财帛与官禄</strong>，
+              那不是巧合，是十二宫逆行排布的直接后果。
+            </p>
+
+            {([["命宫", reading.ming], ["身宫", reading.shen]] as const).map(
+              ([label, r]) => (
+                <div key={label} style={{ marginTop: 14 }}>
+                  <h3 style={{ fontSize: 14.5 }}>
+                    {label}　<span className="dim">{r.palace.branch}
+                      {r.palace.name}</span>
+                  </h3>
+                  <p style={{ fontSize: 14 }}>{r.why}。</p>
+                  <table style={{ marginTop: 8 }}>
+                    <thead>
+                      <tr><th>位</th><th>宫</th><th>主星</th></tr>
+                    </thead>
+                    <tbody>
+                      {r.sanfangStars.map((x) => (
+                        <tr key={x.branch}>
+                          <td className="dim">{x.role}</td>
+                          <td><span className="mono dim">{x.branch}</span> {x.palace}</td>
+                          <td>{x.majors.length === 0
+                            ? <span className="dim">（无主星）</span>
+                            : x.majors.join("、")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            <p className="sub" style={{ marginTop: 12 }}>
+              某一宫没有主星时，传统做法是<strong>借对宫的主星来看</strong>。
+              那不是权宜 —— 本宫与对宫本就同看，空宫只是把重心挪到了对面。
+            </p>
+          </div>
+
+          {reading.geju.length > 0 && (
+            <div className="card">
+              <h2>格局</h2>
+              <p className="sub">
+                某几颗星凑在三方四正里，传统上另有名目。
+                这里只收<strong>由落位直接判定、各家名目一致</strong>的几种。
+              </p>
+              <table>
+                <thead>
+                  <tr><th>名目</th><th>要哪几颗</th><th>见到</th><th>齐否</th></tr>
+                </thead>
+                <tbody>
+                  {reading.geju.map((g) => (
+                    <tr key={g.name}>
+                      <td>{g.name}</td>
+                      <td className="dim">{g.stars.join("、")}</td>
+                      <td>{g.seen.join("、")}</td>
+                      <td>{g.complete ? "齐" : <span className="dim">不齐</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {reading.geju.map((g) => (
+                <p key={g.name} className="sub" style={{ marginTop: 8 }}>
+                  <strong>{g.name}</strong>　{g.why}
+                </p>
+              ))}
+            </div>
+          )}
+
+          <div className="card">
+            <h2>四化落在哪儿</h2>
+            <p className="sub">
+              四化不摆新星，它把<strong>已有的星所在的那一宫</strong>牵动起来。
+              落在命宫三方四正内的，传统上认为与命宫直接相关。
+            </p>
+            <table>
+              <thead>
+                <tr><th>化</th><th>星</th><th>落宫</th><th>在命宫三方四正内</th></tr>
+              </thead>
+              <tbody>
+                {reading.sihua.map((h) => (
+                  <tr key={h.kind}>
+                    <td>{h.kind}</td>
+                    <td>{h.star}</td>
+                    <td>{h.palace === null
+                      ? <span className="dim">该星不在本实现收录之列</span>
+                      : <><span className="mono dim">{h.branch}</span> {h.palace}</>}</td>
+                    <td>{h.inMingSanfang ? "是" : <span className="dim">否</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="card">
+            <h2>这一层解读到哪儿为止</h2>
+            <ul>{reading.notes.map((n) => <li key={n}>{n}</li>)}</ul>
+          </div>
+        </>
+      )}
 
       <div className="card">
         <h2>⚠️ 这些「星」不是天上的星</h2>

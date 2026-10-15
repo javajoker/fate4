@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { buildZiweiChart, type BirthInput } from "@fate/core";
+import { buildZiweiChart, readZiwei, type BirthInput } from "@fate/core";
 
 /**
  * 移动版紫微盘。
@@ -38,6 +38,7 @@ export function Ziwei({ birth }: { birth: BirthInput }) {
   }, [birth]);
 
   if (zw === null) return <p className="m-lede">这张生辰排不出紫微盘。</p>;
+  const R = readZiwei(zw);
 
   return (
     <>
@@ -124,6 +125,78 @@ export function Ziwei({ birth }: { birth: BirthInput }) {
         每格左下是大限起止岁数，中间是宫名，右下是该宫干支（命宫标出）。
         星名右上角的单字是四化（禄权科忌）。
       </p>
+
+      <h2 className="m-sec">盘面怎么读</h2>
+      <p className="m-lede" style={{ marginBottom: 12 }}>
+        紫微<strong>不是一宫一宫单看</strong>的，而是成组地看：
+        本宫、对宫，加三合的另两宫 —— 合称<strong>三方四正</strong>。
+        对命宫来说，那两宫恰好是财帛与官禄。
+      </p>
+
+      {([["命宫", R.ming], ["身宫", R.shen]] as const).map(([label, r]) => (
+        <div className="m-card" key={label}>
+          <h3>{label}　<span className="dim" style={{ fontWeight: 400 }}>
+            {r.palace.branch}{r.palace.name}</span></h3>
+          <p style={{ fontSize: 13.5 }}>{r.why}。</p>
+          <div style={{ marginTop: 8 }}>
+            {r.sanfangStars.map((x) => (
+              <p key={x.branch} style={{ fontSize: 12.5, marginBottom: 3 }}>
+                <span className="dim">{x.role}</span>　
+                <span className="mono dim">{x.branch}</span> {x.palace}　
+                {x.majors.length === 0
+                  ? <span className="dim">（无主星）</span> : x.majors.join("、")}
+              </p>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <div className="m-note">
+        某一宫没有主星时，传统做法是<strong>借对宫的主星来看</strong>。
+        那不是权宜 —— 本宫与对宫本就同看，空宫只是把重心挪到了对面。
+      </div>
+
+      {R.geju.length > 0 && (
+        <>
+          <h2 className="m-sec">格局</h2>
+          {R.geju.map((g) => (
+            <div className="m-card" key={g.name}>
+              <h3>{g.name}　<span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>
+                {g.complete ? "齐" : "不齐"}</span></h3>
+              <p style={{ fontSize: 13.5 }}>
+                要 {g.stars.join("、")}；三方四正里见到 {g.seen.join("、")}。
+              </p>
+              <p className="dim" style={{ marginTop: 6 }}>{g.why}</p>
+            </div>
+          ))}
+        </>
+      )}
+
+      <h2 className="m-sec">四化落在哪儿</h2>
+      <div className="m-card">
+        <p className="dim" style={{ marginBottom: 8 }}>
+          四化不摆新星，它把已有的星所在的那一宫牵动起来。
+        </p>
+        {R.sihua.map((h) => (
+          <p key={h.kind} style={{ fontSize: 13.5, marginBottom: 4 }}>
+            {h.star}<strong>{h.kind}</strong>　→　
+            {h.palace === null ? <span className="dim">该星不在本实现收录之列</span>
+              : <>{h.branch}{h.palace}
+                {h.inMingSanfang && <span className="dim">（命宫三方四正内）</span>}</>}
+          </p>
+        ))}
+      </div>
+
+      <div className="m-note">
+        ⚠️ 本项目<strong>不收星曜的庙旺表</strong>（十四主星 × 十二宫 = 168 格）。
+        那一层凭记忆转录的风险比调候 120 格更大，而结构性检查对它几乎无能为力：
+        一格记错看不出来，却会悄悄改变对某颗星的强弱判断。
+        <strong>这是一个真实的缺口，不是取舍</strong> ——
+        收齐它需要一个底本，而本项目没有。
+        <br /><br />
+        这一页也不出断语。「命宫坐七杀」是事实陈述；
+        「主性格刚毅」「宜从事某行」是另一回事，那一层没有可判定的规则。
+      </div>
 
       <div className="m-note">
         紫微<strong>自己</strong>不算天象，但它吃的农历是实测的 ——
