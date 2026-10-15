@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import {
   buildFindings, buildSeries, findNodes, formatEvidence,
   SCALE_LABEL, type NodeScale,
+  discloses, isFutureWindow, FUTURE_WITHHELD_NOTE,
 } from "@fate/core";
 import { useChart } from "../../../lib/chartContext";
 
@@ -16,7 +17,7 @@ const SCALE_NOTE: Readonly<Record<NodeScale, string>> = {
 };
 
 export default function NodesPage() {
-  const { base } = useChart();
+  const { base, audience } = useChart();
   const [threshold, setThreshold] = useState(2);
   const [scale, setScale] = useState<NodeScale>("large");
   const [open, setOpen] = useState<string | null>(null);
@@ -24,6 +25,9 @@ export default function NodesPage() {
   // 两段记忆化分开：曲线只随命盘变（约 700 ms），节点随尺度与门槛变（约 300 ms）。
   // 合成一个 useMemo 会让每次点门槛都重跑曲线，实测主线程一次卡住 1.6 秒。
   const S = useMemo(() => (base === null ? null : buildSeries(base)), [base]);
+  // 节点是「指向某个时段」的输出。普通读者档只给已经过去的那些 ——
+  // 与 plainCards 同一条线，同一个判据（当前年本身算当下）。
+  const nowYear = new Date().getFullYear();
   const F = useMemo(() => {
     if (S === null) return null;
     // 只算当前选中的那一个尺度 —— 另外两个此刻不显示
@@ -32,7 +36,16 @@ export default function NodesPage() {
   }, [S, scale, threshold]);
 
   if (base === null || S === null || F === null) return <p className="sub">节点计算中…</p>;
-  const shown = F.findings.findings;
+  const all = F.findings.findings;
+  const enteredYear = (f: (typeof all)[number]) => {
+    const v = f.detail.evidence.find((e) => e.label === "进入")?.value;
+    return typeof v === "number" ? v : null;
+  };
+  const future = discloses(audience, "futureWindows")
+    ? []
+    : all.filter((f) => { const y = enteredYear(f); return y !== null && isFutureWindow(y, nowYear); });
+  const shown = discloses(audience, "futureWindows")
+    ? all : all.filter((f) => !future.includes(f));
 
   return (
     <>
@@ -74,6 +87,14 @@ export default function NodesPage() {
         门槛是取舍旋钮，不是显著性水平 —— 序列由出生时刻完全决定，
         越阈的采样点在任何一张盘上都是那么多；调门槛改的是列出几条。
       </p>
+
+      {future.length > 0 && (
+        <div className="card" style={{ margin: "10px 0" }}>
+          <p className="sub" style={{ margin: 0 }}>
+            另有 <b>{future.length}</b> 段落在今年之后。{FUTURE_WITHHELD_NOTE}
+          </p>
+        </div>
+      )}
 
       {shown.length === 0 && <p className="sub">此尺度下没有越过门槛的时段。</p>}
 

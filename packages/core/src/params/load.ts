@@ -335,8 +335,23 @@ function stableStringify(value: unknown): string {
  * 参数指纹 —— 写进每份报告，供日后回答「为什么现在算出来不一样」。
  * FNV-1a：无依赖、稳定、对本用途足够。
  */
+/**
+ * 参数指纹 —— **只盖住影响数值的那些参数**。
+ *
+ * `report` 整节不进哈希：locale、audience、showParamsSnapshot、配色约束，
+ * 没有一项会改变任何一个算出来的数。
+ *
+ * 这一条要紧，因为指纹的用处只有一个：**指纹相同，两份报告的数才可比。**
+ * 若把呈现项也盖进去，同一张盘的简体版与繁体版会得到两个不同的指纹 ——
+ * 于是按本项目自己的规矩，它们"不可比"，而它们的数逐位相同。
+ * 读者档一加进来，这个毛病会立刻变成每天都遇得到的。
+ *
+ * ⚠️ 反过来也要守住：凡是**会**改变数值的参数，一项都不许排除。
+ * 由 `params.spec.ts` 逐节断言 —— 改任一非 report 节，指纹必须变。
+ */
 export function paramsHash(p: Params): string {
-  const json = stableStringify(p);
+  const { report: _presentation, ...computational } = p;
+  const json = stableStringify(computational);
   let h = 0x811c9dc5;
   for (let i = 0; i < json.length; i++) {
     h ^= json.charCodeAt(i);

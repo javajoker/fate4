@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { buildChart } from "../src/chart/buildChart.js";
 import { buildBaseChart, toBaseChart } from "../src/chart/baseChart.js";
 import { buildSeries } from "../src/temporal/series.js";
@@ -6,7 +7,8 @@ import { plainYear } from "../src/plain/year.js";
 import { buildReport } from "../src/report/assemble.js";
 import { plainCards, type PlainCard } from "../src/plain/cards.js";
 import { scanPlain, PLAIN_RULES } from "../src/plain/guard.js";
-import { AUDIENCES, discloses, showsProvenanceWarnings } from "../src/report/audience.js";
+import { AUDIENCES, DISCLOSURES, discloses, showsProvenanceWarnings,
+  type Audience } from "../src/report/audience.js";
 import {
   STRENGTH_PLAIN, GOD_PLAIN, GOD_RELATION_PLAIN, ELEMENT_PLAIN, ELEMENT_BODY_PLAIN,
   ELEMENT_STATE_PLAIN, QUADRANT_PLAIN, DIRECTION_PLAIN, favorPlain, confidencePlain, domainOfSeries,
@@ -642,12 +644,132 @@ describe("**读者档控制披露，不控制断言**", () => {
     // 若日后有人往 Disclosure 里加了一个 guard 之类的键，这条会红。
     const keys: string[] = [];
     for (const a of AUDIENCES) {
-      for (const d of ["numbers", "numberGloss", "futureWindows",
-        "shenshaRaw", "fullDerivation", "calibrationNotes"] as const) {
+      for (const d of DISCLOSURES) {
         expect(typeof discloses(a, d)).toBe("boolean");
         keys.push(d);
       }
     }
     expect([...new Set(keys)].some((k) => /guard|守卫|scan/i.test(k))).toBe(false);
+  });
+
+  it("**每一项披露都有调用处在读它** —— 没人读的成员是一句没兑现的承诺", () => {
+    // 一度有三项（shenshaRaw / fullDerivation / calibrationNotes）只写在表里，
+    // 一个调用处都没有：文档上写着「这一档不给」，实现里照给不误。
+    // 这条在源码里数调用处，故新加一项而忘了接，会当场红。
+    const src = [
+      "src/plain/cards.ts", "src/plain/numbers.ts", "src/plain/question.ts",
+      "src/report/assemble.ts", "src/report/render.ts",
+      "../web/app/chart/nodes/page.tsx", "../web/app/chart/report/page.tsx",
+      "../web/app/m/page.tsx",
+    ].map((f) => {
+      try { return readFileSync(new URL(`../${f}`, import.meta.url), "utf8"); }
+      catch { return ""; }
+    }).join("\n");
+    // 反向对照：文件真读到了，而且那三个删掉的名字确实一处不剩 ——
+    // 少了这一句，上面那条在所有读取都失败时也会全绿。
+    expect(src.length).toBeGreaterThan(50_000);
+    for (const gone of ["shenshaRaw", "fullDerivation"]) {
+      expect(src.includes(gone), `${gone} 已从披露表删除，不该还有调用处`).toBe(false);
+    }
+    for (const d of DISCLOSURES) {
+      expect(src.includes(`"${d}"`), `披露项 ${d} 没有任何调用处在读`).toBe(true);
+    }
+  });
+
+  it("**推导链不在可关之列** —— 「看依据」是底线，不是披露", () => {
+    // 任何档的每一张卡都必须带得回原文。做成可关的，
+    // 等于让普通读者拿到一句无从追溯的概括 —— 那正是本项目在防的形态。
+    expect((DISCLOSURES as readonly string[]))
+      .not.toContain("fullDerivation");
+    for (const a of AUDIENCES) {
+      const cards = plainCards(buildReport(buildChart(CHARTS[0]!), {
+        params: loadParams({ report: { audience: a } }),
+      })).cards;
+      expect(cards.length).toBeGreaterThan(0);
+      for (const c of cards) expect(c.evidence.length, `${a}.${c.id}`).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("**量化数字：同一个数，三档三种写法**", () => {
+  const CH = CHARTS[0]!;
+  const CACHE = new Map<string, ReturnType<typeof buildReport>>();
+  const reportFor = (a: "lay" | "student" | "practitioner") => {
+    const hit = CACHE.get(a);
+    if (hit !== undefined) return hit;
+    const r = buildReport(buildChart(CH), {
+      includeNodes: true, now: { year: 2026, month: 9, day: 2 },
+      params: loadParams({ report: { audience: a } }),
+    });
+    CACHE.set(a, r);
+    return r;
+  };
+  const bodyOf = (a: "lay" | "student" | "practitioner", id: string) =>
+    plainCards(reportFor(a)).cards.find((c) => c.id === id)!.body;
+
+  it("普通读者档一个数都不出", () => {
+    const b = bodyOf("lay", "self.strength");
+    expect(b).not.toMatch(/0\.\d{3}/);
+    expect(b).not.toContain("〔");
+  });
+
+  it("学生档出数且**每个数附一句它是什么意思**", () => {
+    const b = bodyOf("student", "self.strength");
+    expect(b).toContain("〔数〕");
+    expect(b).toMatch(/同党\/总量 0\.\d{4}/);
+    expect(b).toContain("（");          // 有解释
+    expect(b).toContain("置信度");
+  });
+
+  it("命理师档出数但**不附解释** —— 他不需要被解释，解释占掉他要扫的地方", () => {
+    const b = bodyOf("practitioner", "self.strength");
+    expect(b).toMatch(/同党\/总量 0\.\d{4}/);
+    expect(b).not.toContain("〔数〕");   // 紧凑写法
+    expect(b).toContain("｜");
+    expect(b.length).toBeLessThan(bodyOf("student", "self.strength").length);
+  });
+
+  it("**数取自推导链，不另算一遍** —— 另算就有两份实现，迟早对不上", () => {
+    const r = reportFor("practitioner");
+    const rFromChain = r.strength.strength.derivation
+      .find((d) => d.step === "比值")?.values?.["r"];
+    expect(typeof rFromChain).toBe("number");
+    expect(bodyOf("practitioner", "self.strength"))
+      .toContain((rFromChain as number).toFixed(4));
+  });
+
+  it("顺逆指数与节点的 z 也按档给", () => {
+    expect(bodyOf("lay", "cur.year")).not.toMatch(/顺逆指数 \d/);
+    expect(bodyOf("student", "cur.year")).toMatch(/顺逆指数 \d+\.\d/);
+    const node = (a: "lay" | "practitioner") =>
+      plainCards(reportFor(a)).cards.find((c) => c.section === "起伏")!.body;
+    expect(node("lay")).not.toMatch(/z -?\d/);
+    expect(node("practitioner")).toMatch(/z -?\d+\.\d{2}/);
+  });
+
+  it("**人话那一句三档逐字相同** —— 后两档加的是数，不是另一个结论", () => {
+    // 附注一律以全角空格 + 〔 开头，故切掉它就还原出人话本身。
+    // 若哪天换一档连人话都改了，这个开关就不再只是披露深度了。
+    const prose = (a: Audience, id: string) => bodyOf(a, id).split("　〔")[0];
+    for (const id of ["self.strength", "cur.year"]) {
+      expect(prose("student", id), id).toBe(prose("lay", id));
+      expect(prose("practitioner", id), id).toBe(prose("lay", id));
+    }
+  });
+
+  it("**三档的数字附注照样过守卫** —— 数字不构成断言，但解释的措辞会", () => {
+    for (const a of AUDIENCES) {
+      for (const c of plainCards(reportFor(a)).cards) {
+        expect(scanPlain(c.body, `${a}.${c.id}`), `${a}.${c.id}`).toEqual([]);
+      }
+    }
+  });
+
+  it("**附注里不许有 Markdown 粗体** —— 运行时字符串会原样渲染成星号", () => {
+    for (const a of AUDIENCES) {
+      for (const c of plainCards(reportFor(a)).cards) {
+        expect(c.body.includes("**"), `${a}.${c.id}`).toBe(false);
+      }
+    }
   });
 });

@@ -1,14 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { buildReport, renderMarkdown, formatViolations, paramsHash } from "@fate/core";
+import {
+  buildReport, renderMarkdown, formatViolations, paramsHash, discloses,
+} from "@fate/core";
 import { useChart } from "../../../lib/chartContext";
 import { useToday } from "../../../lib/today";
 import { Narrative } from "../../../components/Narrative";
 import { encodeShare } from "../../../lib/storage";
 
 export default function ReportPage() {
-  const { base, params, record, overrides } = useChart();
+  const { base, params, record, overrides, audience } = useChart();
   const today = useToday();
   const [tab, setTab] = useState<"read" | "markdown" | "json">("read");
   const [subject, setSubject] = useState<"self" | "other">("self");
@@ -93,8 +95,19 @@ export default function ReportPage() {
               <Narrative lines={c.narrative} />
             </div>
           ))}
+          {/* 待校准是工程清单：哪几张表还没拿实体书逐格核过。
+              它对想接着往下做的人要紧，对只想读这一份报告的人是噪声。 */}
           <h2>待校准</h2>
-          <ul>{r.method.pendingCalibration.map((i) => <li key={i}>{i}</li>)}</ul>
+          {discloses(audience, "calibrationNotes") ? (
+            <ul>{r.method.pendingCalibration.map((i) => <li key={i}>{i}</li>)}</ul>
+          ) : (
+            // 压下的是清单，不是「有东西没核过」这件事本身 ——
+            // 后者属于这份报告有多可信，任何档都该知道。
+            <p className="sub">
+              本系统有 {r.method.pendingCalibration.length} 项数据尚未拿实体书逐格核对。
+              清单是工程信息，这一档不展开；换到「学习中」或「命理师」可以看到。
+            </p>
+          )}
         </>
       )}
 

@@ -22,12 +22,27 @@
  * | --- | --- | --- | --- |
  * | 排盘与结构 | ✓ | ✓ | ✓ |
  * | **盘的来历警告** | ✓ **必出** | ✓ | ✓ |
- * | 推导链 | 人话摘要 | 完整 | 完整 |
+ * | **推导链（「看依据」）** | ✓ **必给** | ✓ | ✓ |
  * | 量化数字 | ✗ 只给档位 | ✓ 带解释 | ✓ 裸数 |
  * | **指向未来的时段** | **✗ 关闭** | ✓ | ✓ |
- * | 神煞原始命中 | 概括 | ✓ | ✓ |
  * | 待校准清单 | ✗ | ✓ | ✓ |
  * | 措辞守卫 | **同** | **同** | **同** |
+ *
+ * ## 推导链为什么不在可关之列
+ *
+ * 这张表一度有「推导链：人话摘要 / 完整 / 完整」一行。**那一行是错的**，
+ * 而且错在这个项目最吃紧的地方：`plain/cards.ts` 开篇写着
+ * 「人话是概括，而读者随时能看到被概括的是什么」—— 每张卡的「看依据」
+ * 给的是报告里那几行的**原文**，不重写、不缩写，**任何档都给**。
+ *
+ * 把它做成可关的，等于让普通读者拿到一句无从追溯的概括 ——
+ * 那正是这整套东西在防的形态。于是它与「盘的来历警告」同列：
+ * 不是一种披露，是一条底线。
+ *
+ * 表里也一度有「神煞原始命中」一行。那一行不是错，是**空的**：
+ * 人话层本来就不出原始神煞（它们早被 `vocab.ts` 概括成了卡片正文），
+ * 而技术视图是给自愿去读术语的人看的，没有第二档。
+ * 一个没有落点的开关比没有这个开关更糟 —— 它让表看起来比实现更周全。
  *
  * ## 「盘的来历警告」为什么三档都必出
  *
@@ -73,10 +88,16 @@ export const AUDIENCE_LABEL: Readonly<Record<Audience, string>> = Object.freeze(
 export const AUDIENCE_NOTE: Readonly<Record<Audience, string>> = Object.freeze({
   lay: "平常话为主，不出量化数字，也不给指向未来的时段。",
   student: "完整的推导链与数字，每个数附一句它是什么意思。",
-  practitioner: "原始数值直出，不加解释；候选时段、神煞命中、待校准项全给。",
+  practitioner: "原始数值直出，不加解释；候选时段与待校准项全给。",
 });
 
-/** 可以按档位开关的几样东西。 */
+/**
+ * 可以按档位开关的几样东西。
+ *
+ * **每一项都必须有调用处在读它。** 一个没人读的成员等于一句没兑现的承诺：
+ * 表上写着「这一档不给」，实现里照给不误，而读文档的人无从发现。
+ * 由测试锁住（在源码里数调用处）。
+ */
 export type Disclosure =
   /** 量化数字：权重、比值、z 分数、置信度小数。 */
   | "numbers"
@@ -84,25 +105,25 @@ export type Disclosure =
   | "numberGloss"
   /** 指向**未来**某个时段的论断。 */
   | "futureWindows"
-  /** 神煞的原始命中与落宫。 */
-  | "shenshaRaw"
-  /** 完整推导链（相对于人话摘要）。 */
-  | "fullDerivation"
-  /** 待校准清单与参数指纹一类的工程信息。 */
+  /** 待校准清单一类的工程信息。 */
   | "calibrationNotes";
+
+export const DISCLOSURES: readonly Disclosure[] = Object.freeze([
+  "numbers", "numberGloss", "futureWindows", "calibrationNotes",
+]);
 
 const TABLE: Readonly<Record<Audience, Readonly<Record<Disclosure, boolean>>>> = Object.freeze({
   lay: Object.freeze({
     numbers: false, numberGloss: false, futureWindows: false,
-    shenshaRaw: false, fullDerivation: false, calibrationNotes: false,
+    calibrationNotes: false,
   }),
   student: Object.freeze({
     numbers: true, numberGloss: true, futureWindows: true,
-    shenshaRaw: true, fullDerivation: true, calibrationNotes: true,
+    calibrationNotes: true,
   }),
   practitioner: Object.freeze({
     numbers: true, numberGloss: false, futureWindows: true,
-    shenshaRaw: true, fullDerivation: true, calibrationNotes: true,
+    calibrationNotes: true,
   }),
 });
 

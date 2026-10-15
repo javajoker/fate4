@@ -22,6 +22,9 @@ import type { Report } from "../report/types.js";
 import {
   discloses, isFutureWindow, FUTURE_WITHHELD_NOTE, type Audience,
 } from "../report/audience.js";
+import {
+  quantities, confidenceQuantity, favorQuantity, strengthQuantities, nodeQuantities,
+} from "./numbers.js";
 import type { NarrativeLine } from "../report/render.js";
 import { ELEMENTS } from "../types/ganzhi.js";
 import {
@@ -96,7 +99,11 @@ export function plainCards(r: Report, options: PlainCardsOptions = {}): PlainRep
   // ── 性格 ──
   const band = r.strength.strength.value;
   cards.push(card("self.strength", "性格", "你的底子",
-    STRENGTH_PLAIN[band] ?? "这一项没有算出明确的倾向。",
+    (STRENGTH_PLAIN[band] ?? "这一项没有算出明确的倾向。")
+    + quantities(audience, [
+      ...strengthQuantities(r.strength.strength.derivation),
+      confidenceQuantity(r.strength.strength.confidence),
+    ]),
     linesOf(r.strength.narrative, "strength.", "root."),
     r.strength.strength.confidence));
 
@@ -184,7 +191,8 @@ export function plainCards(r: Report, options: PlainCardsOptions = {}): PlainRep
     const age = Math.round(s.startAgeYears);
     cards.push(card(`luck.${s.index}`, "人生轨迹", `${age} 岁起的十年`,
       `${favorPlain(mid.favorIndex)}。`
-      + "十年是一段，段与段之间会换气，换的那一两年往往最有感觉。",
+      + "十年是一段，段与段之间会换气，换的那一两年往往最有感觉。"
+      + quantities(audience, [favorQuantity(mid.favorIndex)]),
       // ⚠️ LuckStep.index 自 1 起，数组自 0 起 —— 直接拿 index 当下标会整体错开一格，
       // 而错开一格的「依据」看上去毫无异样：每张卡都有依据，只是全是隔壁那一步的。
       [luckLines[s.index - 1]].filter((x): x is NarrativeLine => x !== undefined)));
@@ -196,6 +204,10 @@ export function plainCards(r: Report, options: PlainCardsOptions = {}): PlainRep
       // 时间段与指事都从 evidence 里取 —— 它们本就在那儿，
       // 不必也不该在人话层另算一遍。
       const num = (label: string) => f.detail.evidence.find((e) => e.label === label)?.value;
+      // ⚠️ 偏离量那两条的 label 带着序列名前缀（「婚姻感情·净值·峰值偏离」），
+      // 按全等找永远找不到。进入／退出那两条没有前缀，故上面那个 num 对它们有效。
+      const numSuffix = (suffix: string) =>
+        f.detail.evidence.find((e) => e.label.endsWith(suffix))?.value;
       const from = num("进入"); const to = num("退出");
       const span = from === undefined ? ""
         : to === undefined || to === from ? `${from} 年` : `${from}–${to} 年`;
@@ -214,7 +226,18 @@ export function plainCards(r: Report, options: PlainCardsOptions = {}): PlainRep
         // 那段「这是排序不是概率」的话只在小节说一次 —— 八张卡各说一遍，
         // 读者会跳过它，而它恰恰是最不该被跳过的一句。
         (domain === null ? "" : `${domain}，`)
-        + `${DIRECTION_PLAIN[f.direction] ?? "这段时间变动明显"}。`,
+        + `${DIRECTION_PLAIN[f.direction] ?? "这段时间变动明显"}。`
+        // z 取推导链里现成的那两个，不另算 —— 另算就有两份实现
+        + quantities(audience, [
+          ...(() => {
+            const peak = numSuffix("峰值偏离"); const rate = numSuffix("变化率偏离");
+            const z = typeof peak === "number" && typeof rate === "number"
+              ? (Math.abs(peak) >= Math.abs(rate) ? peak : rate)
+              : typeof peak === "number" ? peak : undefined;
+            return z === undefined ? [] : nodeQuantities(z, r.nodes!.threshold);
+          })(),
+          confidenceQuantity(f.confidence),
+        ]),
         [f.summary, ...f.detail.narrative], f.confidence));
     }
   }
@@ -242,7 +265,8 @@ export function plainCards(r: Report, options: PlainCardsOptions = {}): PlainRep
       + "不是运气好坏，更不是生活质量。"
       + (yearTags.length === 0 ? ""
         : `今年被引动的传统符号有：${yearTags.slice(0, 4).join("；")}。`
-          + "这是说这些符号在传统上与哪类事相联系，不是说这些事会发生。"),
+          + "这是说这些符号在传统上与哪类事相联系，不是说这些事会发生。")
+      + quantities(audience, [favorQuantity(r.current.year.favorIndex)]),
       linesOf(r.current.narrative, "year.")));
     cards.push(card("cur.month", "本月", "这个月",
       r.current.month.narrative.length > 0

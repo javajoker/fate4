@@ -148,4 +148,34 @@ describe("参数指纹", () => {
     expect(paramsHash(loadParams({ weights: { monthCommand: { silingBoost: 1.51 } } })))
       .not.toBe(base);
   });
+
+  it("**呈现项不进指纹** —— 指纹的用处是「数可比」，而它们不改任何一个数", () => {
+    // 否则同一张盘的简体版与繁体版会得到两个不同的指纹，于是按本项目自己的
+    // 规矩它们「不可比」—— 而它们的数逐位相同。读者档一加进来，
+    // 这个毛病会从偶尔遇到变成每天都遇到。
+    const base = paramsHash(DEFAULT_PARAMS);
+    for (const o of [
+      { report: { audience: "practitioner" } },
+      { report: { audience: "student" } },
+      { report: { locale: "zh-Hant" } },
+      { report: { showParamsSnapshot: false } },
+      { report: { showConvergenceHistory: true } },
+    ] as const) {
+      expect(paramsHash(loadParams(o)), JSON.stringify(o)).toBe(base);
+    }
+  });
+
+  it("**反过来：会改数值的参数一项都不许漏** —— 逐节各改一处，指纹必须变", () => {
+    const base = paramsHash(DEFAULT_PARAMS);
+    const probes = [
+      ["chart", { chart: { ziHourRule: "earlyZiSameDay" } }],
+      ["weights", { weights: { luck: { total: 150 } } }],
+      ["structure", { structure: { rewriteCarriers: true } }],
+      ["conclusion", { conclusion: { congge: { ratioThreshold: 0.4 } } }],
+      ["nodes", { nodes: { threshold: 3 } }],
+    ] as const;
+    for (const [name, o] of probes) {
+      expect(paramsHash(loadParams(o)), `改 ${name} 后指纹没变`).not.toBe(base);
+    }
+  });
 });

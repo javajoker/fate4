@@ -12,7 +12,8 @@ import {
 } from "react";
 import {
   buildBaseChart, buildChart, chartOptionsOf, loadParams,
-  type BaseChart, type BirthInput, type NatalChart, type Params, type PartialParams,
+  type Audience, type BaseChart, type BirthInput, type NatalChart,
+  type Params, type PartialParams,
 } from "@fate/core";
 import { decodeShare, getChart, type ChartRecord } from "./storage";
 
@@ -29,9 +30,20 @@ interface Ctx {
   readonly params: Params;
   readonly overrides: PartialParams;
   readonly setOverrides: (o: PartialParams) => void;
+  /**
+   * 读者档。
+   *
+   * ⚠️ 它**不进 `overrides`**：overrides 是这张命盘自己的参数覆盖，
+   * 会随命盘保存、随分享链接走；而读者档是**看的人**的偏好，
+   * 与盘无关。混进去的话，把链接发给别人，对方会连你的读者档一起收到。
+   */
+  readonly audience: Audience;
+  readonly setAudience: (a: Audience) => void;
   readonly error: string | null;
   readonly loading: boolean;
 }
+
+const AUD_KEY = "fate.audience.v1";
 
 const ChartCtx = createContext<Ctx | null>(null);
 
@@ -77,7 +89,22 @@ export function ChartProvider({ children }: { children: ReactNode }) {
     return () => { alive = false; };
   }, [frag]);
 
-  const params = useMemo(() => loadParams(overrides), [overrides]);
+  const [audience, setAudienceState] = useState<Audience>("lay");
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(AUD_KEY);
+      if (v === "student" || v === "practitioner") setAudienceState(v);
+    } catch { /* 隐私模式下读不到，用默认 */ }
+  }, []);
+  const setAudience = (a: Audience) => {
+    setAudienceState(a);
+    try { localStorage.setItem(AUD_KEY, a); } catch { /* 同上 */ }
+  };
+
+  // 读者档合进 params 但不进 overrides —— 见 Ctx.audience 的说明
+  const params = useMemo(
+    () => loadParams({ ...overrides, report: { ...overrides.report, audience } }),
+    [overrides, audience]);
 
   const chart = useMemo(() => {
     if (record === null) return null;
@@ -99,7 +126,8 @@ export function ChartProvider({ children }: { children: ReactNode }) {
 
   return (
     <ChartCtx.Provider
-      value={{ record, chart, base, params, overrides, setOverrides, error, loading }}
+      value={{ record, chart, base, params, overrides, setOverrides,
+        audience, setAudience, error, loading }}
     >
       {children}
     </ChartCtx.Provider>

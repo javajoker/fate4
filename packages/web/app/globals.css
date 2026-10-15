@@ -150,3 +150,16 @@ svg text { font-family: -apple-system, "PingFang SC", sans-serif; }
   .coin { width: 27px; height: 27px; }
   .coin-note { font-size: 11px; }
 }
+
+/* ── 读者档切换 ──────────────────────────────────────────
+ * 摆在内容之上而不是设置里：它会改变你看到什么。
+ * 用扁条而不是卡片 —— 它是一个状态指示，不是一节内容。
+ */
+.audbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 0 0 20px; padding: 9px 12px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: var(--radius); font-size: 13px;
+}
+.audbar button { padding: 3px 11px; font-size: 12.5px; }
+.audbar > .dim:last-child { flex: 1 1 100%; font-size: 12px; line-height: 1.6; }

@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import { AUDIENCE_LABEL, AUDIENCE_NOTE, AUDIENCES } from "@fate/core";
 import { ChartProvider, useChart, useFragment } from "../../lib/chartContext";
 import { withFrag } from "../../lib/format";
 
@@ -23,7 +24,7 @@ const TABS: readonly [string, string][] = [
 function Shell({ children }: { children: ReactNode }) {
   const path = usePathname();
   const frag = useFragment();
-  const { record, error, loading } = useChart();
+  const { record, error, loading, audience, setAudience } = useChart();
 
   return (
     <>
@@ -41,6 +42,29 @@ function Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <div className="shell">
+        {/*
+          读者档摆在顶上而不是藏进「参数校准」。
+          它会改变你看到什么 —— 一个改变你看到什么的开关，不该让人不知道它存在。
+          术语版默认就按「学习中」给：进到这里的人已经在看干支与权重了。
+        */}
+        {!loading && error === null && record !== null && (
+          <div className="audbar">
+            <span className="dim">以什么身份看</span>
+            {AUDIENCES.map((a) => (
+              <button key={a} className={a === audience ? "" : "ghost"}
+                onClick={() => setAudience(a)}>
+                {AUDIENCE_LABEL[a]}
+              </button>
+            ))}
+            <span className="dim">{AUDIENCE_NOTE[audience]}</span>
+          </div>
+        )}
+        {!loading && error === null && record !== null && audience === "lay" && (
+          <p className="sub">
+            这几页是术语版，写给在学这套东西的人。只想看结论的话，
+            <a href="/m">移动版</a>把同一份推演换成了平常话。
+          </p>
+        )}
         {loading && <p className="sub">计算中…</p>}
         {error !== null && <div className="card"><p>{error}</p><p><a href="/">回到排盘</a></p></div>}
         {!loading && error === null && record === null && (
