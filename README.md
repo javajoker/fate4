@@ -95,6 +95,9 @@ Web 应用全部计算在浏览器内完成，**生辰数据不出本机**：记
 | [13-liuyao](docs/13-liuyao.md) | **第二至四台引擎** —— 即时问事与当日运程：六爻、六壬、奇门，四家合参 |
 | [14-plain](docs/14-plain.md) | **人话层与移动版** —— 去掉术语恰恰去掉了天然的对冲 |
 | [15-engagement](docs/15-engagement.md) | 移动版的留存设计 —— 让用户自己检验它准不准 |
+| [16-sky](docs/16-sky.md) | **星盘** —— 五星星历（VSOP87D）、四角、古典尊贵、七政四余 |
+| [17-ziwei](docs/17-ziwei.md) | **紫微斗数** —— 五个整数推出一张盘，以及穷举出来的状态数 |
+| [18-tarot-pair](docs/18-tarot-pair.md) | **塔罗与合盘** —— 这个项目在什么地方选择不做 |
 | [pipeline.html](docs/pipeline.html) | **交互页** —— 管线总览 + L1 配重与大运摆动系数的实时校准（[在线版](https://claude.ai/code/artifact/f1eeac0e-1aa2-4242-b12f-4e31338e5bd7)） |
 
 ---

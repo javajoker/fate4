@@ -89,11 +89,69 @@ core/src/
 │   ├── guard.ts                  # §9-6 措辞扫描
 │   ├── finding.ts                # 两层结论 + 趋吉避凶 + 摘要⊆证据的审计
 │   ├── labels.ts                 # 枚举 → 中文
+│   ├── audience.ts               # 读者档：控制披露，不控制断言
+│   ├── hant.ts                   # 简→繁，遇无法定夺的字抛错
 │   ├── assemble.ts  markdown.ts  types.ts
-└── params/
-    ├── types.ts  defaults.ts     # **默认值的真源**
-    └── load.ts                   # 手写校验，不引 zod
+├── plain/                        # 人话层（见 14-plain）
+│   ├── vocab.ts                  # 枚举 → 平常话的定值映射
+│   ├── cards.ts  year.ts  question.ts
+│   ├── numbers.ts                # 量化数字按读者档三种写法
+│   └── guard.ts                  # 人话专用守卫（与技术档规则不同）
+├── params/
+│   ├── types.ts  defaults.ts     # **默认值的真源**
+│   └── load.ts                   # 手写校验，不引 zod
+│
+│   ── 以下为四柱之外的占法。各自独立，共用 ganzhi/ 与 astro/ ──
+│
+├── yijing/                       # 六十四卦、纳甲、爻辞（六爻与梅花共用）
+│   └── hexagrams.ts  trigrams.ts  najia.ts  yaoci.ts
+├── liuyao/                       # 六爻（见 13-liuyao）
+│   ├── cast.ts  moment.ts  dress.ts      # 起卦、装卦
+│   ├── yongshen.ts  strength.ts  judge.ts
+│   ├── yingqi.ts  topics.ts  claims.ts
+│   └── report.ts  markdown.ts  daily.ts
+├── liuren/                       # 大六壬：天地盘、三传
+│   └── plate.ts  sanchuan.ts  tables.ts  claims.ts
+├── qimen/                        # 奇门遁甲：定局排盘
+│   └── chart.ts  tables.ts  claims.ts
+├── divination/                   # 四家合参 —— 并列呈现，不合并
+│   └── bazi.ts  claim.ts  reading.ts
+├── ziwei/                        # 紫微斗数（见 17-ziwei）
+│   ├── palaces.ts                # 十二宫、五行局（纳音定局）
+│   ├── stars.ts                  # 十四主星、六吉六煞、四化
+│   ├── chart.ts                  # 装配 + 状态空间穷举
+│   └── reading.ts                # 三方四正、空宫借星、格局、四化落宫
+├── sky/                          # 星盘（见 16-sky）—— 子路径 @fate/core/sky
+│   ├── planets.ts                # 五星视黄经（VSOP87D）
+│   ├── angles.ts                 # 恒星时、上升点、中天、整宫制
+│   ├── dignities.ts              # 古典必然尊贵五项
+│   ├── qizheng.ts                # 七政四余的庙旺陷落平
+│   └── chart.ts                  # 同一份星历的两套读法
+├── tarot/                        # 塔罗（见 18-tarot-pair）
+│   └── deck.ts  draw.ts          # 78 张、无模偏洗牌、牌阵
+├── pair/                         # 合盘（见 18-tarot-pair）
+│   ├── bazi.ts                   # 四柱合盘 —— **不给分数**
+│   └── synastry.ts               # 星盘合盘（子路径 @fate/core/sky-pair）
+└── compare/                      # 九套占法的可比模型（《测天，还是约定》的底层）
+    ├── systems.ts                # 注册表：输入、天文含量、确定性、是否实现
+    ├── substrate.ts              # 中气 ≡ 入宫点、岁差、月将
+    ├── correspondence.ts         # 四余 = 月亮交点、太岁漂移、平气定气
+    └── statespace.ts             # 各套的状态数（能算的算，不能算的不编）
 ```
+
+### 2.0a 三条子路径，以及它们为什么存在
+
+`@fate/core` 的根 index **不转出**五星级数与依赖它的东西：
+
+| 子路径 | 内容 | 为什么分出来 |
+| --- | --- | --- |
+| `@fate/core/sky` | 星盘全套 | 五星 VSOP87 级数约 410 KB，而只排四柱的调用方一条都用不上 |
+| `@fate/core/sky-pair` | 星盘合盘 | 同上，它依赖 `sky` |
+| `@fate/data/vsop87-planets` | 级数本身 | 同上，与 `yaoci` 同样处理 |
+
+有一条测试**在 dist 的依赖图上**查它们没漏进根 bundle，并带反向对照
+（确认遍历确实走起来了）。查依赖图而不是源码的 import 写法 ——
+真正决定 bundle 的是前者。
 
 > 原稿在此处列过 `types/carrier.ts` `chart.ts` `verdict.ts` `params.ts` `report.ts`、
 > `ganzhi/hiddenStems.ts`、`params/schema.ts`、`temporal/{luck,year,month,day}.ts` ——
@@ -131,6 +189,22 @@ export function dayView(chart: NatalChart, y: number, m: number, d: number,
 // ── L6 报告 ──
 export function buildReport(chart: NatalChart, options?: ReportOptions): Report;
 export function renderMarkdown(report: Report): string;
+
+// ── 四柱之外的占法 ──
+export function buildZiweiChart(input: BirthInput, o?: ZiweiOptions): ZiweiChart;
+export function readZiwei(chart: ZiweiChart): ZiweiReading;
+export function ziweiStateSpace(): ZiweiStateSpace;      // 穷举，非估计
+export function drawSpread(options?: DrawOptions): TarotReading;
+export function baziPairing(a: PairInput, b: PairInput): BaziPairing;  // score 恒 null
+
+// ── @fate/core/sky（子路径）──
+export function skyChart(jdUT: JulianDay, jdTT: JulianDayTT,
+                         lonEast: number, lat: number): SkyChart;
+export function planetPosition(id: PlanetId, jdTT: JulianDayTT): PlanetPosition;
+export function aspectsOf(chart: SkyChart, maxOrb?: number): readonly Aspect[];
+
+// ── @fate/core/sky-pair（子路径）──
+export function synastry(a: SkyChart, b: SkyChart, maxOrb?: number): Synastry;
 
 // ── 措辞守卫 ──
 export function scanText(text: string, where: string, opts?): GuardViolation[];
