@@ -168,7 +168,8 @@ export function stateSpaces(): readonly StateSpace[] {
     {
       system: "塔罗（三张，含逆位）", kind: "离散",
       size: tarotDraws(3, true), basis: "computed",
-      note: "78 × 77 × 76 × 2³。牌阵越大状态数涨得极快，十张的凯尔特十字已逾 10¹⁸。",
+      note: "78 × 77 × 76 × 2³。牌阵越大状态数涨得极快，十张的凯尔特十字已逾 10¹⁸。"
+        + "本项目已实现其机制（`tarot/`），这个数与 `spreadStateSpace` 同源。",
     },
     {
       system: "紫微斗数", kind: "离散", size: null, basis: "declared",

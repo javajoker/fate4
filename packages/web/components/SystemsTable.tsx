@@ -35,7 +35,7 @@ const WHERE: Readonly<Record<string, { readonly href?: string; readonly text: st
   qizheng: { href: "/chart/sky", text: "排盘后的「星盘」页" },
   astrology: { href: "/chart/sky", text: "排盘后的「星盘」页" },
   ziwei: { text: "未实现" },
-  tarot: { text: "未实现" },
+  tarot: { href: "/tarot", text: "塔罗" },
 };
 
 const ASTRO_NOTE: Readonly<Record<string, string>> = {

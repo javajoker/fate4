@@ -26,7 +26,7 @@
  * 而且不会有任何测试发现。
  */
 
-export type NavKey = "chart" | "ask" | "cross" | "book" | "compare";
+export type NavKey = "chart" | "ask" | "cross" | "tarot" | "book" | "compare";
 
 interface Item {
   readonly key: NavKey;
@@ -45,6 +45,7 @@ const PRIMARY: readonly Item[] = [
 const OTHERS: readonly Item[] = [
   { key: "ask", href: "/ask", label: "问事", title: "六爻 —— 只要一个时刻，不要生辰" },
   { key: "cross", href: "/cross", label: "合参", title: "六爻 · 六壬 · 奇门 · 四柱流日 —— 同一时刻四家并列，不合并" },
+  { key: "tarot", href: "/tarot", label: "塔罗", title: "洗牌即起法 —— 连时刻都不要，而且每抽一次都是另一次" },
 ];
 
 /** 两本书。 */

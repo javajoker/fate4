@@ -28,3 +28,4 @@ export * from "./shensha/index.js";
 export * from "./yingqi/index.js";
 export * from "./temporal/index.js";
 export * from "./report/index.js";
+export * from "./tarot/index.js";
