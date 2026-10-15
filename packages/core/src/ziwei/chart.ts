@@ -30,7 +30,9 @@
 import { BRANCHES, STEMS, type Branch, type Stem } from "../types/ganzhi.js";
 import { branchAt, stemAt } from "../ganzhi/algebra.js";
 import { lunarDateOf, type LunarDate, type LunarOptions } from "../chart/lunar.js";
-import { toJulianDay, type JulianDay } from "../astro/julian.js";
+import type { JulianDay } from "../astro/julian.js";
+import { toTrueSolarTime } from "../time/trueSolarTime.js";
+import { DEFAULT_SOLAR_PROVIDER } from "../astro/defaults.js";
 import type { Params } from "../params/types.js";
 import { DEFAULT_PARAMS } from "../params/defaults.js";
 import type { BirthInput } from "../chart/types.js";
@@ -101,10 +103,31 @@ export interface ZiweiOptions extends LunarOptions {
 export function buildZiweiChart(
   input: BirthInput, options: ZiweiOptions = {},
 ): ZiweiChart {
-  const jdUT = toJulianDay({
-    year: input.year, month: input.month, day: input.day,
-    hour: input.hour, minute: input.minute, second: input.second ?? 0,
-  }) as JulianDay;
+  // ⚠️ 入参的 hour 是**当地钟表时**，不是 UT。
+  //
+  // 这里原本直接把它喂给 toJulianDay —— 那等于把 21:00 当成 21:00 UT，
+  // 在东八区就是次日 05:00，于是**农历日整整差一天**，而农历日决定紫微落点，
+  // 十四主星跟着全错。
+  //
+  // 午时前后看不出来（12:00 当成 UT 仍落在同一个民用日里），
+  // 故这个错只在下午四点以后的生时上显形 —— 本项目的既有样例恰好都在白天。
+  // 逮到它的是 iztro 的逐盘对照：命宫与五行局一致，而十四主星全错，
+  // 那个组合只可能来自农历日差一天。
+  //
+  // 走与四柱同一条换算（`toTrueSolarTime` 的 jdCivil），但**不取真太阳时** ——
+  // 紫微的传统起法不涉及经度，见 ZiweiParams.trueSolarTimeHour。
+  const tst = toTrueSolarTime({
+    wall: {
+      year: input.year, month: input.month, day: input.day,
+      hour: input.hour, minute: input.minute, second: input.second ?? 0,
+    },
+    timeZone: input.timeZone,
+    longitude: input.longitude,
+    applyLongitude: false,
+    applyEquationOfTime: false,
+    provider: DEFAULT_SOLAR_PROVIDER,
+  });
+  const jdUT = tst.jdCivil as JulianDay;
   const lunar = lunarDateOf(jdUT, options);
 
   // 时辰：子时跨日，23 时起即次日子时 —— 与四柱的「晚子」处理同一条线，

@@ -60,10 +60,25 @@ export function ziweiIndex(bureauNumber: number, lunarDay: number): number {
 /**
  * 天府星 —— 与紫微关于**寅申轴**对称。
  *
- * 紫微在寅则天府在申，在丑则在酉，以此类推。
- * 由对称推出而不另立表：另立表就有两份会不一致的真相。
+ * 轴穿过寅与申，故那两宫是**不动点**：紫微在寅则天府也在寅，
+ * 紫微在申则天府也在申。其余各宫两两互换：子↔辰、丑↔卯、巳↔亥、午↔戌、未↔酉。
+ *
+ * ```
+ * 天府 = (4 − 紫微) mod 12
+ * ```
+ *
+ * ⚠️ 这里原本写的是 `(寅 + 8 − 紫微)`，即 `(10 − 紫微)` ——
+ * 那也是一个对合（施两次回到原处），不动点却落在巳与亥上，
+ * **是另一条轴**。于是十四主星里八颗（天府系全部）整体偏了六宫。
+ *
+ * 注释一直写着「寅申轴」，错的是式子；而当初那条测试断言的是
+ * `天府(寅) === 申` —— 它把同一个错误抄了一遍，所以一路全绿。
+ * 真正逮到它的是 iztro 的逐例对照（见 `test/ziwei-crossvalidate.spec.ts`）。
+ *
+ * **教训**：对合、周期、幂等这类**结构性**断言，对「选错了哪条轴」
+ * 这种错是盲的 —— 两条轴都满足它们。
  */
-export const tianfuIndex = (ziwei: number): number => mod12(YIN + 8 - ziwei);
+export const tianfuIndex = (ziwei: number): number => mod12(4 - ziwei);
 
 export interface StarPlacement {
   readonly name: string;

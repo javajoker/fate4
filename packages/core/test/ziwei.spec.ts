@@ -121,8 +121,12 @@ describe("紫微与天府", () => {
       const f = tianfuIndex(z);
       expect(tianfuIndex(f), `紫微 ${z}`).toBe(z);        // 对称是对合
     }
-    expect(tianfuIndex(BRANCHES.indexOf("寅"))).toBe(BRANCHES.indexOf("申"));
-    expect(tianfuIndex(BRANCHES.indexOf("丑"))).toBe(BRANCHES.indexOf("酉"));
+    // ⚠️ 寅与申是**不动点** —— 轴穿过它们。
+    // 这两行原本写作「寅→申、丑→酉」，把实现里的错误抄了一遍，于是一路全绿。
+    expect(tianfuIndex(BRANCHES.indexOf("寅"))).toBe(BRANCHES.indexOf("寅"));
+    expect(tianfuIndex(BRANCHES.indexOf("申"))).toBe(BRANCHES.indexOf("申"));
+    expect(tianfuIndex(BRANCHES.indexOf("丑"))).toBe(BRANCHES.indexOf("卯"));
+    expect(tianfuIndex(BRANCHES.indexOf("未"))).toBe(BRANCHES.indexOf("酉"));
   });
 
   it("十四主星：数目对、名字不重、全部落在盘上", () => {
@@ -203,7 +207,9 @@ describe("整张盘", () => {
     const zw = CH.palaces.find((p) => p.stars.some((s) => s.name === "紫微"))!;
     expect(zw.branch).toBe("未");
     const tf = CH.palaces.find((p) => p.stars.some((s) => s.name === "天府"))!;
-    expect(tf.branch).toBe("卯");
+    // 紫微在未 → 天府在酉（寅申轴对称，(4 − 紫微) mod 12）。
+    // 这里原本写的是「卯」—— 与当时那个错式子一致，故一路全绿。
+    expect(tf.branch).toBe("酉");
   });
 
   it("十二宫齐全，每宫一名，命身各有所属", () => {
@@ -348,11 +354,24 @@ describe("盘面的解读", () => {
   });
 
   it("**空宫借对宫的主星**，不空则不借", () => {
-    expect(R.ming.isEmpty).toBe(true);
-    expect(R.ming.majors).toHaveLength(0);
-    expect(R.ming.borrowed.map((s) => s.name).sort()).toEqual(["太阳", "太阴"]);
-    expect(R.ming.why).toContain("借对宫");
-    // 反向对照：找一个有主星的宫，它不该借
+    // 这张盘的命宫坐太阴，不空 —— 故另找一个真空宫来验借星。
+    expect(R.ming.isEmpty).toBe(false);
+    expect(R.ming.majors.map((s) => s.name)).toEqual(["太阴"]);
+
+    const emptyIdx = CH.palaces.findIndex((p) =>
+      !p.stars.some((s) => MAJOR_STAR_NAMES.includes(s.name)));
+    expect(emptyIdx, "十二宫里总该有空宫").toBeGreaterThanOrEqual(0);
+    const e = readPalace(CH, emptyIdx);
+    expect(e.isEmpty).toBe(true);
+    expect(e.majors).toHaveLength(0);
+    expect(e.why).toContain("借对宫");
+    // 借来的必须正是对宫的主星，不是别处的
+    const opp = CH.palaces[e.sanfang.opposite]!;
+    expect(e.borrowed.map((s) => s.name).sort())
+      .toEqual(opp.stars.filter((s) => MAJOR_STAR_NAMES.includes(s.name))
+        .map((s) => s.name).sort());
+
+    // 反向对照：有主星的宫不该借
     const filled = CH.palaces.find((p) =>
       p.stars.some((s) => MAJOR_STAR_NAMES.includes(s.name)))!;
     const r = readPalace(CH, filled.index);

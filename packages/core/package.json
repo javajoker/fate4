@@ -22,5 +22,8 @@
   "dependencies": {
     "@fate/data": "workspace:*"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "devDependencies": {
+    "iztro": "^2.6.2"
+  }
 }

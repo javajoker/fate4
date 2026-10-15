@@ -2,6 +2,9 @@
 
 这里放**外部仓库**，以 submodule 形式引入。目前只有一个。
 
+另有一例交叉校验**没有**走 submodule，理由见本文末尾的
+「[为什么 iztro 不在这里](#为什么-iztro-不在这里)」。
+
 ## astronomy-engine
 
 | | |
@@ -77,3 +80,40 @@ git submodule update --init --depth 1 reference/vendor/astronomy-engine
 程序化搬运的路子是现成的（见 `scripts/generate-yaoci.mjs`）：
 给一个目录，记下每个源文件的 SHA256，逐条校验条目数，出一个 TS 数据模块。
 再加一份典籍，走同一条路即可。
+
+
+---
+
+## 为什么 iztro 不在这里
+
+紫微排盘的交叉校验用的是 [**iztro**](https://github.com/SylarLong/iztro)（MIT），
+但它**不是 submodule**，而是 `packages/core` 的 devDependency。
+
+| | astronomy-engine | iztro |
+| --- | --- | --- |
+| 形态 | 零依赖的纯 JS | TypeScript，四个运行时依赖 |
+| submodule 引进来 | 直接能跑 | 要自己构建、自己解依赖 |
+| 结论 | **submodule** | **devDependency** |
+
+机制不同，用途与纪律完全一样：**只在测试里用，不进任何运行时路径，
+装不上时该条自动跳过。**
+
+### 它逮到了两个错
+
+见 [docs/17-ziwei §9](../../docs/17-ziwei.md)。两个都是**内部不变量看不见**的：
+
+- 天府用错了对称轴 —— 两条轴都是对合，结构性断言对二者皆真
+- 当地钟表时当成 UT —— 只在下午四点以后的生时上显形，而既有样例都在白天
+
+这正是本目录存在的理由：**一个实现可以自洽地错下去**，
+而唯一能逮到它的是另一套独立实现。
+
+### ⚠️ 但它不是底本
+
+iztro **不引任何底本**，而开源紫微生态基本都源自它。
+故「与 iztro 一致」不等于「与《紫微斗数全书》一致」。
+
+> **不一致是信息，一致不是证据。**
+
+星曜庙旺那 168 格仍然缺着。iztro 有一张亮度表，但它同样没有出处 ——
+把它抄过来只是把「没有来历」换个地方放，不会让它变成核对过的。
