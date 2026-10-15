@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync, readdirSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   buildChart, buildQuestionReport, buildReport, cast, castMomentOf, chartOptionsOf,
   dailyOutlook, dress, judge, loadParams, pickYongshen, renderDailyMarkdown,
@@ -725,5 +727,128 @@ describe("**读者档** —— 控制披露，不控制断言", () => {
     const h = cli(["--help"], files).out;
     expect(h).toContain("--audience");
     expect(h).toContain("practitioner");
+  });
+});
+
+describe("**四柱之外几套的子命令**", () => {
+  const files = withChart();
+
+  it("ziwei：排得出盘，并带盘面解读", () => {
+    const r = cli(["ziwei", "--chart", "c.json"], files);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("紫微斗数");
+    expect(r.out).toContain("十二宫");
+    expect(r.out).toContain("命宫");
+    expect(r.out).toMatch(/五局|二局|三局|四局|六局/);
+    expect(r.out).toContain("四化");
+  });
+
+  it("**ziwei 把两套年界的异同说出来** —— 年干决定四化与禄存羊陀", () => {
+    const r = cli(["ziwei", "--chart", "c.json"], files);
+    expect(r.out).toContain("正月初一为界");
+    expect(r.out).toMatch(/与四柱的立春年.*(一致|不一致)/);
+  });
+
+  it("tarot：不要生辰也不要时刻，且声明流派与指纹", () => {
+    const r = cli(["tarot", "--spread", "three"], new Map());
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("塔罗");
+    expect(r.out).toContain("流派");
+    expect(r.out).toContain("参数指纹");
+    expect(r.out).toContain("crypto.getRandomValues");
+    expect(r.out).toContain("不可复算");
+  });
+
+  it("**tarot 的流派开关真的生效**", () => {
+    const a = cli(["tarot", "--spread", "one", "--numbering", "marseille"], new Map()).out;
+    const b = cli(["tarot", "--spread", "one", "--numbering", "rws"], new Map()).out;
+    expect(a).toContain("marseille");
+    expect(b).toContain("rws");
+    // 指纹必不同 —— 这正是把流派收进参数的理由
+    const fp = (s: string) => /参数指纹 ([0-9a-f]+)/.exec(s)?.[1];
+    expect(fp(a)).not.toBe(fp(b));
+  });
+
+  it("**tarot 不给逆位时一张逆位都不出**", () => {
+    for (let i = 0; i < 10; i++) {
+      expect(cli(["tarot", "--spread", "celtic"], new Map()).out)
+        .not.toContain("（逆）");
+    }
+  });
+
+  it("pair：两张盘，且**不给分数**", () => {
+    const r = cli(["pair", "--chart", "c.json", "--chart-b", "c.json"], files);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("合盘");
+    expect(r.out).toContain("日主");
+    expect(r.out).toContain("合盘分数：**不给**");
+    expect(r.out).not.toMatch(/契合度|匹配度|\d+\s*分\b/);
+  });
+
+  it("pair 少一张盘时报用法错误，不静默拿同一张盘凑", () => {
+    const r = cli(["pair", "--chart", "c.json"], files);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain("--chart-b");
+  });
+
+  it("**三个子命令都在帮助里** —— 不在帮助里的开关等于不存在", () => {
+    const h = cli(["--help"], new Map()).out;
+    for (const c of ["ziwei", "tarot", "pair"]) expect(h, c).toContain(c);
+  });
+
+  it("**输出全部过措辞扫描** —— 合盘与紫微都极易滑向断语", () => {
+    for (const argv of [
+      ["ziwei", "--chart", "c.json"],
+      ["tarot", "--spread", "celtic", "--reversals"],
+      ["pair", "--chart", "c.json", "--chart-b", "c.json"],
+    ]) {
+      const r = cli(argv, files);
+      expect(r.code, `${argv[0]} 退出码`).toBe(0);
+    }
+  });
+});
+
+describe("**Skill 的脚本与 CLI 不得脱节**", () => {
+  /**
+   * Skill 的脚本是对 CLI 的薄封装。若某个脚本调了一个不存在的子命令，
+   * 只有在真跑起来时才会发现 —— 而 Skill 多半不在 CI 里跑。
+   * 故在这里对一遍：每个脚本调的子命令都必须真的存在。
+   */
+  const SKILL_SCRIPTS = resolve(import.meta.dirname, "../../skill/scripts");
+
+  it("每个脚本调的子命令都真的存在", () => {
+    const files = readdirSync(SKILL_SCRIPTS).filter((f) => f.endsWith(".sh"));
+    expect(files.length).toBeGreaterThan(5);
+    const help = cli(["--help"], new Map()).out;
+    // 子命令清单从「未知子命令」那条错误里取 —— 它就是 COMMANDS 的键。
+    // 不拿 `<sub> --help` 的退出码做判据：缺必填参数同样返回 2，分不开。
+    const err = cli(["没这个命令"], new Map()).err;
+    const known = new Set(
+      (/可用：(.+)$/m.exec(err)?.[1] ?? "").split(" / ").map((x) => x.trim()));
+    expect(known.size, "反向对照：确实解析出了子命令清单").toBeGreaterThan(8);
+
+    for (const f of files) {
+      if (f === "_common.sh") continue;
+      const src = readFileSync(resolve(SKILL_SCRIPTS, f), "utf8");
+      const m = /^fate\s+([a-z_-]+)/m.exec(src);
+      expect(m, `${f} 里没找到 fate 子命令调用`).not.toBeNull();
+      const sub = m![1]!;
+      expect(known.has(sub), `${f} 调的 "${sub}" 不是已知子命令`).toBe(true);
+      expect(help, `"${sub}" 不在帮助里`).toContain(sub);
+    }
+  });
+
+  it("**新加的三套在 SKILL.md 里有说明** —— 没说明的工具等于没有", () => {
+    const skill = readFileSync(
+      resolve(SKILL_SCRIPTS, "../SKILL.md"), "utf8");
+    for (const k of ["ziwei.sh", "tarot.sh", "pair.sh"]) {
+      expect(skill, k).toContain(k);
+    }
+    // 三条最要紧的边界必须写在里面
+    expect(skill).toContain("不收星曜庙旺表");
+    expect(skill).toContain("本项目不给牌义");
+    expect(skill).toContain("不给分数");
+    // 并且明确禁止模型自己补上那两样
+    expect(skill).toContain("不得替引擎补上它明说不收的东西");
   });
 });

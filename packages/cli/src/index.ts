@@ -23,7 +23,8 @@ import {
   plainCards, plainQuestion, scanPlain, renderCrossMarkdown, renderQuestionMarkdown, crossReading,
   type PlainCard,
   scanText, TOPICS, TOPIC_BY_ID, yearView,
-  loadParams,
+  loadParams, paramsHash, buildChart, buildBaseChart,
+  buildZiweiChart, readZiwei, drawSpread, baziPairing, SUIT_NAME,
   type BirthInput, type CastInput, type CoinThrow, type Liuqin, type PartialParams,
 } from "@fate/core";
 import { UsageError, type Io } from "./io.js";
@@ -72,6 +73,10 @@ const USAGE = `fate —— 四柱推演命令行
               人话版：把判定换成平常话，每条附技术原文作依据。
               问事的人话版是 fate ask --plain，那里「说的是什么事」单列一节。
 
+  fate ziwei  --chart c.json [--json]            紫微斗数：排盘与盘面
+  fate tarot  [--spread one|three|celtic] [--reversals]
+              [--numbering marseille|rws] [--suit-element goldenDawn|swordsFire]
+  fate pair   --chart a.json --chart-b b.json [--json]   合盘（不给分数）
   fate topics             列出 32 类占事
   fate cities             列出内置城市表
   fate --help
@@ -616,10 +621,162 @@ function castInputOf(
 
 // ─────────────────────────────────────────────────────────
 
+/**
+ * 四柱之外的几套占法。
+ *
+ * 它们与四柱共用同一个命盘文件（`--chart`），因为读的是同一个出生时刻；
+ * 塔罗除外 —— 它连时刻都不要。
+ */
+function cmdZiwei(argv: readonly string[], io: Io): void {
+  const v = parse(argv, { ...CHART_REF });
+  const { chart, params } = loadChart(io, v);
+  // 四柱的年柱以立春为界，紫微以正月初一为界 —— 传进去让它比对，
+  // 不一致时盘上会出警告。那不是细节：年干决定四化、禄存、羊陀、魁钺。
+  const zw = buildZiweiChart(chart.input, {
+    params, solarYearStem: chart.year.stem,
+  });
+  const r = readZiwei(zw);
+  if (v["json"] === true) {
+    emit(io, { chart: zw, reading: r } as unknown as Record<string, unknown>,
+      true, v["out"] as string | undefined);
+    return;
+  }
+  const L: string[] = [];
+  L.push(`# 紫微斗数`);
+  L.push("");
+  L.push(`农历 ${zw.lunar.year} 年${zw.lunar.isLeap ? "闰" : ""}${zw.lunar.month} 月`
+    + `${zw.lunar.day} 日　${zw.yearStem}${zw.yearBranch} 年`
+    + `${zw.gender === "male" ? "男" : "女"}`);
+  L.push(`${zw.bureau.bureau}（命宫 ${zw.bureau.mingStem}${zw.bureau.mingBranch}`
+    + `，纳音${zw.bureau.nayin}）　大限${zw.limitDirection}`);
+  L.push(`年干支取农历年（正月初一为界），与四柱的立春年`
+    + `${zw.agreesWithSolarYear ? "一致" : "**不一致**"}。`);
+  for (const w of zw.warnings) L.push(`⚠️ ${w}`);
+  L.push("");
+  L.push("## 十二宫");
+  for (const p2 of zw.palaces) {
+    const mark = (p2.isMing ? "命" : "") + (p2.isShen ? "身" : "");
+    L.push(`${p2.stem}${p2.branch} ${p2.name}${mark ? `（${mark}）` : ""}　`
+      + `${p2.majorLimit!.from}–${p2.majorLimit!.to} 岁　`
+      + (p2.stars.map((x) => x.name).join(" ") || "（空）"));
+  }
+  L.push("");
+  L.push("## 盘面");
+  L.push(`命宫：${r.ming.why}`);
+  for (const x of r.ming.sanfangStars) {
+    L.push(`  ${x.role}　${x.branch}${x.palace}　`
+      + `${x.majors.join("、") || "（无主星）"}`);
+  }
+  L.push(`身宫：${r.shen.why}`);
+  for (const g of r.geju) {
+    L.push(`格局 ${g.name}：见 ${g.seen.join("、")}${g.complete ? "（齐）" : "（不齐）"}`);
+  }
+  L.push("");
+  L.push("## 四化");
+  for (const h of r.sihua) {
+    L.push(`${h.star}${h.kind} → ${h.branch ?? "—"}${h.palace ?? "该星不在本实现收录之列"}`
+      + (h.inMingSanfang ? "（命宫三方四正内）" : ""));
+  }
+  L.push("");
+  for (const n of r.notes) L.push(`> ${n}`);
+  io.out(L.join("\n"), "data");
+}
+
+function cmdTarot(argv: readonly string[], io: Io): void {
+  const v = parse(argv, {
+    spread: { type: "string" }, numbering: { type: "string" },
+    "suit-element": { type: "string" }, reversals: { type: "boolean" },
+    json: { type: "boolean" }, out: { type: "string" },
+  });
+  const params = loadParams({
+    tarot: {
+      ...(typeof v["numbering"] === "string"
+        ? { numbering: v["numbering"] as "marseille" } : {}),
+      ...(typeof v["suit-element"] === "string"
+        ? { suitElement: v["suit-element"] as "goldenDawn" } : {}),
+      ...(v["reversals"] === true ? { withReversals: true } : {}),
+    },
+  });
+  const r = drawSpread({
+    spreadId: typeof v["spread"] === "string" ? v["spread"] : "three", params,
+  });
+  if (v["json"] === true) {
+    emit(io, r as unknown as Record<string, unknown>, true,
+      v["out"] as string | undefined);
+    return;
+  }
+  const L: string[] = [`# 塔罗 · ${r.spread.name}`, "", r.spread.note, ""];
+  for (const c of r.cards) {
+    L.push(`${c.position.index + 1}. ${c.position.name}　`
+      + `**${c.card.name}**${c.reversed ? "（逆）" : ""}`);
+    L.push(`   ${c.majorNumber !== null ? `大牌 ${c.majorNumber}`
+      : `${c.card.suit === undefined ? "" : SUIT_NAME[c.card.suit]}　`
+        + `${c.suitElement ?? ""}`}`);
+    L.push(`   ${c.position.question}`);
+  }
+  L.push("");
+  L.push(`流派：${r.schools.numbering} / ${r.schools.suitElement}`
+    + `${r.schools.withReversals ? " / 含逆位" : ""}　参数指纹 ${paramsHash(params)}`);
+  L.push(`随机源 ${r.randomSource}`);
+  L.push("");
+  for (const n of r.notes) L.push(`> ${n}`);
+  io.out(L.join("\n"), "data");
+}
+
+function cmdPair(argv: readonly string[], io: Io): void {
+  const v = parse(argv, {
+    chart: { type: "string" }, "chart-b": { type: "string" },
+    json: { type: "boolean" }, out: { type: "string" },
+  });
+  const a = v["chart"]; const b = v["chart-b"];
+  if (typeof a !== "string" || typeof b !== "string") {
+    throw new UsageError("合盘要两张盘：--chart a.json --chart-b b.json");
+  }
+  const params = loadParams({});
+  const prep = (file: string) => {
+    const raw = JSON.parse(io.readFile(file)) as { input: BirthInput };
+    const base = buildBaseChart(buildChart(raw.input), params);
+    const rep = buildReport(base, { params, subject: "other" });
+    return {
+      chart: base,
+      yongshen: {
+        primary: rep.strength.yongshen.value.primary,
+        xishen: rep.strength.yongshen.value.xishen,
+      },
+    };
+  };
+  const P = baziPairing(prep(a), prep(b));
+  if (v["json"] === true) {
+    emit(io, P as unknown as Record<string, unknown>, true,
+      v["out"] as string | undefined);
+    return;
+  }
+  const L: string[] = ["# 合盘", "", `日主：${P.dayMaster.why}`, ""];
+  L.push(`## 干支关系（${P.relations.length} 条）`);
+  for (const r of P.relations) {
+    L.push(`${r.from}↔${r.to}　${r.kind}　${r.a}${r.b}`
+      + (r.transformsTo !== undefined ? ` 化${r.transformsTo}` : ""));
+  }
+  L.push("");
+  L.push("## 用神的供给");
+  for (const [who, items] of [["甲方", P.aNeedsFromB], ["乙方", P.bNeedsFromA]] as const) {
+    for (const x of items) {
+      L.push(`${who}的${x.role} ${x.element}：对方盘 `
+        + `${(x.shareInOther * 100).toFixed(1)}%（自己盘 `
+        + `${(x.shareInSelf * 100).toFixed(1)}%）`);
+    }
+  }
+  L.push("");
+  L.push(`合盘分数：**不给**。理由见下。`);
+  for (const n of P.notes) L.push(`> ${n}`);
+  io.out(L.join("\n"), "data");
+}
+
 const COMMANDS: Readonly<Record<string, (a: readonly string[], io: Io) => void>> = {
   chart: cmdChart, luck: cmdLuck, year: cmdYear,
   month: cmdMonth, day: cmdDay, report: cmdReport, cities: cmdCities,
   ask: cmdAsk, daily: cmdDaily, topics: cmdTopics, cross: cmdCross, plain: cmdPlain,
+  ziwei: cmdZiwei, tarot: cmdTarot, pair: cmdPair,
 };
 
 export function run(argv: readonly string[], io: Io): number {
