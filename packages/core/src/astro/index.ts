@@ -8,3 +8,4 @@ export * from "./defaults.js";
 export * from "./equationOfTime.js";
 export * from "./solarTerms.js";
 export * from "./moon.js";
+export * from "./horizon.js";

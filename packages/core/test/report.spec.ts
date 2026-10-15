@@ -15,6 +15,8 @@ import { buildReport, collectReportText } from "../src/report/assemble.js";
 import { renderMarkdown } from "../src/report/markdown.js";
 import { dayView, luckTimeline, monthView } from "../src/temporal/views.js";
 import type { BirthInput } from "../src/chart/types.js";
+import { loadParams } from "../src/params/load.js";
+import { precisionBandOf } from "../src/astro/horizon.js";
 
 describe("模板库的自洽性", () => {
   const localeTexts = (t: NarrativeTemplate): [string, string][] => {
@@ -502,5 +504,80 @@ describe("语料全量扫描", () => {
     const planted = "命主 2029 年会离婚，且必然破财。";
     expect(scanText(planted, "planted").length).toBeGreaterThanOrEqual(2);
     expect(formatViolations(scanText(planted, "planted"))).not.toBe("措辞扫描通过。");
+  });
+});
+
+describe("**精度地平线** —— 引擎自己给不出保证的那一段，必须说出来", () => {
+  const chartOf = (year: number): BirthInput => ({
+    year, month: 5, day: 12, hour: 14, minute: 30,
+    gender: "male", timeZone: "Asia/Shanghai", longitude: 121.47,
+  });
+  const reportOf = (year: number) => buildReport(
+    buildBaseChart(buildChart(chartOf(year)), loadParams()),
+    { includeNodes: true, now: { year: 2026, month: 10, day: 15 } });
+  const methodText = (year: number) =>
+    reportOf(year).method.narrative.map((l) => l.text).join("\n");
+
+  it("三段的分界就在 2050 与 2100 上，不差一年", () => {
+    expect(precisionBandOf(2050)).toBe("guaranteed");
+    expect(precisionBandOf(2051)).toBe("beyondTolerance");
+    expect(precisionBandOf(2100)).toBe("beyondTolerance");
+    expect(precisionBandOf(2101)).toBe("beyondSpan");
+  });
+
+  it("**一张 1990 年的盘确实越界** —— 这正是本次要补的那个洞", () => {
+    const h = reportOf(1990).method.horizon;
+    // 大运排到第十步、流年曲线铺满，报告覆盖的年份远超出生年。
+    // buildChart 只校验出生年，故此前这一整片是静默的。
+    expect(h.furthestYear).toBeGreaterThan(2100);
+    expect(h.band).toBe("beyondSpan");
+    expect(h.beyondToleranceCount).toBeGreaterThan(50);
+    expect(h.beyondSpanCount).toBeGreaterThan(0);
+  });
+
+  it("越界时两条都出 —— 容差与跨度讲的不是同一回事", () => {
+    const t = methodText(1990);
+    expect(t).toContain("60 秒容差");
+    expect(t).toContain("声明并测试过的跨度");
+    expect(t).toContain("2050");
+    expect(t).toContain("2100");
+  });
+
+  it("**措辞限定在换柱那一刻** —— 不说成「那些年的结论不可信」", () => {
+    const t = methodText(1990);
+    expect(t).toContain("换柱的那一刻");
+    // 年柱月柱不因此改变，这一句必须在，否则读者会把它读成全盘失效
+    expect(t).toContain("不因此改变");
+    // 也不许把「超出跨度」说成算错了
+    expect(t).toContain("这不是「算错了」");
+  });
+
+  it("**反向对照：不越界的盘一个字都不多说** —— 否则上面几条可能恒为真", () => {
+    // 1900 年生，大运十步也只到 2010 上下，整份报告落在承诺之内。
+    const h = reportOf(1900).method.horizon;
+    expect(h.band).toBe("guaranteed");
+    expect(h.beyondToleranceCount).toBe(0);
+    const t = methodText(1900);
+    expect(t).not.toContain("60 秒容差");
+    expect(t).not.toContain("声明并测试过的跨度");
+  });
+
+  it("地平线取自已装配的各节，与报告里真正出现的年份一致", () => {
+    const r = reportOf(1990);
+    // 若另推一遍窗口，报告里摆着 2118 而警告说 2098 —— 这条锁住它们同源
+    const shown = Math.max(
+      ...r.years.curve.map((p) => p.year),
+      ...r.years.cards.map((c) => c.view.year),
+    );
+    expect(r.method.horizon.furthestYear).toBeGreaterThanOrEqual(shown);
+  });
+
+  it("**叙述模板里不许有 Markdown 粗体** —— Narrative 按纯文本渲染", () => {
+    // 网页的 Narrative 组件直接渲染 {l.text}，星号会原样出现在屏幕上。
+    for (const t of NARRATIVE_TEMPLATES) {
+      for (const [loc, text] of Object.entries(t.text)) {
+        expect(text.includes("**"), `${t.id}.${loc}`).toBe(false);
+      }
+    }
   });
 });

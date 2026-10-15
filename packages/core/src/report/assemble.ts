@@ -22,7 +22,8 @@ import {
 } from "../ganzhi/algebra.js";
 import { CONTROLS, GENERATES, MONTH_BRANCH_ORDER } from "../ganzhi/tables.js";
 import { phaseOf } from "../ganzhi/changsheng.js";
-import { toJulianDay } from "../astro/julian.js";
+import { fromJulianDay, toJulianDay } from "../astro/julian.js";
+import { horizonOf } from "../astro/horizon.js";
 import { enclosingTermOf } from "../chart/pillars.js";
 import type { NatalChart } from "../chart/types.js";
 import type { Params } from "../params/types.js";
@@ -722,11 +723,45 @@ export function buildReport(
   L8.add("method.provenance", {
     engineVersion, paramsHash: hash, solarProvider: chart.rulesUsed.solarProviderId,
   });
+
+  // ── 精度地平线 ──
+  //
+  // 年份从**已装配好的各节**里取，不另推一遍窗口：另推就有两份关于
+  // 「报告覆盖到哪一年」的说法，而它们迟早会不一致 —— 到时报告里摆着
+  // 2109，警告却说算到 2098，还查不出是哪边错了。
+  const coveredYears: number[] = [
+    ...luckSection.steps.map((st) => fromJulianDay(st.endJd).year),
+    ...yearsSection.curve.map((p) => p.year),
+    ...yearsSection.cards.map((c) => c.view.year),
+    ...(nodesSection === null ? [] : [nodesSection.statsTo]),
+    current === null ? chart.input.year : current.year.year,
+  ];
+  const horizon = horizonOf(coveredYears);
+  // 次序要紧：先 2050（低的那条线，且带出「算到哪一年」这个前提），
+  // 再 2100。反过来读是「超出跨度……又越过容差」，像两件无关的事。
+  //
+  // 两条都出，不合成一条：越过跨度的报告必然也越过容差，但二者讲的不是
+  // 同一回事 —— 前者是 ΔT 外推不确定度，后者是没有测试覆盖。
+  if (horizon.band !== "guaranteed") {
+    L8.add("method.horizonBeyondTolerance", {
+      furthestYear: String(horizon.furthestYear),
+      toleranceUntilYear: String(horizon.toleranceUntilYear),
+      count: String(horizon.beyondToleranceCount),
+    });
+  }
+  if (horizon.band === "beyondSpan") {
+    L8.add("method.horizonBeyondSpan", {
+      spanToYear: String(horizon.spanToYear),
+      count: String(horizon.beyondSpanCount),
+    });
+  }
+
   L8.add("warn.pendingCalibration", { items: PENDING_CALIBRATION.join("；") });
 
   const method: MethodSection = {
     rulesUsed: chart.rulesUsed, schoolsUsed: C.schoolsUsed,
     paramsHash: hash, engineVersion, pendingCalibration: PENDING_CALIBRATION,
+    horizon,
     narrative: L8.items,
   };
 

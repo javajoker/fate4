@@ -411,6 +411,19 @@ const methodTemplates: NarrativeTemplate[] = [
     zhHans: "引擎版本 {engineVersion}，参数快照 {paramsHash}，太阳黄经算法 {solarProvider}。半年后若同一生辰算出不同结果，这三项是唯一能回答「为什么」的依据。",
     en: "Engine {engineVersion}, parameter snapshot {paramsHash}, solar longitude provider {solarProvider}. If the same birth data yields a different result half a year from now, these three fields are the only way to answer why.",
   }),
+  // 措辞刻意限定在**边界时刻**上。越过容差不等于那些年的柱是错的 ——
+  // 年柱月柱走六十甲子的定序推进，节气只决定哪一刻换柱。说成「结论不可信」
+  // 是另一种不诚实，而本项目两头都要防。
+  T("method.horizonBeyondTolerance", "data", "method",
+    ["furthestYear", "toleranceUntilYear", "count"], {
+    zhHans: "本报告算到 {furthestYear} 年，其中 {count} 个年份越过本引擎承诺 60 秒容差的上界（{toleranceUntilYear} 年）—— 那以后 ΔT 是对地球自转的外推，不确定度已超过容差。受影响的只是「换柱的那一刻」，即起运时刻与流月边界；整年整月的柱走六十甲子定序推进，与节气时刻无关，不因此改变。",
+    en: "This report reaches {furthestYear}; {count} of its years fall past {toleranceUntilYear}, the last year for which this engine guarantees its 60-second tolerance. Beyond it ΔT is an extrapolation of Earth's rotation whose uncertainty exceeds that tolerance. Only the instant of a pillar change is affected (luck-cycle onset, monthly boundaries): whole-year and whole-month pillars advance on the fixed sexagenary cycle and do not shift.",
+  }),
+  T("method.horizonBeyondSpan", "data", "method",
+    ["spanToYear", "count"], {
+    zhHans: "其中 {count} 个年份更落在本引擎声明并测试过的跨度（至 {spanToYear} 年）之外。这不是「算错了」：格里高利历不在 {spanToYear} 年失效，级数也照常收敛 —— 是那一段既没有精度声明，也没有测试覆盖。两者的区别要紧。",
+    en: "Of those, {count} fall outside the span this engine declares and tests (through {spanToYear}). This is not an error: the Gregorian calendar does not lapse in {spanToYear} and the series still converge. It is that the range carries no accuracy claim and no test coverage. The distinction matters.",
+  }),
 ];
 
 // ═══════════════════════════════════════════════════════════

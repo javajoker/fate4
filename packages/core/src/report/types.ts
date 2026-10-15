@@ -12,6 +12,7 @@ import type { BodyCorrespondence, Persona } from "../conclude/persona.js";
 import type { ShenshaHit, PalaceName } from "../shensha/scan.js";
 import type { DayView, LuckStep, MonthView, YearView } from "../temporal/types.js";
 import type { Audience } from "./audience.js";
+import type { PrecisionHorizon } from "../astro/horizon.js";
 import type { Locale } from "./templates.js";
 import type { NarrativeLine } from "./render.js";
 import type { GuardViolation } from "./guard.js";
@@ -173,6 +174,13 @@ export interface MethodSection {
   readonly paramsHash: string;
   readonly engineVersion: string;
   readonly pendingCalibration: readonly string[];
+  /**
+   * 这份报告算到了多远，以及引擎的精度承诺到哪儿为止。
+   *
+   * 此前只对**出生年**校验过（`buildChart`），而报告覆盖的年份远不止它：
+   * 一张 1990 年的盘排到 2109。那是引擎自己给不出保证、却照样输出的数。
+   */
+  readonly horizon: PrecisionHorizon;
   readonly narrative: readonly NarrativeLine[];
 }
 
