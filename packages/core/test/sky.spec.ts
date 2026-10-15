@@ -21,6 +21,11 @@ import {
   skyChart, aspectsOf, SKY_PENDING_CALIBRATION,
 } from "../src/sky/chart.js";
 import { PLANET_ACCURACY_ARCSEC } from "../src/sky/planets.js";
+import {
+  QIZHENG_PALACES, QIZHENG_DIGNITY, QIZHENG_PENDING_CALIBRATION,
+  SIYU_DIGNITY_NOT_INCLUDED, qizhengStateOf, compareWithHellenistic,
+  type QizhengState,
+} from "../src/sky/qizheng.js";
 
 const AE_PATH = resolve(
   import.meta.dirname, "../../../reference/vendor/astronomy-engine/source/js/astronomy.js");
@@ -413,5 +418,133 @@ describe("**连续 vs 离散：这条分界跨在东西之上**", () => {
     const b = skyChart(jdOf(JD2), ttOf(JD2), 121.47, 31.23);
     expect(a.angles.ascendant).toBe(b.angles.ascendant);
     expect(a.bodies.map((x) => x.longitude)).toEqual(b.bodies.map((x) => x.longitude));
+  });
+});
+
+describe("七政四余的庙旺利陷", () => {
+  it("十二宫配地支，取自月将表而非另抄一份", () => {
+    expect(QIZHENG_PALACES).toHaveLength(12);
+    const got = QIZHENG_PALACES.map((p) => `${p.branch}${p.name}`).join(" ");
+    expect(got).toBe(
+      "戌白羊 酉金牛 申阴阳 未巨蟹 午狮子 巳双女 "
+      + "辰天秤 卯天蝎 寅人马 丑磨羯 子宝瓶 亥双鱼");
+    // 地支逆行：宫序每进一，地支退一
+    const BRANCHES = "子丑寅卯辰巳午未申酉戌亥";
+    for (let i = 0; i < 11; i++) {
+      const a = BRANCHES.indexOf(QIZHENG_PALACES[i]!.branch);
+      const b = BRANCHES.indexOf(QIZHENG_PALACES[i + 1]!.branch);
+      expect((a - 1 + 12) % 12, `${i}→${i + 1}`).toBe(b);
+    }
+  });
+
+  it("传统名与现代名并列，不互相替换", () => {
+    const p = QIZHENG_PALACES;
+    expect(p[2]!.name).toBe("阴阳");
+    expect(p[2]!.modernName).toBe("双子");
+    expect(p[8]!.name).toBe("人马");
+    expect(p[8]!.modernName).toBe("射手");
+    expect(p[10]!.name).toBe("宝瓶");
+    expect(p[10]!.modernName).toBe("水瓶");
+  });
+
+  it("庙：日月各一宫，五星各二宫", () => {
+    expect(QIZHENG_DIGNITY.sun.miao).toHaveLength(1);
+    expect(QIZHENG_DIGNITY.moon.miao).toHaveLength(1);
+    for (const b of ["mercury", "venus", "mars", "jupiter", "saturn"] as const) {
+      expect(QIZHENG_DIGNITY[b].miao, b).toHaveLength(2);
+    }
+    // 十二宫恰被瓜分完，不重不漏
+    const all = CLASSICAL_BODIES.flatMap((b) => [...QIZHENG_DIGNITY[b].miao]);
+    expect([...all].sort((x, y) => x - y)).toEqual([...Array(12).keys()]);
+  });
+
+  it("**陷落由对宫推出，不另立表**", () => {
+    // 土星庙磨羯(9)，其对宫巨蟹(3)必为陷
+    expect(qizhengStateOf("saturn", 9 * 30 + 5).states).toContain("庙");
+    expect(qizhengStateOf("saturn", 3 * 30 + 5).states).toContain("陷");
+    // 木星旺巨蟹(3)，其对宫磨羯(9)必为落
+    expect(qizhengStateOf("jupiter", 3 * 30 + 5).states).toContain("旺");
+    expect(qizhengStateOf("jupiter", 9 * 30 + 5).states).toContain("落");
+  });
+
+  it("无庙旺陷落即为平，且平不与别的档并存", () => {
+    for (const b of CLASSICAL_BODIES) {
+      for (let i = 0; i < 12; i++) {
+        const st = qizhengStateOf(b, i * 30 + 15);
+        expect(st.states.length, `${b}@${i}`).toBeGreaterThan(0);
+        if (st.states.includes("平")) expect(st.states, `${b}@${i}`).toHaveLength(1);
+        expect(st.why.length).toBe(st.states.length);
+      }
+    }
+  });
+
+  it("每颗星在十二宫里恰有一庙或二庙、一旺、对应的陷与落", () => {
+    for (const b of CLASSICAL_BODIES) {
+      const count = (s: QizhengState) => Array.from({ length: 12 },
+        (_, i) => qizhengStateOf(b, i * 30 + 15).states).filter((x) => x.includes(s)).length;
+      expect(count("庙"), `${b} 庙`).toBe(QIZHENG_DIGNITY[b].miao.length);
+      expect(count("陷"), `${b} 陷`).toBe(QIZHENG_DIGNITY[b].miao.length);
+      expect(count("旺"), `${b} 旺`).toBe(1);
+      expect(count("落"), `${b} 落`).toBe(1);
+    }
+  });
+});
+
+describe("**与西洋古典的对照：一个观察，不是一个论证**", () => {
+  /**
+   * ⚠️ 本段**刻意不断言两张表必须相同**。
+   *
+   * 现状是七格全同，但那不该被写成要求：哪天有人拿《果老星宗》核出某一格
+   * 不同，正确的反应是改表，而不是改测试。把现状钉成断言，
+   * 等于让下一个核对的人面对一条红色测试，而红色会诱使人去改测试。
+   *
+   * 更要紧的是文件头那条：本表的转录者读过西洋那张表，故「相同」这件事
+   * 本身带污染风险，不能拿它反过来论证什么。
+   */
+  it("对照跑得通，且逐格给得出两边的宫名", () => {
+    const rows = compareWithHellenistic();
+    expect(rows).toHaveLength(7);
+    for (const r of rows) {
+      expect(r.qizhengMiao.length).toBeGreaterThan(0);
+      expect(r.westernDomicile.length).toBe(r.qizhengMiao.length);
+      expect(r.qizhengWang.length).toBeGreaterThan(0);
+      expect(r.westernExaltation.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("**对照认得出不同** —— 注入一张改过的表，必须报出来", () => {
+    // 不注入的话，这条无法区分「确实相同」与「函数恒返回 true」
+    const tampered = {
+      ...QIZHENG_DIGNITY,
+      mars: { miao: [0, 1], wang: 9 },    // 火星庙宫改掉一个
+      jupiter: { miao: [8, 11], wang: 4 }, // 木星旺宫改掉
+    };
+    const rows = compareWithHellenistic(tampered);
+    expect(rows.find((r) => r.body === "mars")!.domicileSame).toBe(false);
+    expect(rows.find((r) => r.body === "jupiter")!.exaltationSame).toBe(false);
+    // 没动过的那几格仍报相同
+    expect(rows.find((r) => r.body === "sun")!.domicileSame).toBe(true);
+  });
+
+  it("待核对清单里写明了污染风险 —— 这一条比表本身更要紧", () => {
+    const joined = QIZHENG_PENDING_CALIBRATION.join("\n");
+    expect(joined).toContain("凭记忆转录");
+    expect(joined).toContain("污染");
+    // 四余的庙旺明确不收，而不是悄悄没有
+    expect(joined).toContain("四余的庙旺");
+    expect(SIYU_DIGNITY_NOT_INCLUDED).toContain("紫炁");
+  });
+
+  it("七政四余的档位比西洋粗 —— 并列而不合并", () => {
+    const JD3 = 2448023.729166667;
+    const c = skyChart(jdOf(JD3), ttOf(JD3), 121.47, 31.23);
+    expect(c.qizheng).toHaveLength(7);
+    // 同一组位置：两套读法的星与次序一致
+    expect(c.qizheng.map((q) => q.body)).toEqual(c.bodies.map((b) => b.body));
+    for (let i = 0; i < 7; i++) {
+      expect(c.qizheng[i]!.degree).toBeCloseTo(c.bodies[i]!.degree, 9);
+    }
+    // 七政四余不计分 —— 没有「总分」这个东西可取
+    expect((c.qizheng[0] as unknown as { score?: number }).score).toBeUndefined();
   });
 });

@@ -43,6 +43,9 @@ import {
   dignitiesOf, dignityScore, isDayChart, BODY_NAME,
   type ClassicalBody, type DignityHit,
 } from "./dignities.js";
+import {
+  qizhengStateOf, QIZHENG_PENDING_CALIBRATION, type QizhengPlacement,
+} from "./qizheng.js";
 
 export interface BodyPlacement {
   readonly body: ClassicalBody;
@@ -85,6 +88,14 @@ export interface SkyChart {
   readonly bodies: readonly BodyPlacement[];
   /** 四余：罗睺、计都、月孛。紫炁无公认天体对应，故不在此处。 */
   readonly siyu: SiyuPositions;
+  /**
+   * 七政的庙旺利陷 —— 与 `bodies[].dignities` 是**同一组位置的两套读法**。
+   *
+   * 两者并列而不合并：西洋那套把五项必然尊贵加成一个分数，
+   * 七政四余这套只分庙旺陷落平五档，不计分。合并就要替其中一方
+   * 发明一个它本来没有的东西。
+   */
+  readonly qizheng: readonly QizhengPlacement[];
   /** 上升点所在宫 —— 七政四余的命宫与西洋的第一宫，是同一宫。 */
   readonly ascendantSign: string;
   /** 本模块的黄经精度，角秒。随盘带出，不让读者去翻文档。 */
@@ -162,6 +173,7 @@ export function skyChart(
 
   return {
     angles, isDay, bodies, siyu: siyuAt(jdTT),
+    qizheng: bodies.map((b) => qizhengStateOf(b.body, b.longitude)),
     ascendantSign: SIGNS[signIndexOf(angles.ascendant)]!.name,
     accuracyArcsec: PLANET_ACCURACY_ARCSEC,
     warnings,
@@ -236,5 +248,5 @@ export const SKY_PENDING_CALIBRATION: readonly string[] = Object.freeze([
   "三分主星（取 Dorothean 一系；另有 Ptolemaic 一系，昼夜主星配置不同）",
   "必然尊贵的计分（取 Lilly 一系；各家互有出入，且把五项加成一个总分本身是强假设）",
   "相位容许度（默认 8°，各家 6°–10°，传统上还按星分别取）",
-  "七政四余的庙旺利陷表（尚未收录）",
+  ...QIZHENG_PENDING_CALIBRATION,
 ]);

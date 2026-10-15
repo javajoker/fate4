@@ -97,16 +97,15 @@ export function chartAngles(
   return { ascendant: asc, midheaven: mc, localSiderealTime: lst, obliquity: eps };
 }
 
-/** 黄道十二宫，自白羊 0° 起每 30° 一宫。与 `compare/substrate.ts` 的那一份同源。 */
-export const SIGNS: readonly { readonly name: string; readonly nameEn: string }[] =
-  Object.freeze([
-    { name: "白羊", nameEn: "Aries" }, { name: "金牛", nameEn: "Taurus" },
-    { name: "双子", nameEn: "Gemini" }, { name: "巨蟹", nameEn: "Cancer" },
-    { name: "狮子", nameEn: "Leo" }, { name: "处女", nameEn: "Virgo" },
-    { name: "天秤", nameEn: "Libra" }, { name: "天蝎", nameEn: "Scorpio" },
-    { name: "人马", nameEn: "Sagittarius" }, { name: "摩羯", nameEn: "Capricorn" },
-    { name: "宝瓶", nameEn: "Aquarius" }, { name: "双鱼", nameEn: "Pisces" },
-  ]);
+/**
+ * 黄道十二宫 —— **直接取 `compare/substrate.ts` 的那一份，不另立表**。
+ *
+ * 这里原本自己声明了一份，三个宫名与那边不一致（人马/射手、宝瓶/水瓶）。
+ * 同一样东西两张表，迟早会在某一处分叉，而那时屏幕上两处写着不同的名字，
+ * 谁也说不清哪个是对的。宫名的歧异是真的（见 `qizheng.ts` 的传统名），
+ * 但它该被表示成**一张表加一份别名**，不是两张各说各话的表。
+ */
+export { TROPICAL_SIGNS as SIGNS, signOf } from "../compare/substrate.js";
 
 /** 黄经落在第几宫（0 = 白羊）。 */
 export const signIndexOf = (longitude: number): number =>

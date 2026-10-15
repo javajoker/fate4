@@ -199,9 +199,10 @@ export const SYSTEMS: readonly SystemProfile[] = Object.freeze([
     astronomyWhy: "输入直接是日、月、五星的实际位置 —— 要算星历才起得了盘。"
       + "这是中土传统里与西洋占星同源的那一支。",
     determinism: "确定",
-    // 七政与四余已可算（`sky/chart.ts`、`compare/correspondence.ts`），
-    // 十二宫由上升点定。尚缺的是**庙旺利陷表**，故只算起得了盘，
-    // 断不了强弱 —— 列在 SKY_PENDING_CALIBRATION 里。
+    // 七政与四余可算（`sky/chart.ts`、`compare/correspondence.ts`），
+    // 十二宫由上升点定，庙旺陷落平在 `sky/qizheng.ts`。
+    // ⚠️ 庙旺表凭记忆转录且转录者读过西洋那张表，故带一层特殊的污染风险 ——
+    // 见 docs/11-validation.md §5.1。
     implemented: true,
   },
   {
