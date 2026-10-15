@@ -7,6 +7,7 @@ import {
   type Liuqin, type TopicCategory,
 } from "@fate/core";
 import { Card } from "../Card";
+import { Tarot } from "./Tarot";
 import { Disclaimer } from "../page";
 import { CITIES, loadAudience, loadMarks, saveMark, type Mark, type Verdict } from "../store";
 
@@ -36,6 +37,7 @@ const readJournal = (): Entry[] => {
 export default function AskPage() {
   // 读者档影响应期那一张卡 —— 普通读者档不给指向未来的时段
   const params = useMemo(() => loadParams({ report: { audience: loadAudience() } }), []);
+  const [method, setMethod] = useState<"liuyao" | "tarot">("liuyao");
   const [cat, setCat] = useState<TopicCategory>("财");
   const [topicId, setTopicId] = useState("wealth.seek");
   const [relation, setRelation] = useState<Liuqin>("父母");
@@ -92,6 +94,22 @@ export default function AskPage() {
   return (
     <>
       <h1 className="m-h1">问一件事</h1>
+
+      {/*
+        两套方法摆在同一页，是为了让它们的差别看得见：
+        六爻同一时刻重起得同一个卦，故有「一事不二占」；
+        塔罗每抽一次就是一次新试验，故没有。
+        分成两个标签，读者只会以为是两个功能。
+      */}
+      <div className="m-seg">
+        <button className={method === "liuyao" ? "on" : undefined}
+          onClick={() => setMethod("liuyao")}>六爻</button>
+        <button className={method === "tarot" ? "on" : undefined}
+          onClick={() => setMethod("tarot")}>塔罗</button>
+      </div>
+
+      {method === "tarot" ? <Tarot /> : (
+      <>
       <p className="m-lede">
         这一页不需要你的出生信息 —— 它看的是你问的这个时刻。
         同一个时段里，所有人问所有事得到的是同一个结果，
@@ -198,6 +216,8 @@ export default function AskPage() {
           <Disclaimer plain={plainQuestion(out.report).disclaimer}
             technical={out.report.disclaimerBottom} />
         </>
+      )}
+      </>
       )}
     </>
   );

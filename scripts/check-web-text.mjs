@@ -15,11 +15,23 @@ const problems = [];
 
 for (const f of files) {
   const src = readFileSync(f, "utf8");
+  // JSX 的块注释 `{/* … */}` 可以跨多行，而其中的文字不会被渲染。
+  // 只看行首特征会把注释的**续行**当成正文 —— 那是假阳性，
+  // 而假阳性会教人去忽略这个检查，比漏报更坏。故跟踪块注释的开合。
+  let inBlockComment = false;
   src.split("\n").forEach((line, i) => {
     const n = i + 1;
-    // 跳过注释与字符串字面量里的星号（import 之类）
     const t = line.trim();
-    if (t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")) return;
+    const opens = line.lastIndexOf("{/*") >= 0 || line.lastIndexOf("/*") >= 0;
+    const closes = line.includes("*/");
+    if (inBlockComment) {
+      if (closes) inBlockComment = false;
+      return;
+    }
+    if (opens && !closes) { inBlockComment = true; return; }
+    if (opens && closes) return;
+    // 跳过行注释与字符串字面量里的星号（import 之类）
+    if (t.startsWith("//") || t.startsWith("*")) return;
     if (/\*\*[^*]+\*\*/.test(line)) {
       problems.push(`${f}:${n}  JSX 文本里的 Markdown 粗体无效，会渲染成星号\n    ${t}`);
     }

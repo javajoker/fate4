@@ -167,11 +167,12 @@ function BirthForm(
   const submit = () => {
     const [Y, M, D] = date.split("-").map(Number);
     const [h, mi] = time.split(":").map(Number);
-    const [, tz, lon] = CITIES[city]!;
+    const [, tz, lon, lat] = CITIES[city]!;
     onDone({
       year: Y!, month: M!, day: D!,
       hour: unknownHour ? 12 : (h ?? 12), minute: unknownHour ? 0 : (mi ?? 0),
-      gender, timeZone: tz, longitude: lon,
+      // 纬度四柱用不到，但星盘要。随城市一并存下，免得日后再问一次
+      gender, timeZone: tz, longitude: lon, latitude: lat,
       ...(unknownHour ? { unknownHour: true } : {}),
     });
   };

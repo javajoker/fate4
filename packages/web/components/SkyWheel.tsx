@@ -129,6 +129,13 @@ export function SkyWheel({ chart, aspects, size = 460 }: {
           <g key={name}>
             <line x1={x1} y1={y1} x2={x2} y2={y2}
               stroke="var(--accent)" strokeWidth={1.5} />
+            {/*
+              标签底下垫一块底色：宫名摆在每宫正中，而上升点可以恰好落在
+              那个正中附近 —— 实测过一张盘，ASC 与「双女」两字叠在一起。
+              垫底比挪位置稳妥：挪位置只能躲开这一张盘。
+            */}
+            <rect x={tx - 12} y={ty - 6} width={24} height={12} rx={2}
+              fill="var(--surface)" opacity={0.92} />
             <text x={tx} y={ty} textAnchor="middle" dominantBaseline="central"
               fontSize={9} fill="var(--accent)" fontWeight={600}>{name}</text>
           </g>

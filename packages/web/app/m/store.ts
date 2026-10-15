@@ -25,12 +25,21 @@ export function clearBirth(): void {
   try { localStorage.removeItem(KEY); } catch { /* 同上 */ }
 }
 
-export const CITIES: readonly (readonly [string, string, number])[] = [
-  ["上海", "Asia/Shanghai", 121.47], ["北京", "Asia/Shanghai", 116.41],
-  ["广州", "Asia/Shanghai", 113.26], ["深圳", "Asia/Shanghai", 114.06],
-  ["成都", "Asia/Shanghai", 104.07], ["西安", "Asia/Shanghai", 108.95],
-  ["台北", "Asia/Taipei", 121.56], ["香港", "Asia/Hong_Kong", 114.17],
-  ["新加坡", "Asia/Singapore", 103.82],
+/**
+ * 城市表：[名, 时区, 东经, 北纬]。
+ *
+ * **纬度是后加的那一项。** 四柱用不到它 —— 对出生地的依赖只到真太阳时
+ * 那一层，用经度。但星盘的上升点要纬度，而且南北差一度就能差出几度。
+ *
+ * 在手机上让人填一个纬度数字是糟糕的交互，而选城市本来就要选。
+ * 故把纬度并进这张表，选了城市就有了 —— 用户不必知道它的存在。
+ */
+export const CITIES: readonly (readonly [string, string, number, number])[] = [
+  ["上海", "Asia/Shanghai", 121.47, 31.23], ["北京", "Asia/Shanghai", 116.41, 39.90],
+  ["广州", "Asia/Shanghai", 113.26, 23.13], ["深圳", "Asia/Shanghai", 114.06, 22.54],
+  ["成都", "Asia/Shanghai", 104.07, 30.57], ["西安", "Asia/Shanghai", 108.95, 34.34],
+  ["台北", "Asia/Taipei", 121.56, 25.03], ["香港", "Asia/Hong_Kong", 114.17, 22.32],
+  ["新加坡", "Asia/Singapore", 103.82, 1.35],
 ];
 
 /**
