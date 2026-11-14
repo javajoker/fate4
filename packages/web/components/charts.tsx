@@ -8,6 +8,7 @@
  * 全部遵守 §4 配色约束：有序量走单色阶，分类量才用色相，无红绿吉凶色。
  */
 
+import { useState } from "react";
 import { ELEMENTS, type Element } from "@fate/core";
 import { seriesColor, ELEMENT_COLOR, FLOW_COLOR, PARTY_COLOR, sequential } from "../lib/palette";
 
@@ -454,8 +455,12 @@ function smoothPath(pts: readonly (readonly [number, number])[]): string {
   return out.join(" ");
 }
 
+/** 横轴的可视窗口，下标在**传进来的数组**那个空间里（已抽稀之后）。 */
+export interface CurveWindow { readonly from: number; readonly to: number }
+
 export function LifeCurves({
   series, years, luckBreaks, mark, onPick, mode = "sigma", threshold = 2,
+  window: win, onWindow,
 }: {
   series: readonly CurveSpec[];
   years: readonly number[];
@@ -464,11 +469,36 @@ export function LifeCurves({
   onPick?: (index: number) => void;
   mode?: "sigma" | "weight";
   threshold?: number;
+  /** 不给即全幅。 */
+  window?: CurveWindow | null;
+  /** 拖出一段即回调；`null` 表示还原全幅。 */
+  onWindow?: (w: CurveWindow | null) => void;
 }) {
   const n = years.length;
+  const [drag, setDrag] = useState<{ a: number; b: number } | null>(null);
   if (n === 0 || series.length === 0) return null;
   const W = 860; const H = 300; const padL = 34; const padB = 22; const padT = 10;
-  const X = (i: number) => padL + (i / Math.max(1, n - 1)) * (W - padL - 8);
+
+  /**
+   * ⚠️ **三个下标空间，别搞混。**
+   *
+   * 1. 帧下标（`S.frames` 里的位置）—— 调用方持有
+   * 2. 显示下标（抽稀之后，即本组件收到的数组下标）
+   * 3. 像素
+   *
+   * 本组件只管 2 ↔ 3。`onPick` 回的是**显示下标**，由调用方再换回帧下标。
+   * 缩放只改 2 → 3 这一段的映射，**不改数组本身** ——
+   * 一裁数组，mark 与 luckBreaks 的下标就全错位，而那种错位画出来像真的。
+   */
+  const w0 = Math.max(0, win?.from ?? 0);
+  const w1 = Math.min(n - 1, win?.to ?? n - 1);
+  const span = Math.max(1, w1 - w0);
+  const X = (i: number) => padL + ((i - w0) / span) * (W - padL - 8);
+  /** 像素 → 显示下标，夹在窗口内。 */
+  const indexAt = (clientX: number, rect: DOMRect) => {
+    const f = (((clientX - rect.left) / rect.width) * W - padL) / (W - padL - 8);
+    return Math.min(w1, Math.max(w0, Math.round(w0 + f * span)));
+  };
 
   // σ 模式：纵轴是 z，范围取 ±max(threshold+1, 实际极值)，两模式都不裁剪数据
   const zOf = (s: CurveSpec, v: number) => (s.sigma <= 0 ? 0 : (v - s.center) / s.sigma);
@@ -484,13 +514,28 @@ export function LifeCurves({
     const pad = (hi - lo) * 0.06;
     lo -= pad; hi += pad;
   }
+  /**
+   * ⚠️ **纵轴按全幅算，不随窗口变。**
+   *
+   * 放大时若纵轴跟着可见段重算，同一个 z 值会因为你缩放到哪里而落在不同高度 ——
+   * 两张截图并排看就会把「刻度变了」读成「这一段更极端」。
+   *
+   * σ 对齐的全部意义是「纵向位置 = 离这条序列自己的常态有多远」。
+   * 那个意思必须与缩放无关，否则它就不是一把尺了。
+   *
+   * 代价是：缩进一段平静的时期，线会接近平直。那是实情 —— 它本来就平。
+   */
   const Y = (v: number) => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
   const val = (s: CurveSpec, i: number) =>
     mode === "sigma" ? zOf(s, s.values[i]!) : s.values[i]!;
 
+  // 刻度间隔随窗口宽度走 —— 窗口只剩十来年时还按十年标，整段就一个刻度
+  const visibleYears = (years[w1] ?? 0) - (years[w0] ?? 0);
+  const everyN = visibleYears <= 12 ? 1 : visibleYears <= 40 ? 5 : 10;
   const ticks = years
     .map((y, i) => ({ y, i }))
-    .filter(({ y, i }) => y % 10 === 0 && (i === 0 || years[i - 1] !== y));
+    .filter(({ y, i }) => i >= w0 && i <= w1
+      && y % everyN === 0 && (i === 0 || years[i - 1] !== y));
 
   const axisLabels = mode === "sigma"
     ? [threshold, 0, -threshold]
@@ -499,13 +544,33 @@ export function LifeCurves({
   return (
     <div className="scroll">
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="生命曲线"
-        style={{ cursor: onPick ? "crosshair" : "default" }}
-        onClick={(e) => {
-          if (onPick === undefined) return;
+        // userSelect:none —— 不然拖选范围时顺手把坐标轴的文字也选中了，
+        // 蓝底一片，看着像出了错
+        style={{
+          cursor: onPick ? "crosshair" : "default",
+          touchAction: "none", userSelect: "none", WebkitUserSelect: "none",
+        }}
+        onPointerDown={(e) => {
+          if (onWindow === undefined) return;
           const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
-          const i = Math.round((((e.clientX - r.left) / r.width) * W - padL)
-            / (W - padL - 8) * (n - 1));
-          onPick(Math.min(n - 1, Math.max(0, i)));
+          const i = indexAt(e.clientX, r);
+          setDrag({ a: i, b: i });
+          (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          if (drag === null) return;
+          const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
+          setDrag({ a: drag.a, b: indexAt(e.clientX, r) });
+        }}
+        onPointerUp={(e) => {
+          const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
+          const i = indexAt(e.clientX, r);
+          const d = drag;
+          setDrag(null);
+          // 拖动不足三格当作点选 —— 否则手一抖就把图缩到两个月宽，
+          // 而用户以为自己只是点了一下
+          if (d === null || Math.abs(i - d.a) < 3) { onPick?.(i); return; }
+          onWindow?.({ from: Math.min(d.a, i), to: Math.max(d.a, i) });
         }}>
         {/* ±θσ 界线。只在 σ 模式画 —— 权重模式下各条 σ 不同，画出来是十条横线 */}
         {mode === "sigma" && [threshold, -threshold].map((t) => (
@@ -526,7 +591,7 @@ export function LifeCurves({
             fontSize={9.5} fill="var(--ink-3)">{v.toFixed(0)}</text>
         ))}
 
-        {luckBreaks.map((i) => (
+        {luckBreaks.filter((i) => i >= w0 && i <= w1).map((i) => (
           <line key={`b${i}`} x1={X(i)} y1={padT} x2={X(i)} y2={H - padB}
             stroke="var(--line)" strokeWidth={1} strokeDasharray="2 4" />
         ))}
@@ -535,16 +600,25 @@ export function LifeCurves({
             {y}
           </text>
         ))}
-        {mark !== undefined && (
+        {mark !== undefined && mark >= w0 && mark <= w1 && (
           <line x1={X(mark)} y1={padT} x2={X(mark)} y2={H - padB}
             stroke="var(--accent)" strokeWidth={1.5} />
         )}
         {series.map((s, si) => (
           <path key={s.id}
-            d={smoothPath(s.values.map((_, i) => [X(i), Y(val(s, i))] as const))}
+            d={smoothPath(s.values
+              .map((_, i) => i)
+              .filter((i) => i >= w0 && i <= w1)
+              .map((i) => [X(i), Y(val(s, i))] as const))}
             fill="none" stroke={seriesColor(si)} strokeWidth={1.4}
             strokeLinecap="round" strokeLinejoin="round" />
         ))}
+        {/* 拖选中的那一段。只是个取景框，不改任何数值 */}
+        {drag !== null && Math.abs(drag.b - drag.a) >= 3 && (
+          <rect x={Math.min(X(drag.a), X(drag.b))} y={padT}
+            width={Math.abs(X(drag.b) - X(drag.a))} height={H - padT - padB}
+            fill="var(--accent)" opacity={0.14} />
+        )}
       </svg>
       <div className="legend">
         {series.map((s, i) => (

@@ -6,7 +6,7 @@ import {
   chartOptionsOf, loadParams, precisionBandOf,
 } from "@fate/core";
 import { useChart } from "../../../lib/chartContext";
-import { LifeCurves } from "../../../components/charts";
+import { LifeCurves, type CurveWindow } from "../../../components/charts";
 import { num, pillarText } from "../../../lib/format";
 
 /**
@@ -44,6 +44,8 @@ const GROUPS: readonly [string, string][] = [
 export default function CurvesPage() {
   const { base, record, params: ctxParams } = useChart();
   const [span, setSpan] = useState(60);
+  // 取景窗。null = 全幅。下标在**抽稀之后**那个空间里，与 keep 同一口径。
+  const [win, setWin] = useState<CurveWindow | null>(null);
   const [group, setGroup] = useState("tenGod");
   const [sel, setSel] = useState<readonly string[] | null>(null); // null = 全部
   const [picked, setPicked] = useState<number | null>(null);
@@ -216,7 +218,9 @@ export default function CurvesPage() {
           <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
             跨度
             <select value={span} onChange={(e) => {
-              setSpan(Number(e.target.value)); setPicked(null);
+              // ⚠️ 跨度一变，抽稀之后的下标空间就变了 —— 旧窗口的下标
+              // 指向的是另一段时间。必须清掉，不能留着「看起来还能用」。
+              setSpan(Number(e.target.value)); setPicked(null); setWin(null);
             }}>
               {SPANS.map((x) => (
                 <option key={x.years} value={x.years}>
@@ -228,7 +232,11 @@ export default function CurvesPage() {
           <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
             采样
             <select value={density}
-              onChange={(e) => setDensity(e.target.value as "year" | "month")}>
+              onChange={(e) => {
+                // 同上：按年与按月的下标相差十二倍
+                setDensity(e.target.value as "year" | "month");
+                setPicked(null); setWin(null);
+              }}>
               <option value="year">按年（{span} 点，看形状）</option>
               <option value="month">按月（{S.frames.length} 点，看年内推移）</option>
             </select>
@@ -276,12 +284,40 @@ export default function CurvesPage() {
       </div>
 
       {specs.length === 0 ? <p className="sub">未选中任何曲线。</p> : (
-        <LifeCurves
-          series={specs} years={years} luckBreaks={breaks}
-          mode={mode} threshold={threshold}
-          {...(markIndex < 0 ? {} : { mark: markIndex })}
-          onPick={(k) => setPicked(keep[k] ?? null)}
-        />
+        <>
+          <LifeCurves
+            series={specs} years={years} luckBreaks={breaks}
+            mode={mode} threshold={threshold}
+            {...(markIndex < 0 ? {} : { mark: markIndex })}
+            onPick={(k) => setPicked(keep[k] ?? null)}
+            window={win} onWindow={setWin}
+          />
+          <div className="zoombar">
+            <span className="dim">
+              {win === null
+                ? "在图上横向拖一段即可放大；拖不足三格算点选。"
+                : `当前窗口 ${years[win.from]}–${years[win.to]} 年（共 ${
+                  years[win.to]! - years[win.from]! + 1} 年）`}
+            </span>
+            {/* 全幅里的位置。缩进去之后不给这一条，人会不知道自己在哪儿 */}
+            <svg className="zoommini" viewBox="0 0 200 10" preserveAspectRatio="none"
+              role="img" aria-label="当前窗口在全幅中的位置">
+              <rect x={0} y={3} width={200} height={4} fill="var(--surface-2)" />
+              <rect y={3} height={4} fill="var(--accent)" opacity={0.55}
+                x={win === null ? 0 : (win.from / Math.max(1, years.length - 1)) * 200}
+                width={win === null ? 200
+                  : Math.max(2, ((win.to - win.from) / Math.max(1, years.length - 1)) * 200)} />
+            </svg>
+            <button className="ghost" disabled={win === null}
+              onClick={() => setWin(null)}>全幅</button>
+          </div>
+          <p className="sub" style={{ marginTop: 6 }}>
+            <strong>放大只改横轴。</strong>纵轴按全幅算，不随窗口变 ——
+            否则同一个 z 值会因为你缩放到哪里而落在不同高度，
+            而「纵向位置 = 离这条序列自己的常态有多远」这个意思就没了。
+            缩进一段平静的时期线会接近平直，那是实情。
+          </p>
+        </>
       )}
 
       {atFrame !== null && (
