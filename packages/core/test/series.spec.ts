@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { buildChart } from "../src/chart/buildChart.js";
+import { buildChart, chartOptionsOf } from "../src/chart/buildChart.js";
 import { buildBaseChart } from "../src/chart/baseChart.js";
 import { buildSeries, relationStrength } from "../src/temporal/series.js";
+import { curveStats } from "../src/temporal/nodes.js";
 import { evaluateAt } from "../src/temporal/evaluate.js";
 import { annualPillarOf } from "../src/temporal/views.js";
 import { loadParams, ParamsValidationError } from "../src/params/load.js";
 import { DEFAULT_PARAMS } from "../src/params/defaults.js";
-import { BRANCHES } from "../src/types/ganzhi.js";
 import type { BirthInput } from "../src/chart/types.js";
+import { BRANCHES } from "../src/types/ganzhi.js";
 
 const EXAMPLE: BirthInput = {
   year: 1990, month: 5, day: 12, hour: 14, minute: 30,
@@ -235,5 +236,78 @@ describe("硬约束", () => {
     const inWin = s2.frames.filter((f) => f.inStatsWindow);
     expect(new Set(inWin.map((f) => f.year)).size).toBe(5);
     expect(s2.statsTo - s2.statsFrom).toBe(4);
+  });
+});
+
+describe("**绘制跨度与大运柱数必须配套**", () => {
+  /**
+   * 界面可以把生命曲线拉到 60 / 120 / 180 年。但大运的柱数由
+   * `temporal.luckPillarCount` 定（默认 12 柱 = 120 年）——
+   * 只拉年数而不加柱，最后那几十年的帧 `luckPillar === null`，
+   * **曲线少了一整层**，而那个断口看起来像一个真实的转折。
+   *
+   * 实测过：180 年配 12 柱，三分之一的帧没有大运。
+   */
+  const INPUT: BirthInput = {
+    year: 1990, month: 5, day: 12, hour: 14, minute: 30,
+    gender: "male", timeZone: "Asia/Shanghai", longitude: 121.47,
+  };
+  const baseWith = (pillars: number) => {
+    const p = loadParams({ temporal: { luckPillarCount: pillars } });
+    return buildBaseChart(buildChart(INPUT, chartOptionsOf(p)), p);
+  };
+
+  /** 起运之前没有大运，那不是缺口 —— 是那段本来就还没起运。 */
+  const gapAfterStart = (S: ReturnType<typeof buildSeries>): number => {
+    const first = S.frames.findIndex((f) => f.luckPillar !== null);
+    return S.frames.slice(first).filter((f) => f.luckPillar === null).length;
+  };
+
+  it("**配套的柱数下，起运之后一帧不缺**", () => {
+    for (const [years, pillars] of [[60, 6], [120, 12], [180, 18]] as const) {
+      const S = buildSeries(baseWith(pillars), { years });
+      expect(gapAfterStart(S), `${years} 年配 ${pillars} 柱`).toBe(0);
+      expect(S.frames).toHaveLength(years * 12);
+    }
+  });
+
+  it("**反向对照：柱数不够时确实会缺一大片** —— 这正是要防的", () => {
+    const S = buildSeries(baseWith(12), { years: 180 });
+    const missing = gapAfterStart(S);
+    expect(missing, "180 年只配 12 柱，末尾六十年应当没有大运")
+      .toBeGreaterThan(S.frames.length / 4);
+  });
+
+  it("**σ 的基准窗不随跨度变** —— 否则节点会因显示选择而出现或消失", () => {
+    const stats = (years: number, pillars: number) => {
+      const S = buildSeries(baseWith(pillars), { years });
+      const s = S.series[0]!;
+      const st = curveStats(S, s);
+      return { center: st.center, sigma: st.sigma, inWindow: S.frames.filter((f) => f.inStatsWindow).length };
+    };
+    const a = stats(60, 6);
+    const b = stats(120, 12);
+    const c = stats(180, 18);
+    // 基准窗恒为头 60 年
+    expect(a.inWindow).toBe(60 * 12);
+    expect(b.inWindow).toBe(60 * 12);
+    expect(c.inWindow).toBe(60 * 12);
+    // 故同一条序列的中心与散布三档一致
+    expect(b.center).toBeCloseTo(a.center, 9);
+    expect(c.center).toBeCloseTo(a.center, 9);
+    expect(b.sigma).toBeCloseTo(a.sigma, 9);
+    expect(c.sigma).toBeCloseTo(a.sigma, 9);
+  });
+
+  it("拉长跨度只是往后接，前 60 年逐点不变", () => {
+    const a = buildSeries(baseWith(6), { years: 60 });
+    const c = buildSeries(baseWith(18), { years: 180 });
+    const sid = a.series[0]!.id;
+    const av = a.series.find((s) => s.id === sid)!.values;
+    const cv = c.series.find((s) => s.id === sid)!.values;
+    expect(cv.length).toBe(av.length * 3);
+    for (let i = 0; i < av.length; i++) {
+      expect(cv[i], `第 ${i} 帧`).toBeCloseTo(av[i]!, 9);
+    }
   });
 });

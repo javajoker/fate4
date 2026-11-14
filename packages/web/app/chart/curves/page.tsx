@@ -1,10 +1,39 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { buildSeries, curveStats, evaluateAt } from "@fate/core";
+import {
+  buildSeries, curveStats, evaluateAt, buildChart, buildBaseChart,
+  chartOptionsOf, loadParams, precisionBandOf,
+} from "@fate/core";
 import { useChart } from "../../../lib/chartContext";
 import { LifeCurves } from "../../../components/charts";
 import { num, pillarText } from "../../../lib/format";
+
+/**
+ * 可选的绘制跨度。
+ *
+ * ## 为什么换跨度要连大运一起换
+ *
+ * 大运的柱数由 `temporal.luckPillarCount` 定，默认 12 柱 = 120 年。
+ * 若只把绘制年数拉到 180 而不加柱，**最后六十年根本没有大运那一层** ——
+ * 曲线照画，但它少了一整层，而那个断口看起来像一个真实的转折。
+ * 实测：180 年里有三分之一的帧 `luckPillar === null`。
+ *
+ * 故每一档都带上它需要的柱数：跨度 N 年要 ⌈N/10⌉ 柱。
+ *
+ * ## σ 的基准窗**不随跨度变**
+ *
+ * `series.spanYears` 恒为 60，`buildSeries` 里取 `min(spanYears, years)`。
+ * 这是对的，而且重要：若基准窗跟着跨度走，同一年的 z 分数就会随
+ * **你把滑块拖到哪里**而变 —— 一个节点会因为显示选择而出现或消失。
+ * 统计节点必须是盘的性质，不是界面状态的函数。
+ */
+const SPANS: readonly { readonly years: number; readonly pillars: number;
+  readonly label: string }[] = [
+  { years: 60, pillars: 6, label: "60 年" },
+  { years: 120, pillars: 12, label: "120 年" },
+  { years: 180, pillars: 18, label: "180 年" },
+];
 
 const GROUPS: readonly [string, string][] = [
   ["tenGod", "十神"], ["element", "五行"], ["palace", "宫位"],
@@ -13,7 +42,8 @@ const GROUPS: readonly [string, string][] = [
 ];
 
 export default function CurvesPage() {
-  const { base } = useChart();
+  const { base, record, params: ctxParams } = useChart();
+  const [span, setSpan] = useState(60);
   const [group, setGroup] = useState("tenGod");
   const [sel, setSel] = useState<readonly string[] | null>(null); // null = 全部
   const [picked, setPicked] = useState<number | null>(null);
@@ -21,27 +51,53 @@ export default function CurvesPage() {
   const [threshold, setThreshold] = useState(2);
   const [density, setDensity] = useState<"year" | "month">("year");
 
-  const S = useMemo(() => (base === null ? null : buildSeries(base)), [base]);
+  const spanDef = SPANS.find((x) => x.years === span) ?? SPANS[0]!;
+
+  /**
+   * 跨度超过默认柱数能覆盖的范围时，**另建一份带足够大运柱的基础盘**。
+   * 不改全局参数 —— 那会连带改掉大运页、报告与节点页的范围，
+   * 而用户只是想把这一张图拉长。
+   */
+  const spanBase = useMemo(() => {
+    if (base === null || record === null) return base;
+    if (spanDef.pillars <= ctxParams.temporal.luckPillarCount) return base;
+    const p = loadParams({
+      ...ctxParams, temporal: { luckPillarCount: spanDef.pillars },
+    } as never);
+    try {
+      return buildBaseChart(buildChart(record.input, chartOptionsOf(p)), p);
+    } catch { return base; }
+  }, [base, record, ctxParams, spanDef.pillars]);
+
+  const S = useMemo(
+    () => (spanBase === null ? null : buildSeries(spanBase, { years: span })),
+    [spanBase, span]);
 
   // 取点处的即时盘 —— 神煞与结构事件由它来，解释曲线为何在此处变化
   const atFrame = useMemo(() => {
-    if (base === null || S === null || picked === null) return null;
+    if (spanBase === null || S === null || picked === null) return null;
     const f = S.frames[picked];
     if (f === undefined) return null;
     return {
       f,
-      ev: evaluateAt(base, {
+      ev: evaluateAt(spanBase, {
         luck: f.luckPillar === null ? null
           : { pillar: f.luckPillar, elapsedYears: f.elapsedYears },
         annual: f.annual, fleetingMonth: f.fleetingMonth,
       }),
     };
-  }, [base, S, picked]);
+  }, [spanBase, S, picked]);
 
-  if (base === null || S === null) return <p className="sub">曲线计算中…</p>;
+  if (base === null || spanBase === null || S === null) {
+    return <p className="sub">曲线计算中…</p>;
+  }
+
+  const lastYear = S.frames[S.frames.length - 1]!.year;
+  const lastAge = Math.round(lastYear - spanBase.chart.input.year);
+  const band = precisionBandOf(lastYear);
 
   // 本命日主 —— 五行曲线里哪一条是「自己」，不标出来就得靠读者自己数
-  const dm = base.conclusions.dayMaster;
+  const dm = spanBase.conclusions.dayMaster;
   const inGroup = S.series.filter((s) => s.kind === group);
   const shown = sel === null ? inGroup : inGroup.filter((s) => sel.includes(s.id));
 
@@ -99,6 +155,46 @@ export default function CurvesPage() {
         流月只进符号层：它在扰动序列里，不在权重序列里。
       </p>
 
+      {span > 60 && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <h3 style={{ fontSize: 14.5, marginBottom: 6 }}>
+            拉到 {span} 年之后，这张图在画什么
+          </h3>
+          <p className="sub">
+            <strong>它不再是「一生」。</strong>这张盘上第 {lastAge} 岁那一端，
+            没有人活到那里。超过百岁之后，曲线显示的是<strong>这套方法本身的结构</strong> ——
+            大运十年一柱地推下去、流年六十年一轮回 —— 而不是一个人。
+          </p>
+          <p className="sub">
+            看长跨度有一个正当用处：<strong>看出周期</strong>。
+            流年是六十年一个整轮，大运是十年一步；
+            拉到 120 或 180 年，这两个周期的叠合关系才显出来，
+            而 60 年只够看见其中一轮。
+          </p>
+          <p className="sub">
+            <strong>σ 的基准窗仍是头 60 年，不随跨度变。</strong>
+            若基准跟着跨度走，同一年的 z 分数就会随你把跨度拖到哪里而变 ——
+            一个节点会因为显示选择而出现或消失。那不该发生：
+            统计节点是盘的性质，不是界面状态的函数。
+          </p>
+          <p className="sub">
+            大运柱数也跟着加到 {spanDef.pillars} 柱。
+            不加的话最后那几十年<strong>根本没有大运这一层</strong>，
+            曲线照画，而那个断口看起来像一个真实的转折。
+          </p>
+          {band !== "guaranteed" && (
+            <p className="sub">
+              ⚠️ 这张图算到 <span className="mono">{lastYear}</span> 年
+              {band === "beyondSpan"
+                ? "，已超出本引擎声明并测试过的跨度（至 2100 年）。"
+                : "，已越过本引擎承诺 60 秒节气容差的上界（2050 年）。"}
+              {" "}受影响的只是「换柱的那一刻」—— 整年整月的柱走六十甲子定序推进，
+              与节气时刻无关，不因此改变。曲线的形状不受影响。
+            </p>
+          )}
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "14px 0" }}>
         {GROUPS.map(([k, name]) => (
           <button key={k} className={group === k ? undefined : "ghost"}
@@ -118,10 +214,22 @@ export default function CurvesPage() {
             </select>
           </label>
           <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
+            跨度
+            <select value={span} onChange={(e) => {
+              setSpan(Number(e.target.value)); setPicked(null);
+            }}>
+              {SPANS.map((x) => (
+                <option key={x.years} value={x.years}>
+                  {x.label}（{x.pillars} 柱大运）
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
             采样
             <select value={density}
               onChange={(e) => setDensity(e.target.value as "year" | "month")}>
-              <option value="year">按年（60 点，看形状）</option>
+              <option value="year">按年（{span} 点，看形状）</option>
               <option value="month">按月（{S.frames.length} 点，看年内推移）</option>
             </select>
           </label>
