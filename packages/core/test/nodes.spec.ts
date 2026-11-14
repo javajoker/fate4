@@ -3,8 +3,9 @@ import { buildChart } from "../src/chart/buildChart.js";
 import { buildBaseChart } from "../src/chart/baseChart.js";
 import { buildSeries, type Series, type SeriesSet } from "../src/temporal/series.js";
 import { evaluateAt } from "../src/temporal/evaluate.js";
+import { splineAt } from "../src/temporal/spline.js";
 import {
-  allNodes, findNodes, robustSigma, curveStats, thresholdCrossings,
+  allNodes, findNodes, robustSigma, curveStats, drawnCrossings,
 } from "../src/temporal/nodes.js";
 import { loadParams } from "../src/params/load.js";
 import { aggregateDomains } from "../src/yingqi/domains.js";
@@ -32,7 +33,6 @@ function synth(specs: readonly Partial<Series>[]): SeriesSet {
         id: sp.id ?? `synth.${k}`, kind: "metric", label: sp.id ?? `合成${k}`,
         baseValue: sp.baseValue ?? 0, values, deltas: values.map((v) => v - (sp.baseValue ?? 0)),
         polarity: sp.polarity ?? "neutral", monthResolving: sp.monthResolving ?? false,
-        withinBlock: sp.withinBlock ?? "linear",
       } satisfies Series;
     }),
   };
@@ -372,240 +372,236 @@ describe("整体", () => {
   });
 });
 
-describe("**门槛穿越：曲线与 ±θσ 的交点**", () => {
+// ═══════════════════════════════════════════════════════════
+//  图上的交点 —— 画出来的曲线与 ±θσ 的交点，穿入与穿出都报大致日期
+// ═══════════════════════════════════════════════════════════
+
+describe("**图上的交点：穿入与穿出各自的大致日期**", () => {
   const BASE = buildBaseChart(buildChart({
     year: 1990, month: 5, day: 12, hour: 14, minute: 30,
     gender: "male", timeZone: "Asia/Shanghai", longitude: 121.47,
   }), loadParams());
+
+  // ───────── 搭一个 z 形状精确已知的序列 ─────────
+  //
+  // curveStats 只看**统计窗内**的帧。于是：统计窗里交替放 ±1（μ=0、σ≈1），
+  // 统计窗**之外**的帧爱放什么放什么 —— 不会动到 μ 与 σ。
+  // 这样就能用闭式公式核对日期，而不是拿实现去核实现。
+  const S120 = buildSeries(BASE, { years: 120 });
+  const outside = S120.frames.map((f, i) => ({ f, i })).filter((x) => !x.f.inStatsWindow);
+  /** 统计窗之外、每个立春年的第一帧（寅月）—— 按年采样时图上画的那些点。 */
+  const yearStarts = outside.filter((x) => x.f.monthIndex === 0).map((x) => x.i);
+
+  function rig(zByYear: readonly number[]) {
+    expect(zByYear.length, "须不超过统计窗之外的年数").toBeLessThanOrEqual(yearStarts.length);
+    const values: number[] = S120.frames.map((f, i) => (f.inStatsWindow ? (i % 2 === 0 ? 1 : -1) : 0));
+    const probe = { ...S120.series[0]!, values };
+    const { center, sigma } = curveStats(S120, probe);
+    expect(center).toBeCloseTo(0, 6);
+    // 每个立春年内取常数 —— 与权重类「年内几乎不动、立春才跳」同一形状
+    zByYear.forEach((z, j) => {
+      const start = yearStarts[j]!;
+      for (let k = start; k < S120.frames.length && S120.frames[k]!.year === S120.frames[start]!.year; k++) {
+        values[k] = center + sigma * z;
+      }
+    });
+    const s: Series = { ...probe, values, deltas: values, polarity: "neutral" };
+    // 摆完再量一次：统计窗外的值不得改动 μ、σ
+    expect(curveStats(S120, s).sigma).toBeCloseTo(sigma, 12);
+    return { S: S120, s, keep: yearStarts.slice(0, zByYear.length), sigma };
+  }
+  const jdOf = (S: SeriesSet, i: number) => S.frames[i]!.jd;
+
+  it("**线性数据上，交点日期有闭式答案** —— 平滑曲线过线性点列仍是那条直线", () => {
+    // z = 0,1,2,3,4 → 门槛 2.5 穿过第 2、3 个点之间的正中
+    const { S, s, keep } = rig([0, 1, 2, 3, 4]);
+    const [c] = drawnCrossings(S, s, 2.5, keep);
+    expect(c).toBeDefined();
+    const want = (jdOf(S, keep[2]!) + jdOf(S, keep[3]!)) / 2;
+    // 一步线性折算，量级是分钟以内；这里放到 0.05 日（72 分钟）
+    expect(Math.abs(c!.enterAt!.jd - want)).toBeLessThan(0.05);
+  });
+
+  it("**这一版修的那个错：穿入日期不得落在越线那个采样点上，而要落在它之前**", () => {
+    // 上一个立春 z=1.9（未越线），下一个立春 z=7（越线）。
+    // 旧做法报「下一个立春那天」；图上曲线其实早已在两点之间穿过了虚线。
+    const { S, s, keep } = rig([0, 0, 1.9, 7, 7, 7]);
+    const [c] = drawnCrossings(S, s, 2, keep);
+    const prev = jdOf(S, keep[2]!);
+    const next = jdOf(S, keep[3]!);
+    expect(c!.enterAt!.jd).toBeGreaterThan(prev);
+    expect(c!.enterAt!.jd, "不得等于下一个立春 —— 那是模型里跳变的那天，不是图上穿线的那刻")
+      .toBeLessThan(next - 1);
+    // 且公历年是前一个立春所在的那一年，不是后一年
+    expect(c!.enterAt!.year).toBe(S.frames[keep[2]!]!.year);
+  });
+
+  it("**穿入与穿出都有日期，且穿出在穿入之后**", () => {
+    const { S, s, keep } = rig([0, 0, 3, 3, 0, 0]);
+    const cs = drawnCrossings(S, s, 2, keep);
+    expect(cs).toHaveLength(1);
+    const c = cs[0]!;
+    expect(c.enterAt, "穿入").not.toBeNull();
+    expect(c.exitAt, "穿出").not.toBeNull();
+    expect(c.exitAt!.jd).toBeGreaterThan(c.enterAt!.jd);
+    // 穿入落在 [点1, 点2] 之间，穿出落在 [点3, 点4] 之间
+    expect(c.enterAt!.jd).toBeGreaterThan(jdOf(S, keep[1]!));
+    expect(c.enterAt!.jd).toBeLessThan(jdOf(S, keep[2]!));
+    expect(c.exitAt!.jd).toBeGreaterThan(jdOf(S, keep[3]!));
+    expect(c.exitAt!.jd).toBeLessThan(jdOf(S, keep[4]!));
+  });
+
+  it("**到末尾仍未回来：exitAt 为 null，不拿末点冒充**", () => {
+    const { S, s, keep } = rig([0, 0, 3, 3, 3]);
+    const [c] = drawnCrossings(S, s, 2, keep);
+    expect(c!.enterAt).not.toBeNull();
+    expect(c!.exitAt).toBeNull();
+  });
+
+  it("**窗口一开始就在门槛外：enterAt 为 null，不拿窗口起点冒充**", () => {
+    const { S, s, keep } = rig([3, 3, 0, 0]);
+    const [c] = drawnCrossings(S, s, 2, keep);
+    expect(c!.enterAt).toBeNull();
+    expect(c!.exitAt).not.toBeNull();
+  });
+
+  it("**低于 −θσ 同样是穿越，且两端日期照给**", () => {
+    const { S, s, keep } = rig([0, 0, -3, -3, 0, 0]);
+    const [c] = drawnCrossings(S, s, 2, keep);
+    expect(c!.sign).toBe(-1);
+    expect(c!.enterAt).not.toBeNull();
+    expect(c!.exitAt).not.toBeNull();
+  });
+
+  it("**平滑过冲出来的「段」要丢掉** —— 一个采样点都没越线，数据里没有", () => {
+    // 两个点都是 1.9，两侧是 −1.9（都在 ±2 以内，所以本身不算穿越）：
+    // Catmull-Rom 在中间鼓到 (1.9+17.1+17.1+1.9)/16 ≈ 2.375，越过了 2
+    const { S, s, keep } = rig([-1.9, 1.9, 1.9, -1.9, -1.9]);
+    // 先证明这个测试不是空转：曲线确实鼓过了门槛
+    const zs = keep.map((i) => (s.values[i]! - curveStats(S, s).center) / curveStats(S, s).sigma);
+    expect(splineAt(zs, 1, 0.5), "前提：曲线中点越线").toBeGreaterThan(2);
+    // 然后：它不算穿越
+    expect(drawnCrossings(S, s, 2, keep)).toEqual([]);
+  });
+
+  it("**相邻穿越并成一段** —— 在门槛上下摆的曲线不吐几十个交点", () => {
+    // 2.2, 1.8, 2.2, 1.8, 2.2 在 θ=2 上下摆；一段，不是四五段
+    const { S, s, keep } = rig([0, 2.2, 1.8, 2.2, 1.8, 2.2, 0]);
+    const n = drawnCrossings(S, s, 2, keep).length;
+    // 平滑曲线在 2 附近会有几次真实的上下穿越，但必须远少于「每对点一个」
+    expect(n).toBeLessThanOrEqual(3);
+  });
+
+  it("σ 为 0 时返回空，而不是返回一堆 0/0", () => {
+    const flat = { ...S120.series[0]!, values: S120.frames.map(() => 42) };
+    expect(drawnCrossings(S120, flat, 2, yearStarts)).toEqual([]);
+  });
+
+  it("**取景窗口只决定看哪一段，曲线仍按全幅算**", () => {
+    const { S, s, keep } = rig([0, 0, 3, 3, 0, 0, 0, 4, 4, 0]);
+    const all = drawnCrossings(S, s, 2, keep);
+    expect(all).toHaveLength(2);
+    const sub = drawnCrossings(S, s, 2, keep, { from: 5, to: 9 });
+    expect(sub).toHaveLength(1);
+    // 窗口里那一个，与全幅里的第二个是同一个交点（同一日期）
+    expect(sub[0]!.enterAt!.jd).toBeCloseTo(all[1]!.enterAt!.jd, 6);
+  });
+
+  // ───────── 真盘上的性质 ─────────
+
   const S = buildSeries(BASE, { years: 60 });
-  const pick = (kind: string) => S.series.find((s) => s.kind === kind)!;
-
-  const zAt = (s: typeof S.series[number], i: number) => {
+  const keepYear = S.frames.map((f, i) => ({ f, i })).filter((x) => x.f.monthIndex === 0).map((x) => x.i);
+  const keepAll = S.frames.map((_, i) => i);
+  const zOf = (s: Series) => {
     const { center, sigma } = curveStats(S, s);
-    return (s.values[i]! - center) / sigma;
+    return S.frames.map((_, i) => (s.values[i]! - center) / sigma);
   };
-  const indexOf = (mk: { year: number; monthIndex: number }) =>
-    S.frames.findIndex((f) => f.year === mk.year && f.monthIndex === mk.monthIndex);
+  const everyCrossing = (keep: readonly number[], th = 2) =>
+    S.series.flatMap((s) => drawnCrossings(S, s, th, keep));
 
-  it("**每一段的端点确实是交点** —— 入点在门槛外，入点前一点在门槛内", () => {
-    const s = pick("tenGod");
-    const cs = thresholdCrossings(S, s, 2);
-    expect(cs.length).toBeGreaterThan(0);
-    for (const c of cs) {
-      const i = indexOf(c.enter);
-      expect(Math.abs(zAt(s, i)), `入点 ${c.enter.year}`).toBeGreaterThanOrEqual(2);
-      if (i > 0) {
-        // 入点的前一点必须在门槛以内，否则这一段没有在这里开始
-        expect(Math.abs(zAt(s, i - 1)), `入点前一点 ${c.enter.year}`).toBeLessThan(2);
+  it("**交点确实在曲线上，且恰在门槛上** —— 把日期换回曲线参数，z 应 ≈ ±θ", () => {
+    let checked = 0;
+    for (const s of S.series) {
+      const zsFull = zOf(s);
+      const zs = keepYear.map((i) => zsFull[i]!);
+      for (const c of drawnCrossings(S, s, 2, keepYear)) {
+        for (const at of [c.enterAt, c.exitAt]) {
+          if (at === null) continue;
+          // 找到包含这个 jd 的那一段，还原曲线参数 t
+          let seg = -1;
+          for (let k = 0; k < keepYear.length - 1; k++) {
+            if (at.jd >= jdOf(S, keepYear[k]!) - 1e-6 && at.jd <= jdOf(S, keepYear[k + 1]!) + 1e-6) { seg = k; break; }
+          }
+          expect(seg, "日期必须落在图的横轴范围内").toBeGreaterThanOrEqual(0);
+          const a = jdOf(S, keepYear[seg]!); const b = jdOf(S, keepYear[seg + 1]!);
+          const z = splineAt(zs, seg, (at.jd - a) / (b - a));
+          // 16 步线性折算，在陡坡上也该在 0.15σ 以内
+          expect(Math.abs(Math.abs(z) - 2), `${s.id} ${at.year}-${at.month}-${at.day}`).toBeLessThan(0.15);
+          checked++;
+        }
       }
-      if (c.exit !== null) {
-        const j = indexOf(c.exit);
-        expect(Math.abs(zAt(s, j)), `出点 ${c.exit.year}`).toBeLessThan(2);
-        expect(Math.abs(zAt(s, j - 1)), `出点前一点`).toBeGreaterThanOrEqual(2);
+    }
+    expect(checked, "应当真的核了不少交点").toBeGreaterThan(30);
+  });
+
+  it("**按年与按月两种采样都给得出穿入与穿出的日期**", () => {
+    for (const keep of [keepYear, keepAll]) {
+      const cs = everyCrossing(keep);
+      expect(cs.length).toBeGreaterThan(10);
+      const both = cs.filter((c) => c.enterAt !== null && c.exitAt !== null);
+      expect(both.length, "应当有完整的「穿入—穿出」").toBeGreaterThan(5);
+      for (const c of both) expect(c.exitAt!.jd).toBeGreaterThan(c.enterAt!.jd);
+    }
+  });
+
+  it("日期是合法的公历日", () => {
+    for (const c of everyCrossing(keepYear)) {
+      for (const at of [c.enterAt, c.exitAt]) {
+        if (at === null) continue;
+        expect(at.month).toBeGreaterThanOrEqual(1);
+        expect(at.month).toBeLessThanOrEqual(12);
+        expect(at.day).toBeGreaterThanOrEqual(1);
+        expect(at.day).toBeLessThanOrEqual(31);
       }
     }
   });
 
-  it("峰值点确实是区间内 |z| 最大的那一点", () => {
-    for (const kind of ["tenGod", "element", "agitation"]) {
-      const s = pick(kind);
-      for (const c of thresholdCrossings(S, s, 2)) {
-        const a = indexOf(c.enter);
-        const b = c.exit === null ? S.frames.length - 1 : indexOf(c.exit) - 1;
-        let best = -Infinity;
-        for (let i = a; i <= b; i++) best = Math.max(best, Math.abs(zAt(s, i)));
-        expect(Math.abs(c.peakZ), `${kind} ${c.enter.year}`).toBeCloseTo(best, 9);
+  it("峰值点是段内越线的采样点里 |z| 最大的那一个，且是图上画出的点", () => {
+    const keepSet = new Set(keepYear);
+    for (const s of S.series) {
+      const z = zOf(s);
+      for (const c of drawnCrossings(S, s, 2, keepYear)) {
+        expect(keepSet.has(c.peakFrame), "峰值点必须是图上画出的采样点").toBe(true);
+        expect(c.peakZ).toBeCloseTo(z[c.peakFrame]!, 9);
+        expect(c.sign * c.peakZ).toBeGreaterThanOrEqual(2 - 1e-9);
       }
     }
   });
 
-  it("**门槛抬高，穿越只会更少** —— 它是「取多少条」的旋钮", () => {
-    const s = pick("tenGod");
+  it("**门槛抬高，越线的采样点只会更少** —— 它是「取多少条」的旋钮", () => {
+    // 段数在升门槛时可以变多（一段被切成两段），采样点数不会
     let prev = Infinity;
     for (const th of [1.5, 2, 2.5, 3]) {
-      const n = thresholdCrossings(S, s, th).length;
+      const n = everyCrossing(keepYear, th).reduce((a, c) => a + c.samples, 0);
       expect(n, `θ=${th}`).toBeLessThanOrEqual(prev);
       prev = n;
     }
   });
 
-  it("**时间报到哪一级由序列自己定** —— 权重类只许报到年", () => {
-    // 流月不进权重，故权重类序列的月序不携带信息
-    for (const kind of ["tenGod", "element", "palace", "dayMaster"]) {
-      for (const c of thresholdCrossings(S, pick(kind), 2)) {
-        expect(c.monthResolved, `${kind} 不该声称报得到月`).toBe(false);
-      }
-    }
-    // 扰动类流月真的进来了，故报得到月
-    const ag = thresholdCrossings(S, pick("agitation"), 2);
-    expect(ag.length).toBeGreaterThan(0);
-    for (const c of ag) expect(c.monthResolved).toBe(true);
-  });
-
-  it("**权重类的穿越段起于寅月** —— 跳变全在立春那一刻，这是同一件事的另一面", () => {
-    let total = 0; let atYin = 0;
-    for (const kind of ["tenGod", "element"]) {
-      for (const s of S.series.filter((x) => x.kind === kind)) {
-        for (const c of thresholdCrossings(S, s, 2)) {
-          total++;
-          if (c.enter.monthIndex === 0) atYin++;
-        }
-      }
-    }
-    expect(total, "样本量").toBeGreaterThan(5);
-    expect(atYin / total, `${atYin}/${total} 起于寅月`).toBeGreaterThan(0.8);
-  });
-
-  it("**跑到末尾仍未回来时 exit 为 null** —— 不拿末点冒充穿出点", () => {
-    // 构造一条恒在门槛外的序列：拿真序列但把门槛压到 0
-    const s = pick("tenGod");
-    const cs = thresholdCrossings(S, s, 0);
-    expect(cs.length).toBeGreaterThan(0);
-    const last = cs[cs.length - 1]!;
-    expect(last.exit).toBeNull();
-  });
-
-  it("σ 为 0 时返回空，而不是返回一堆 0/0", () => {
-    const flat = { ...pick("tenGod"), values: S.frames.map(() => 42) };
-    expect(thresholdCrossings(S, flat, 2)).toEqual([]);
-  });
-
-  it("**限定窗口只看那一段** —— 与界面上的缩放同一口径", () => {
-    const s = pick("tenGod");
-    const all = thresholdCrossings(S, s, 2);
-    expect(all.length).toBeGreaterThan(1);
-    const first = all[0]!;
-    const i = indexOf(first.enter);
-    const sub = thresholdCrossings(S, s, 2, { from: i, to: i + 11 });
-    expect(sub).toHaveLength(1);
-    expect(sub[0]!.enter).toEqual(first.enter);
-  });
-
-  it("**高于与低于都算穿越，不分吉凶**", () => {
-    let up = 0; let down = 0;
-    for (const s of S.series) {
-      for (const c of thresholdCrossings(S, s, 1.5)) {
-        if (c.sign > 0) up++; else down++;
-      }
-    }
-    expect(up, "应当两侧都有").toBeGreaterThan(0);
-    expect(down, "应当两侧都有").toBeGreaterThan(0);
-  });
-});
-
-// ═══════════════════════════════════════════════════════════
-
-describe("±θσ 交点报到日", () => {
-  const pick = (kind: string) => S.series.find((x) => x.kind === kind)!;
-  const indexOf = (mk: { year: number; monthIndex: number }) =>
-    S.frames.findIndex((f) => f.year === mk.year && f.monthIndex === mk.monthIndex);
-  const all = S.series.flatMap((s) => thresholdCrossings(S, s, 2));
-  const withEnter = all.filter((c) => c.enterAt !== null);
-
-  it("每个交点都给得出一个具体日期，且落在两个采样点之间", () => {
-    expect(withEnter.length).toBeGreaterThan(20);
-    for (const c of withEnter) {
-      const at = c.enterAt!;
-      expect(Number.isFinite(at.jd)).toBe(true);
-      expect(at.month).toBeGreaterThanOrEqual(1);
-      expect(at.month).toBeLessThanOrEqual(12);
-      expect(at.day).toBeGreaterThanOrEqual(1);
-      expect(at.day).toBeLessThanOrEqual(31);
-      // 时刻必须落在 [穿入点前一采样, 穿入点] 之内 —— 否则报的是别处的日子
-      const i = indexOf(c.enter);
-      expect(i).toBeGreaterThan(0);
-      const left = S.frames[i - 1]!.jd;
-      const right = S.frames[i]!.jd;
-      // 真节可能比等分网格早 3 日，故左边界放宽 4 日
-      expect(at.jd).toBeGreaterThanOrEqual(left - 4);
-      expect(at.jd).toBeLessThanOrEqual(right + 4);
-    }
-  });
-
-  it("**窗口第一点就在门槛外时给 null，而不是拿窗口起点冒充穿越时刻**", () => {
-    const s = pick("tenGod");
-    const c0 = thresholdCrossings(S, s, 2)[0]!;
-    const i = indexOf(c0.peak);
-    // 从峰那一点开始取窗口 —— 第一点必然已在门槛之外
-    const sub = thresholdCrossings(S, s, 2, { from: i, to: i + 5 });
-    expect(sub).toHaveLength(1);
-    expect(sub[0]!.enterAt, "穿越发生在窗口之前，定不出时刻").toBeNull();
-  });
-
-  it("**权重类的交点绝大多数是换柱阶跃，不是运内斜坡** —— 这是模型的直陈", () => {
-    const weight = all.filter((c) => !c.monthResolved && c.enterAt !== null);
-    const byBasis = new Map<string, number>();
-    for (const c of weight) {
-      byBasis.set(c.enterAt!.basis, (byBasis.get(c.enterAt!.basis) ?? 0) + 1);
-    }
-    const step = byBasis.get("pillarStep") ?? 0;
-    expect(step / weight.length,
-      "流月不进权重，立春换柱是唯一的跳变来源").toBeGreaterThan(0.6);
-    expect(byBasis.get("jieStep") ?? 0, "权重类不吃流月，不该走节分支").toBe(0);
-  });
-
-  it("**扰动类一律落在真节上，而真节与等分采样点差得到 3 日**", () => {
-    const ag = all.filter((c) => c.monthResolved && c.enterAt !== null);
-    expect(ag.length).toBeGreaterThan(5);
-    let maxGap = 0;
-    for (const c of ag) {
-      expect(c.enterAt!.basis).toBe("jieStep");
-      const i = indexOf(c.enter);
-      maxGap = Math.max(maxGap, Math.abs(c.enterAt!.jd - S.frames[i]!.jd));
-    }
-    // 若误用采样点的 jd 而非真节，这个差会恒为 0 —— 这条就是那个错法的反向对照
-    expect(maxGap, "真节与等分网格必须真的不同，否则说明没去解节").toBeGreaterThan(0.5);
-    expect(maxGap, "但也不该超过 3 日 —— 超过说明解到了隔壁的节").toBeLessThan(3.5);
-  });
-
-  it("**域序列定不出时刻，给的是区间中点与半区间** —— 阶梯上没有插值可言", () => {
-    const dom = all.filter((c) => c.seriesId.startsWith("domain.") && c.enterAt !== null);
-    if (dom.length === 0) return;      // 该盘可能没有域交点
-    for (const c of dom) {
-      expect(["interval", "pillarStep"]).toContain(c.enterAt!.basis);
-      if (c.enterAt!.basis === "interval") {
-        expect(c.enterAt!.uncertaintyDays).toBeGreaterThan(10);
+  it("**μ 与 σ 不随采样密度变** —— 抽稀只是少画了点，没有换一把尺子", () => {
+    // 同一个采样点（某年寅月）的 z，按年画与按月画取到的是同一个数
+    for (const s of S.series.slice(0, 12)) {
+      const byYear = new Map(drawnCrossings(S, s, 2, keepYear).map((c) => [c.peakFrame, c.peakZ]));
+      for (const c of drawnCrossings(S, s, 2, keepAll)) {
+        const y = byYear.get(c.peakFrame);
+        if (y !== undefined) expect(y).toBeCloseTo(c.peakZ, 9);
       }
     }
   });
 
-  it("**阶跃的误差半径比插值小几个量级** —— 两个「日」不是同一种东西", () => {
-    const steps = withEnter.filter((c) => c.enterAt!.basis === "pillarStep");
-    expect(steps.length).toBeGreaterThan(0);
-    for (const c of steps) {
-      expect(c.enterAt!.uncertaintyDays,
-        "换柱那一刻是算出来的，不是插出来的").toBeLessThan(0.02);
-    }
-    const intervals = withEnter.filter((c) => c.enterAt!.basis === "interval");
-    for (const c of intervals) {
-      expect(c.enterAt!.uncertaintyDays).toBeGreaterThan(10);
-    }
-  });
-
-  it("**穿出的时刻必在穿入之后** —— 两端各自定日，不保证顺序，所以必须断言", () => {
-    for (const c of all) {
-      if (c.enterAt === null || c.exitAt === null) continue;
-      expect(c.exitAt.jd).toBeGreaterThan(c.enterAt.jd);
-    }
-  });
-
-  it("**块内线性这件事是实测的** —— 二阶差分比阶梯类小三个量级", () => {
-    const worst = new Map<string, number>();
-    for (const s of S.series) {
-      const { center, sigma } = curveStats(S, s);
-      if (!(sigma > 0)) continue;
-      const z = (i: number) => (s.values[i]! - center) / sigma;
-      let w = 0;
-      for (let i = 1; i < S.frames.length - 1; i++) {
-        const a = S.frames[i - 1]!; const b = S.frames[i]!; const c = S.frames[i + 1]!;
-        if (b.year !== a.year || c.year !== b.year) continue;
-        if (b.luckIndex !== a.luckIndex || c.luckIndex !== b.luckIndex) continue;
-        w = Math.max(w, Math.abs(z(i + 1) - 2 * z(i) + z(i - 1)));
-      }
-      worst.set(s.withinBlock, Math.max(worst.get(s.withinBlock) ?? 0, w));
-    }
-    expect(worst.get("linear")!, "线性类块内二阶差分须近零").toBeLessThan(0.05);
-    expect(worst.get("step")!, "阶梯类必须显著不同 —— 否则这个标注是摆设")
-      .toBeGreaterThan(0.5);
+  it("**高于与低于都出得来，不分吉凶**", () => {
+    const cs = everyCrossing(keepYear, 1.5);
+    expect(cs.some((c) => c.sign > 0), "应有高于").toBe(true);
+    expect(cs.some((c) => c.sign < 0), "应有低于").toBe(true);
   });
 });

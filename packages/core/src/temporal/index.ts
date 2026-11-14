@@ -3,3 +3,4 @@ export * from "./evaluate.js";
 export * from "./views.js";
 export * from "./series.js";
 export * from "./nodes.js";
+export * from "./spline.js";

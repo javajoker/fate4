@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   buildSeries, curveStats, evaluateAt, buildChart, buildBaseChart,
-  chartOptionsOf, loadParams, precisionBandOf, thresholdCrossings,
+  chartOptionsOf, loadParams, precisionBandOf, drawnCrossings,
 } from "@fate/core";
 import { useChart } from "../../../lib/chartContext";
 import { LifeCurves, type CurveWindow } from "../../../components/charts";
@@ -142,42 +142,20 @@ export default function CurvesPage() {
       center: st.center, sigma: st.sigma,
     };
   });
-  /** 与 ±θσ 的交点。只算选中的序列，并跟随当前取景窗。 */
-  const crossings = shown.flatMap((sr) => thresholdCrossings(
-    S, sr, threshold,
-    win === null ? undefined : { from: keep[win.from]!, to: keep[win.to]! },
-  )).sort((a, b) => a.enter.year - b.enter.year
-    || a.enter.monthIndex - b.enter.monthIndex);
-
-  /** 时间文本。⚠️ 月序不携带信息时只写年 —— 见表下那段说明。 */
   /**
-   * 交点报到**日**。
+   * 与 ±θσ 的交点 —— **图上那条曲线**穿过虚线的位置，换算成大致日期。
    *
-   * 这一列与「穿入 / 穿出」那两列说的不是同一件事，所以分开放：
-   * 那两列是**采样点**（权重类只到年，见下方说明），这一列是交点本身那一刻。
-   * 四种来历的「日」是四种不同的东西，故一律把来历与误差半径一起给出 ——
-   * 一个不带来历的日期，读者没法知道它是算出来的还是插出来的。
+   * 在画图用的同一份采样（keep）、同一条平滑曲线上求，所以表上的日期
+   * 与肉眼在图上看到的位置一致。窗口下标与 keep 同一空间，直接传。
    */
-  const BASIS_TEXT: Record<string, string> = {
-    pillarStep: "换柱",
-    jieStep: "交节",
-    chord: "插值",
-    interval: "区间内",
-  };
-  const uncText = (d: number) =>
-    d < 1 / 1440 ? "秒级"
-      : d < 1 / 24 ? `±${Math.round(d * 1440)} 分`
-        : d < 1 ? `±${(d * 24).toFixed(1)} 时`
-          : `±${d.toFixed(1)} 日`;
-  const dayText = (at: { year: number; month: number; day: number } | null) =>
-    at === null ? null : `${at.year}-${String(at.month).padStart(2, "0")}-${String(at.day).padStart(2, "0")}`;
+  const crossings = shown.flatMap((sr) => drawnCrossings(
+    S, sr, threshold, keep, win === null ? undefined : { from: win.from, to: win.to },
+  )).sort((a, b) => (a.enterAt?.jd ?? -Infinity) - (b.enterAt?.jd ?? -Infinity));
 
-  const timeText = (mk: { year: number; monthIndex: number }, resolved: boolean) =>
-    resolved ? `${mk.year} 年 ${"寅卯辰巳午未申酉戌亥子丑"[mk.monthIndex]}月` : `${mk.year} 年`;
-
-  /** 表里的时刻 → 帧下标，供点行跳转。 */
-  const frameIndexOf = (mk: { year: number; monthIndex: number }) =>
-    S.frames.findIndex((f) => f.year === mk.year && f.monthIndex === mk.monthIndex);
+  /** 「约 2026-03-12 · Q1」。只给大致日期，不给时分，也不给误差半径。 */
+  const spotText = (at: { year: number; month: number; day: number }) =>
+    `${at.year}-${String(at.month).padStart(2, "0")}-${String(at.day).padStart(2, "0")}`
+    + `　Q${Math.ceil(at.month / 3)}`;
 
   // picked 是**帧下标**（S.frames 里的位置），而图上的横坐标是抽稀之后的下标 ——
   // 按年采样时两者差十二倍。两处都要经 keep 换算，否则标记线画错位置、
@@ -441,8 +419,8 @@ export default function CurvesPage() {
               <table>
                 <thead>
                   <tr>
-                    <th>序列</th><th>方向</th><th>穿入</th><th>穿出</th>
-                    <th>穿入那一日</th><th>来历</th>
+                    <th>序列</th><th>方向</th>
+                    <th>穿入（大致日期）</th><th>穿出（大致日期）</th>
                     <th style={{ textAlign: "right" }}>峰值 z</th><th>用意</th>
                   </tr>
                 </thead>
@@ -450,25 +428,18 @@ export default function CurvesPage() {
                   {crossings.map((c, k) => (
                     <tr key={`${c.seriesId}-${k}`}
                       style={{ cursor: "pointer" }}
-                      onClick={() => setPicked(frameIndexOf(c.peak))}>
+                      onClick={() => setPicked(c.peakFrame)}>
                       <td>{c.label}</td>
                       <td>{c.sign > 0 ? `高于 +${threshold}σ` : `低于 −${threshold}σ`}</td>
-                      <td className="mono">{timeText(c.enter, c.monthResolved)}</td>
-                      <td className="mono">
-                        {c.exit === null
-                          ? <span className="dim">到末尾仍未回</span>
-                          : !c.monthResolved && c.exit.year === c.enter.year
-                            ? `${c.exit.year} 年内`
-                            : timeText(c.exit, c.monthResolved)}
-                      </td>
                       <td className="mono">
                         {c.enterAt === null
-                          ? <span className="dim">在窗口之前</span>
-                          : dayText(c.enterAt)}
+                          ? <span className="dim">窗口之前就已越线</span>
+                          : <>约 {spotText(c.enterAt)}</>}
                       </td>
-                      <td className="dim" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
-                        {c.enterAt === null ? "—"
-                          : `${BASIS_TEXT[c.enterAt.basis] ?? c.enterAt.basis}　${uncText(c.enterAt.uncertaintyDays)}`}
+                      <td className="mono">
+                        {c.exitAt === null
+                          ? <span className="dim">到末尾仍未回</span>
+                          : <>约 {spotText(c.exitAt)}</>}
                       </td>
                       <td className="mono" style={{ textAlign: "right" }}>
                         {c.peakZ > 0 ? `+${c.peakZ.toFixed(2)}` : c.peakZ.toFixed(2)}
@@ -485,93 +456,34 @@ export default function CurvesPage() {
           )}
           {on("notes") && (<>
           <p className="sub" style={{ marginTop: 10 }}>
-            <strong>「穿入那一日」与左边那两列不是同一件事。</strong>
-            左边报的是<strong>采样点</strong>（权重类只到年，见下）；
-            这一列报的是<strong>交点本身那一刻</strong>。
-            要把它定到日，就得先回答「两个采样点之间曲线是什么」——
-            图上画的是直线，而那条直线是<strong>画出来的，不是算出来的</strong>。
-            真正的形状有四种，对应四种完全不同的「日」，所以每一行都把来历摆出来：
-          </p>
-          <div className="scroll">
-            <table>
-              <thead><tr><th>来历</th><th>这一刻由什么定</th><th>误差来自哪里</th></tr></thead>
-              <tbody>
-                <tr>
-                  <td className="mono">换柱</td>
-                  <td>立春，或大运换柱那一刻 —— 曲线在那里是<strong>真的阶跃</strong></td>
-                  <td>节气求解容差（60 秒）；大运边界按构造精确</td>
-                </tr>
-                <tr>
-                  <td className="mono">交节</td>
-                  <td>流月换支那一刻，即那个<strong>节</strong>（只有扰动类吃流月）</td>
-                  <td>同上，60 秒</td>
-                </tr>
-                <tr>
-                  <td className="mono">插值</td>
-                  <td>运内斜坡：两采样连线与门槛的交点</td>
-                  <td>曲线偏离那条弦的程度，逐行现算</td>
-                </tr>
-                <tr>
-                  <td className="mono">区间内</td>
-                  <td><strong>定不出来</strong>：区间里确有跳变，但没有可归因的边界</td>
-                  <td>半个采样间隔，约 15 日</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p className="sub">
-            <strong>「交节」为什么不直接取采样点那一天。</strong>
-            采样点是「立春 + m × 30.44 日」——<strong>回归年的等分，不是真节</strong>。
-            实测 1960–2060 共 252 个节，等分与真节相差
-            <strong>中位 0.96 日、最大 3.00 日</strong>（寒露），
-            而且是系统性的：立春处为零，春季偏正，寒露偏负近三日，再回零 ——
-            来历是地球轨道偏心，近日点附近太阳走得快，等时长的格子装不下等黄经的月。
-            报到月时这三天看不见；报到日时它就是全部误差。所以这一列去解真节。
+            <strong>日期是图上那条线穿过虚线的位置，换算出来的大致日子。</strong>
+            穿入与穿出各一个，都按这一段两端采样点的日期折算：
+            按年采样时两端是相邻两个立春（寅月起点，约 2 月 4 日），
+            按月采样时是相邻两个月的起点。只到「哪一周」的量级，不求真节。
+            <span className="mono">Q1</span>–<span className="mono">Q4</span> 是公历季度，
+            读法上更稳 —— 日子可以差几天，季度一般不会错。
           </p>
           <p className="sub">
-            <strong>⚠️ 「穿入 2008 年」旁边却写着 2008-08-07，这不是自相矛盾。</strong>
-            左边那一列只报到年，理由是<strong>采样网格的月不携带信息</strong> ——
-            权重类在一个立春年内只有大运斜坡在动，拿网格的月当证据是伪精度。
-            但这一行的交点落在<strong>大运换柱</strong>那一刻，
-            而那一刻是算出来的、精确到秒的，不是从网格上读的。
-            所以它比年更精确，而且不违反那条规矩：
-            那条规矩从来不是「真相只到年」，而是<strong>「网格的月不算证据」</strong>。
-            凡是来历写着「换柱」或「交节」的行，日期都不出自网格。
+            <strong>⚠️ 这是「图上」的交点，不是「模型里某一天发生了什么」。</strong>
+            权重类序列在立春那一刻<strong>真的阶跃</strong>，年内几乎不动；
+            但按年采样时，图上画的是相邻两个立春之间一条平滑的坡。
+            于是一次阶跃在图上会被画成「上一个立春与下一个立春之间某处穿过」——
+            表上给的是前者，模型里它发生在后一个立春。
+            两个日期都对，回答的是两个问题。
+            想看阶跃本身，把采样切到<strong>按月</strong>，它就原样画出来了。
           </p>
           <p className="sub">
-            <strong>「插值」那几行为什么敢给到分钟。</strong>
-            因为运内权重<strong>对时间是线性的</strong>——
-            大运天干占比线性推移，权重是它的线性组合，于是那条弦就是函数本身
-            （实测块内 z 的二阶差分 ≤ 6e-3，而域与扰动是 1.8–3.4，差三个量级）。
-            但曲线若近乎相切地擦过门槛，同样的偏差折成的日期误差会放大 ——
-            那时误差半径自己会涨上去，而<strong>那种情况下「哪一天」本就没有意义</strong>：
-            曲线在门槛上趴着，等于问一条水平线哪天穿过自己。
-          </p>
-          </>)}
-          <p className="sub" style={{ marginTop: 10 }}>
-            <strong>⚠️ 权重类序列只报到年，不报到月。</strong>
-            流月不进权重，真正的跳变全发生在立春换柱那一刻 ——
-            对它们写「某年某月穿越」是伪精度，说的其实是「那一个立春年」。
-            只有扰动类的流月真的进了序列，才报得到月。
-          </p>
-          {on("notes") && (<>
-          <p className="sub">
-            <strong>点一行会跳到该段 |z| 最大的那个采样点</strong>，「此刻的权重」随之打开。
-            注意那里会显示到月（如<span className="mono">2008 年 酉月</span>）——
-            那是<strong>被取出的那一个采样点</strong>，不是「峰在酉月」：
-            权重类在立春年内只有大运斜坡在动，年内取哪个月都代表同一个立春年。
-            要看月真的有意义的峰，看扰动类那一组。
-          </p>
-          <p className="sub">
-            所以权重类那几行会出现<span className="mono">穿出「某年内」</span> ——
-            那<strong>不是零长度的事件</strong>：曲线在那一年里穿了出去又落回来，
-            大运份额在年内是连续移动的，所以年内摆回门槛以内是常事。
-            压成同一个年份是分辨率的结果，不是时间的结果。
+            <strong>相邻的穿越并成一段。</strong>
+            一条在门槛附近摆动的曲线能穿出几十个交点，逐个都真，合起来什么也说不出；
+            并成一段之后，两个端点正是穿入与穿出。
+            另外，平滑曲线会在两个采样点之间轻微鼓出一点 ——
+            若一段「越线」的曲线里<strong>一个采样点都没越线</strong>，那是平滑画出来的，
+            数据里没有，表上不列。
           </p>
           <p className="sub">
             <strong>穿越不等于吉凶。</strong>高于与低于都算穿越；
             「用意」那一栏说的是这条序列<strong>本身</strong>偏用神还是偏忌神，
-            而不是这一次穿越是好是坏。点任意一行可跳到那个峰值点看当时的神煞。
+            而不是这一次穿越是好是坏。点任意一行可跳到峰值那个采样点，看当时的神煞。
           </p>
           <p className="sub">
             这与「统计节点」页不是一回事：那边取 max(|z|, |ż|)，

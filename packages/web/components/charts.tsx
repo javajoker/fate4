@@ -9,7 +9,7 @@
  */
 
 import { useState } from "react";
-import { ELEMENTS, type Element } from "@fate/core";
+import { ELEMENTS, catmullRomControls, type Element } from "@fate/core";
 import { seriesColor, ELEMENT_COLOR, FLOW_COLOR, PARTY_COLOR, sequential } from "../lib/palette";
 
 // ─────────────────────────────────────────────────────────
@@ -445,10 +445,10 @@ function smoothPath(pts: readonly (readonly [number, number])[]): string {
     const p1 = pts[i]!;
     const p2 = pts[i + 1]!;
     const p3 = pts[i + 2 < pts.length ? i + 2 : pts.length - 1]!;
-    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
-    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
-    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
-    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    // 控制点公式取自内核的 spline.ts —— 曲线页的交点表在同一条曲线上求交，
+    // 图与表共用这一份，才不会出现图上穿过去了、表上说没穿的局面。
+    const [c1x, c2x] = catmullRomControls(p0[0], p1[0], p2[0], p3[0]);
+    const [c1y, c2y] = catmullRomControls(p0[1], p1[1], p2[1], p3[1]);
     out.push(`C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} `
       + `${p2[0].toFixed(1)},${p2[1].toFixed(1)}`);
   }
