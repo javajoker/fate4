@@ -288,3 +288,29 @@ td.split, th.split { border-left: 1px solid var(--line-strong); }
 .zoommini { flex: 1; height: 10px; min-width: 80px; }
 .zoombar button { padding: 3px 10px; font-size: 12px; }
 .zoombar button:disabled { opacity: 0.45; cursor: default; }
+
+/* ── 曲线页：图与表并排 ──
+ *
+ * 并排的用处是把「图」与「正在读的那张表」摆在同一屏，不必来回滚。
+ * 两件事值得记在这儿：
+ *
+ * 1. 左列 sticky，而不是整页固定。页面还得能正常滚动 ——
+ *    固定布局在窄屏与打印时都会出问题。
+ * 2. `minmax(0, 1fr)` 而不是 `1fr`。grid 轨道的默认最小尺寸是 auto，
+ *    里面一张宽表会把轨道顶开，整页横向滚动，而 .scroll 就白写了。
+ * 3. 900px 以下退回单列。并排在窄屏上等于两列都没地方。
+ */
+.split { display: grid; gap: 16px; align-items: start; }
+@media (min-width: 900px) {
+  .split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .split > .split-chart { position: sticky; top: 12px; }
+}
+.panelbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  margin: 14px 0 10px; padding: 8px 10px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--surface); }
+.panelbar .label { font-size: 12px; color: var(--ink-3); margin-right: 2px; }
+.panelbar button { font-size: 12px; padding: 3px 9px; }
+
+/* 交点表：并排时只有半幅宽，日期若折行会断成「1999-02-」「04」两截 ——
+ * 一个被折断的日期比没有日期更坏。整表 nowrap，由 .scroll 横滚。 */
+.crosstable table { white-space: nowrap; }

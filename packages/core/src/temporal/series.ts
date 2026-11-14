@@ -117,6 +117,31 @@ export interface Series {
    * 应期域取 `scope: "year"`，按构造也是年尺度，故同样为 false。
    */
   readonly monthResolving: boolean;
+  /**
+   * 在**一块之内**（同一立春年 ∩ 同一大运柱）这条曲线是什么形状。
+   *
+   * 这件事只有在要把交点报到**日**的时候才要紧，而那时它决定一切：
+   *
+   * | | 块内形状 | 两采样之间的交点 |
+   * | -- | -- | -- |
+   * | `"linear"` | 直线 | **弦插值即函数本身** —— 大运天干占比线性推移，权重是它的线性组合 |
+   * | `"step"` | 阶梯 | 弦插值**无意义** —— 跳变发生在区间内某一刻，连线是画出来的，不是算出来的 |
+   *
+   * 实测块内 `|z` 二阶差分`|` 的最大值（1990 年例盘，60 年）：
+   *
+   * ```
+   * tenGod 4.3e-3   element 3.6e-3   palace 5.9e-3
+   * dayMaster 2.0e-3  innerOuter 4.7e-3  metric 2.8e-3     ← 线性
+   * domain 3.4e+0     agitation 1.8e+0                     ← 阶梯，差三个数量级
+   * ```
+   *
+   * 域是阶梯，因为应期规则是**离散触发**的；扰动是阶梯，因为流月符号在节上换。
+   * 两者都不是噪声，是各自机制的直陈。
+   *
+   * 把这件事放在 `Series` 上而不是放在 `nodes.ts` 里按 `kind` 硬判，
+   * 是因为形状是**构造这条序列的人**才知道的事；判在下游，下游就得跟着上游改。
+   */
+  readonly withinBlock: "linear" | "step";
 }
 
 export interface SeriesSet {
@@ -264,10 +289,12 @@ export function buildSeries(base: BaseChart, opts: SeriesOptions = {}): SeriesSe
   const push = (
     id: string, kind: SeriesKind, label: string, baseValue: number,
     polarity: Series["polarity"], pick: (ev: EvaluatedChart, i: number) => number,
+    withinBlock: Series["withinBlock"] = "linear",
   ) => {
     const values = evs.map(pick);
     out.push({ id, kind, label, baseValue, values,
-      deltas: values.map((v) => v - baseValue), polarity, monthResolving: false });
+      deltas: values.map((v) => v - baseValue), polarity, monthResolving: false,
+      withinBlock });
   };
 
   // ── 十神 10 条 ──
@@ -320,10 +347,11 @@ export function buildSeries(base: BaseChart, opts: SeriesOptions = {}): SeriesSe
   // 一律报「只报变动」，趋避一节因而几乎空着 —— 而它恰恰是最该有内容的地方。
   const domains = Object.keys(DOMAIN_LABEL) as Domain[];
   for (const d of domains) {
+    // 域是块内**阶梯** —— 应期规则离散触发，不是连续推移。见 Series.withinBlock
     push(`domain.${d}.tension`, "domain", `${DOMAIN_LABEL[d]}·张力`, 0, "neutral",
-      (_ev, i) => domainsAt[i]!.find((x) => x.domain === d)?.tension ?? 0);
+      (_ev, i) => domainsAt[i]!.find((x) => x.domain === d)?.tension ?? 0, "step");
     push(`domain.${d}.net`, "domain", `${DOMAIN_LABEL[d]}·净值`, 0, "favorable",
-      (_ev, i) => domainsAt[i]!.find((x) => x.domain === d)?.net ?? 0);
+      (_ev, i) => domainsAt[i]!.find((x) => x.domain === d)?.net ?? 0, "step");
   }
   // ── 综合 3 条 ──
   push("metric.vitality", "metric", "单轮留存",
@@ -349,6 +377,8 @@ export function buildSeries(base: BaseChart, opts: SeriesOptions = {}): SeriesSe
       baseValue: 0, values, deltas: values, polarity: "neutral",
       // 唯一吃流月的一类：`agitationAt` 收 `f.fleetingMonth`
       monthResolving: true,
+      // 流月符号在**节**上换，块内是阶梯 —— 交点落在那个节，不落在连线上
+      withinBlock: "step",
     });
   }
 

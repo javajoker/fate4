@@ -83,6 +83,9 @@ import { DOMAIN_LABEL } from "../yingqi/types.js";
 import { ELEMENTS, type Element } from "../types/ganzhi.js";
 import { elementOf } from "../ganzhi/algebra.js";
 import type { Series, SeriesFrame, SeriesSet } from "./series.js";
+import { jieMonthBounds, lichunJdOf } from "./views.js";
+import { fromJulianDay } from "../astro/julian.js";
+import { precisionBandOf } from "../astro/horizon.js";
 
 // ─────────────────────────────────────────────────────────
 
@@ -563,4 +566,256 @@ export function allNodes(
     medium: findNodes(S, "medium", override),
     large: findNodes(S, "large", override),
   });
+}
+
+// ═════════════════════════════════════════════════════════
+// 门槛穿越 —— 曲线与 ±θσ 两条横线的交点
+// ═════════════════════════════════════════════════════════
+
+/**
+ * 一段**越过门槛的时期**，以及它的两个端点（即曲线与 ±θσ 的交点）。
+ *
+ * ## 为什么报区间而不报一串点
+ *
+ * 一条在门槛附近摆动的曲线，几十个采样点里能穿出几十次交点 ——
+ * 那串点逐个都是真的，合起来却什么也说不出。
+ * 把相邻的穿越并成**一段**，两个端点正是穿入与穿出的那两个交点，
+ * 中间再给一个峰值点。这样既没丢掉交点，也没把抖动当成几十件事。
+ *
+ * ## ⚠️ 时间报到哪一级，由序列自己决定
+ *
+ * 权重类序列**流月不进权重**，真正的跳变全在立春换柱那一刻。
+ * 对它们写「2046 年午月穿越」是伪精度 —— 说的其实是「2046 这个立春年」。
+ * 故 `monthResolved` 取自 `Series.monthResolving`，为 false 时上层**只许报到年**。
+ *
+ * 这与 `NodeInterval` 同一条规矩，不是另立一套。
+ *
+ * ## 与 `findNodes` 的分别
+ *
+ * `findNodes` 取 `max(|z|, |ż|)` —— 它把「一直很极端」与「正在急速穿过」
+ * 都算作节点，那是两层结论要的东西。
+ *
+ * 这里只看 **|z| 本身**：曲线与那两条横线的交点，一条几何事实。
+ * 两者会给出不同的区间，而那不是矛盾 —— 它们问的不是同一个问题。
+ */
+/**
+ * 交点落在**哪一刻**，以及那个「哪一刻」是怎么来的。
+ *
+ * 要把交点报到日，就必须先回答一个问题：**两个采样点之间，曲线是什么？**
+ * 图上画的是直线，但那条直线是画出来的，不是算出来的。真正的形状有三种，
+ * 对应的「日」是三种完全不同的东西 —— 混成一个数字报出去，才是伪精度。
+ *
+ * | basis | 这一刻由什么定 | 误差来源 |
+ * | -- | -- | -- |
+ * | `"pillarStep"` | 换柱那一刻：立春，或大运边界 | 立春本身的求解容差（60 秒，且 2050 年后不承诺）；大运边界按构造精确 |
+ * | `"jieStep"` | 流月符号换支那一刻：那个**节** | 同上，节气求解容差 |
+ * | `"chord"` | 相邻两采样连线与门槛的交点 | 曲线偏离那条弦的程度 —— 逐个交点现算，不给全局常数 |
+ * | `"interval"` | **定不出来**：区间内有跳变，但无可归因的边界 | 半个采样间隔（约 15 日） |
+ *
+ * ## 为什么 `jieStep` 不直接取采样点的 jd
+ *
+ * 采样点是 `立春 + m × 30.44 日`——**回归年的等分**，不是真节。
+ * 实测（1960–2060，每 5 年一取，252 个节）：
+ *
+ * ```
+ * |等分 − 真节|   中位 0.96 日   90% 2.76 日   最大 3.00 日（寒露）
+ * ```
+ *
+ * 偏差是**系统性**的，不是随机的：立春处为 0（锚点），春季渐正至 +0.93，
+ * 盛夏转负，寒露达 −2.96，再回零。来历是地球轨道偏心 ——
+ * 近日点附近太阳视黄经走得快，等时长的格子装不下等黄经的月。
+ *
+ * 报到月时这 3 天看不见；报到日时它就是全部误差。所以 `jieStep` 去解真节
+ * （`jieMonthBounds`，六爻应期在用的同一份），不用采样网格。
+ *
+ * ## 为什么 `chord` 的误差要逐个算
+ *
+ * 块内线性的序列上，弦插值**就是函数本身**（实测二阶差分 ≤ 6e-3，见
+ * `Series.withinBlock`）。但曲线若近乎相切地擦过门槛，`|Δz|` 趋零，
+ * 同样的 z 误差折成的日期误差就会放大。实测这个上界的分布：
+ *
+ * ```
+ * 中位 0.004 日   90% 0.036 日   99% 1.12 日   最大 105 日
+ * ```
+ *
+ * 那个 105 日不是算错，是**那一处的「日」本就没有意义** ——
+ * 曲线在门槛上趴着，问它哪一天穿过去等于问一条水平线哪一天穿过自己。
+ * 所以每个交点带自己的 `uncertaintyDays`，由局部几何现算。
+ */
+export type CrossingBasis = "pillarStep" | "jieStep" | "chord" | "interval";
+
+export interface CrossingInstant {
+  /** 儒略日（UT）。 */
+  readonly jd: number;
+  /** 公历年月日 —— 上层不必再解一次。 */
+  readonly year: number;
+  readonly month: number;
+  readonly day: number;
+  readonly basis: CrossingBasis;
+  /**
+   * 这个日期的误差半径（日）。**来历不同，这个数的来源完全不同** —— 见 CrossingBasis。
+   * 它不是置信区间，没有分布假设；它是「这个日子最多能差多少」的量级。
+   */
+  readonly uncertaintyDays: number;
+}
+
+export interface ThresholdCrossing {
+  readonly seriesId: string;
+  readonly label: string;
+  /** +1 高于 +θσ；−1 低于 −θσ。**两者都是穿越**，不分吉凶。 */
+  readonly sign: 1 | -1;
+  /** 穿入的那一个采样点 —— 第一个落在门槛之外的点。 */
+  readonly enter: TimeMark;
+  /** 穿出的那一个采样点。`null` 表示到绘制末尾仍未回到门槛以内。 */
+  readonly exit: TimeMark | null;
+  /** 区间内 |z| 最大的那一点。 */
+  readonly peak: TimeMark;
+  readonly peakZ: number;
+  /** 采样点数。月采样时即月数。 */
+  readonly samples: number;
+  /**
+   * 时间是否报得到月。false 时上层**只许报到年** —— 见上文。
+   */
+  readonly monthResolved: boolean;
+  /** 该序列是用神向、忌神向，还是不判方向。穿越本身不含吉凶。 */
+  readonly polarity: Series["polarity"];
+  /**
+   * 穿入那一刻，报到日。`null` 表示穿越发生在窗口**之前** ——
+   * 第一个采样点就已在门槛之外，没有前一点可据，定不出时刻。
+   */
+  readonly enterAt: CrossingInstant | null;
+  /** 穿出那一刻，报到日。`null` 表示到末尾仍未回到门槛以内。 */
+  readonly exitAt: CrossingInstant | null;
+}
+
+/**
+ * 一条序列与 ±θσ 的全部交点，按区间归并。
+ *
+ * @param theta 门槛，单位标准差。与界面上那两条虚线同一个值。
+ * @param from  只看这一段（显示窗口）。不给即全段。
+ */
+export function thresholdCrossings(
+  S: SeriesSet, s: Series, theta: number,
+  range?: { readonly from: number; readonly to: number },
+): readonly ThresholdCrossing[] {
+  const { center, sigma } = curveStats(S, s);
+  // σ 为 0 即这条序列在基准窗里纹丝不动 —— 此时任何 z 都没有意义，
+  // 返回空而不是返回一堆 0/0。
+  if (!(sigma > 0)) return [];
+  const lo = Math.max(0, range?.from ?? 0);
+  const hi = Math.min(S.frames.length - 1, range?.to ?? S.frames.length - 1);
+
+  const markOf = (i: number): TimeMark => ({
+    year: S.frames[i]!.year, monthIndex: S.frames[i]!.monthIndex,
+  });
+  const zAt = (i: number) => (s.values[i]! - center) / sigma;
+
+  /**
+   * 把一个「从 i−1 到 i 之间穿过了 targetZ」的事实定到某一日。
+   * 四条分支的理由见 CrossingBasis 的注释 —— 这里只写判别顺序为何如此。
+   */
+  const instantAt = (i: number, targetZ: number): CrossingInstant | null => {
+    if (i <= lo) return null;          // 窗口第一点就在外面：穿越在窗口之前
+    const f = S.frames[i]!;
+    const p = S.frames[i - 1]!;
+    const mk = (jd: number, basis: CrossingBasis, unc: number): CrossingInstant => {
+      const c = fromJulianDay(jd);
+      return { jd, year: c.year, month: c.month, day: c.day, basis, uncertaintyDays: unc };
+    };
+    // 节气求解的容差是 60 秒。越过 `horizon.ts` 那条地平线之后引擎不再承诺这一条，
+    // 故按档放宽 —— 门槛取自 horizon.ts，不在这里另写一个年份。
+    // 这不是「那以后算不准」：柱序走六十甲子定序推进，不受影响；
+    // 受影响的只有「哪一刻换柱」，而这里报的恰好就是那一刻，所以必须跟着放宽。
+    const band = precisionBandOf(f.year);
+    const termUnc = band === "guaranteed" ? 60 / 86400
+      : band === "beyondTolerance" ? 0.01 : 0.1;
+
+    // ① 先把这个区间内**能解释这次跳变**的边界全收起来，再看有几个。
+    //    不要一判到就返回 —— 两个独立边界落在同一区间时，归因并不唯一，
+    //    而先判到的那一个会把这件事盖掉。
+    const cands: { jd: number; basis: CrossingBasis; unc: number }[] = [];
+    if (s.monthResolving) {
+      // 吃流月的序列：符号在**节**上换，所以跳变就在那个节。
+      // 用真节，不用采样网格 —— 两者最多差 3.00 日。
+      // 寅月那一格的节正是立春，于是「换年柱」与「换流月」是同一刻，不另记。
+      cands.push({
+        jd: jieMonthBounds(f.year, f.monthIndex).openJd, basis: "jieStep", unc: termUnc,
+      });
+    } else if (f.monthIndex === 0 && f.year !== p.year) {
+      // 权重类不吃流月，年内唯一的阶跃是立春换年柱
+      cands.push({ jd: lichunJdOf(f.year), basis: "pillarStep", unc: termUnc });
+    }
+    if (f.luckIndex !== p.luckIndex) {
+      const lp = S.base.chart.luck.pillars.find((x) => x.index === f.luckIndex);
+      // 大运边界按构造精确（起运时刻 + 整数倍回归年），不带节气容差
+      if (lp !== undefined) cands.push({ jd: lp.startJd, basis: "pillarStep", unc: 1 / 86400 });
+    }
+    if (cands.length === 1) {
+      const c = cands[0]!;
+      return mk(c.jd, c.basis, c.unc);
+    }
+    if (cands.length > 1) {
+      // 一个区间里换了柱又换了流月 —— 两刻都足以解释，而序列只给了一个跳变。
+      // 报晚的那一刻，误差半径取两刻之间的跨度：说「是这两者之一」，
+      // 而不是挑一个装作确定。十年一遇，但遇上时不许含糊。
+      const jds = cands.map((c) => c.jd);
+      const late = Math.max(...jds);
+      const early = Math.min(...jds);
+      return mk(late, "interval", Math.max(late - early, ...cands.map((c) => c.unc)));
+    }
+    // ② 块内线性：弦插值即函数本身。误差由局部二阶差分现算。
+    if (s.withinBlock === "linear") {
+      const zp = zAt(i - 1);
+      const zc = zAt(i);
+      const dz = zc - zp;
+      if (Math.abs(dz) > 1e-12) {
+        const t = (targetZ - zp) / dz;
+        const jd = p.jd + Math.min(1, Math.max(0, t)) * (f.jd - p.jd);
+        // 弦与真曲线的最大偏离约 |z''|h²/8，折成横坐标 ≈ h·|Δ²z|/(8|Δz|)。
+        // 取 i 两侧可得的二阶差分；取不到就按线性当作无偏。
+        const z2 = (i + 1 <= hi) ? Math.abs(zAt(i + 1) - 2 * zc + zp) : 0;
+        const h = f.jd - p.jd;
+        return mk(jd, "chord", Math.min(h / 2, h * z2 / (8 * Math.abs(dz))));
+      }
+    }
+    // ③ 块内是阶梯而又无边界可归因（域序列：应期规则离散触发）。
+    //    跳变确实发生在这个区间内，但发生在哪一刻定不出来 —— 给中点与半区间，
+    //    而不是拿弦插值假装算得出来。
+    const h = f.jd - p.jd;
+    return mk(p.jd + h / 2, "interval", h / 2);
+  };
+
+  const out: ThresholdCrossing[] = [];
+  let run: { sign: 1 | -1; start: number; peak: number; peakZ: number } | null = null;
+
+  const flush = (endExclusive: number) => {
+    if (run === null) return;
+    out.push({
+      seriesId: s.id, label: s.label, sign: run.sign,
+      enter: markOf(run.start),
+      // 跑到窗口末尾还没回来 —— 给 null，不要拿末点冒充穿出点
+      exit: endExclusive > hi ? null : markOf(endExclusive),
+      peak: markOf(run.peak), peakZ: run.peakZ,
+      samples: Math.min(endExclusive, hi + 1) - run.start,
+      monthResolved: s.monthResolving,
+      polarity: s.polarity,
+      enterAt: instantAt(run.start, run.sign * theta),
+      exitAt: endExclusive > hi ? null : instantAt(endExclusive, run.sign * theta),
+    });
+    run = null;
+  };
+
+  for (let i = lo; i <= hi; i++) {
+    const z = (s.values[i]! - center) / sigma;
+    const side: 1 | -1 | 0 = z >= theta ? 1 : z <= -theta ? -1 : 0;
+    if (side === 0) { flush(i); continue; }
+    if (run === null || run.sign !== side) {
+      flush(i);
+      run = { sign: side, start: i, peak: i, peakZ: z };
+    } else if (Math.abs(z) > Math.abs(run.peakZ)) {
+      run.peak = i; run.peakZ = z;
+    }
+  }
+  flush(hi + 1);
+  return Object.freeze(out);
 }

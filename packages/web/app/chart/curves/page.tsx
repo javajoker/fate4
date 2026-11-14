@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   buildSeries, curveStats, evaluateAt, buildChart, buildBaseChart,
-  chartOptionsOf, loadParams, precisionBandOf,
+  chartOptionsOf, loadParams, precisionBandOf, thresholdCrossings,
 } from "@fate/core";
 import { useChart } from "../../../lib/chartContext";
 import { LifeCurves, type CurveWindow } from "../../../components/charts";
@@ -41,6 +41,12 @@ const GROUPS: readonly [string, string][] = [
   ["metric", "综合"], ["agitation", "扰动"],
 ];
 
+/** 可开关的面板。顺序即并排时右栏的堆叠顺序。 */
+const PANELS: readonly (readonly [string, string])[] = [
+  ["cross", "±σ 交点"], ["reason", "该时点的神煞与结构"],
+  ["weights", "该时点的权重"], ["stats", "全部序列统计"], ["notes", "说明文字"],
+];
+
 export default function CurvesPage() {
   const { base, record, params: ctxParams } = useChart();
   const [span, setSpan] = useState(60);
@@ -52,6 +58,22 @@ export default function CurvesPage() {
   const [mode, setMode] = useState<"sigma" | "weight">("sigma");
   const [threshold, setThreshold] = useState(2);
   const [density, setDensity] = useState<"year" | "month">("year");
+  /**
+   * 哪几块面板出，以及图与表是上下还是并排。
+   *
+   * 这一页本来是一条长栏：图、交点表、神煞、权重、全序列统计，一路往下。
+   * 每一块单独看都有用，合起来的后果是**图与你正在读的那张表永远不在同一屏** ——
+   * 点一行跳到某个时点，再滚回去看图，图上那条标记线早已滚出视野。
+   *
+   * 所以给两个开关：出哪几块，以及要不要并排。默认全出、单列 —— 与原先一致，
+   * 不替读者决定他该看什么。
+   */
+  const [panels, setPanels] = useState<readonly string[]>(
+    () => PANELS.map(([k]) => k));
+  const [layout, setLayout] = useState<"stack" | "split">("stack");
+  const on = (k: string) => panels.includes(k);
+  const flip = (k: string) => setPanels((cur) =>
+    cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]);
 
   const spanDef = SPANS.find((x) => x.years === span) ?? SPANS[0]!;
 
@@ -120,6 +142,43 @@ export default function CurvesPage() {
       center: st.center, sigma: st.sigma,
     };
   });
+  /** 与 ±θσ 的交点。只算选中的序列，并跟随当前取景窗。 */
+  const crossings = shown.flatMap((sr) => thresholdCrossings(
+    S, sr, threshold,
+    win === null ? undefined : { from: keep[win.from]!, to: keep[win.to]! },
+  )).sort((a, b) => a.enter.year - b.enter.year
+    || a.enter.monthIndex - b.enter.monthIndex);
+
+  /** 时间文本。⚠️ 月序不携带信息时只写年 —— 见表下那段说明。 */
+  /**
+   * 交点报到**日**。
+   *
+   * 这一列与「穿入 / 穿出」那两列说的不是同一件事，所以分开放：
+   * 那两列是**采样点**（权重类只到年，见下方说明），这一列是交点本身那一刻。
+   * 四种来历的「日」是四种不同的东西，故一律把来历与误差半径一起给出 ——
+   * 一个不带来历的日期，读者没法知道它是算出来的还是插出来的。
+   */
+  const BASIS_TEXT: Record<string, string> = {
+    pillarStep: "换柱",
+    jieStep: "交节",
+    chord: "插值",
+    interval: "区间内",
+  };
+  const uncText = (d: number) =>
+    d < 1 / 1440 ? "秒级"
+      : d < 1 / 24 ? `±${Math.round(d * 1440)} 分`
+        : d < 1 ? `±${(d * 24).toFixed(1)} 时`
+          : `±${d.toFixed(1)} 日`;
+  const dayText = (at: { year: number; month: number; day: number } | null) =>
+    at === null ? null : `${at.year}-${String(at.month).padStart(2, "0")}-${String(at.day).padStart(2, "0")}`;
+
+  const timeText = (mk: { year: number; monthIndex: number }, resolved: boolean) =>
+    resolved ? `${mk.year} 年 ${"寅卯辰巳午未申酉戌亥子丑"[mk.monthIndex]}月` : `${mk.year} 年`;
+
+  /** 表里的时刻 → 帧下标，供点行跳转。 */
+  const frameIndexOf = (mk: { year: number; monthIndex: number }) =>
+    S.frames.findIndex((f) => f.year === mk.year && f.monthIndex === mk.monthIndex);
+
   // picked 是**帧下标**（S.frames 里的位置），而图上的横坐标是抽稀之后的下标 ——
   // 按年采样时两者差十二倍。两处都要经 keep 换算，否则标记线画错位置、
   // 取点面板干脆出不来。
@@ -139,6 +198,13 @@ export default function CurvesPage() {
   return (
     <>
       <h1>生命曲线</h1>
+      {!on("notes") ? (
+        <p className="sub">
+          以基础盘为固定基准，按月采样 {S.frames.length} 点（{S.statsFrom}–{S.statsTo}）。
+          本命日主 <b>{dm.stem}</b>（{dm.polarity}{dm.element}）。
+          <span className="dim">　说明文字已收起。</span>
+        </p>
+      ) : (<>
       <p className="sub">
         以基础盘为固定基准，<b>按月</b>采样 {S.frames.length} 点（{S.statsFrom}–{S.statsTo}）。
         曲线本来就是连续的：流年是阶跃、大运是斜坡（天干占比自 0.70 线性降到 0.30），
@@ -156,6 +222,7 @@ export default function CurvesPage() {
         <b>流月不参与权重。</b>月度上之所以有变化，是大运份额在推移，不是流月加了分。
         流月只进符号层：它在扰动序列里，不在权重序列里。
       </p>
+      </>)}
 
       {span > 60 && (
         <div className="card" style={{ marginBottom: 12 }}>
@@ -256,6 +323,7 @@ export default function CurvesPage() {
             <button className="ghost" onClick={() => setSel([])}>清空</button>
           </span>
         </div>
+        {on("notes") && (
         <p className="sub" style={{ fontSize: 12, marginTop: 8 }}>
           σ 对齐时全部曲线共用同一条 ±θσ 界线，穿越点一眼可读；
           权重对齐时不画界线 —— 各条的 σ 不同，画出来是若干条不同高度的横线，
@@ -266,6 +334,7 @@ export default function CurvesPage() {
           月度视图里那些锯齿是<b>立春换柱的真实阶跃</b> —— 权重类序列在一个立春年内
           近乎恒定，跳变都发生在换柱那一刻。
         </p>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
@@ -283,6 +352,29 @@ export default function CurvesPage() {
         })}
       </div>
 
+      <div className="panelbar">
+        <span className="label">面板</span>
+        {PANELS.map(([k, name]) => (
+          <button key={k} className={on(k) ? undefined : "ghost"}
+            aria-pressed={on(k)} onClick={() => flip(k)}>{name}</button>
+        ))}
+        <span style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+          <button className={layout === "split" ? undefined : "ghost"}
+            aria-pressed={layout === "split"}
+            onClick={() => setLayout(layout === "split" ? "stack" : "split")}>
+            图表并排
+          </button>
+          <button className="ghost" onClick={() => {
+            setPanels(["cross"]); setLayout("split");
+          }}>只看图与交点</button>
+          <button className="ghost" onClick={() => {
+            setPanels(PANELS.map(([k]) => k)); setLayout("stack");
+          }}>还原</button>
+        </span>
+      </div>
+
+      <div className={layout === "split" ? "split" : undefined}>
+      <div className={layout === "split" ? "split-chart" : undefined}>
       {specs.length === 0 ? <p className="sub">未选中任何曲线。</p> : (
         <>
           <LifeCurves
@@ -311,16 +403,187 @@ export default function CurvesPage() {
             <button className="ghost" disabled={win === null}
               onClick={() => setWin(null)}>全幅</button>
           </div>
+          {on("notes") && (
           <p className="sub" style={{ marginTop: 6 }}>
             <strong>放大只改横轴。</strong>纵轴按全幅算，不随窗口变 ——
             否则同一个 z 值会因为你缩放到哪里而落在不同高度，
             而「纵向位置 = 离这条序列自己的常态有多远」这个意思就没了。
             缩进一段平静的时期线会接近平直，那是实情。
           </p>
+          )}
         </>
       )}
+      </div>
 
-      {atFrame !== null && (
+      <div>
+      {specs.length > 0 && on("cross") && (
+        <div className="card" style={{ marginTop: 14 }}>
+          <h3 style={{ fontSize: 15, marginBottom: 4 }}>
+            与 ±{threshold}σ 的交点
+            {win !== null && (
+              <span className="dim" style={{ fontSize: 12, fontWeight: 400 }}>
+                　（只看当前窗口 {years[win.from]}–{years[win.to]}）
+              </span>
+            )}
+          </h3>
+          <p className="sub">
+            曲线穿出那两条虚线的时刻。<strong>相邻的穿越并成一段</strong> ——
+            一条在门槛附近摆动的曲线能穿出几十个交点，逐个都真，
+            合起来却什么也说不出；并成一段之后，两个端点正是穿入与穿出的那两个交点。
+          </p>
+          {crossings.length === 0 ? (
+            <p className="sub">
+              选中的曲线在这一段里<strong>没有越过 ±{threshold}σ</strong>。
+              那不是「没事」—— 是这几条在这段时间里都待在自己的常态范围内。
+            </p>
+          ) : (
+            <div className="scroll crosstable">
+              <table>
+                <thead>
+                  <tr>
+                    <th>序列</th><th>方向</th><th>穿入</th><th>穿出</th>
+                    <th>穿入那一日</th><th>来历</th>
+                    <th style={{ textAlign: "right" }}>峰值 z</th><th>用意</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {crossings.map((c, k) => (
+                    <tr key={`${c.seriesId}-${k}`}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => setPicked(frameIndexOf(c.peak))}>
+                      <td>{c.label}</td>
+                      <td>{c.sign > 0 ? `高于 +${threshold}σ` : `低于 −${threshold}σ`}</td>
+                      <td className="mono">{timeText(c.enter, c.monthResolved)}</td>
+                      <td className="mono">
+                        {c.exit === null
+                          ? <span className="dim">到末尾仍未回</span>
+                          : !c.monthResolved && c.exit.year === c.enter.year
+                            ? `${c.exit.year} 年内`
+                            : timeText(c.exit, c.monthResolved)}
+                      </td>
+                      <td className="mono">
+                        {c.enterAt === null
+                          ? <span className="dim">在窗口之前</span>
+                          : dayText(c.enterAt)}
+                      </td>
+                      <td className="dim" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
+                        {c.enterAt === null ? "—"
+                          : `${BASIS_TEXT[c.enterAt.basis] ?? c.enterAt.basis}　${uncText(c.enterAt.uncertaintyDays)}`}
+                      </td>
+                      <td className="mono" style={{ textAlign: "right" }}>
+                        {c.peakZ > 0 ? `+${c.peakZ.toFixed(2)}` : c.peakZ.toFixed(2)}
+                      </td>
+                      <td className="dim">
+                        {c.polarity === "favorable" ? "用神向"
+                          : c.polarity === "adverse" ? "忌神向" : "不判方向"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {on("notes") && (<>
+          <p className="sub" style={{ marginTop: 10 }}>
+            <strong>「穿入那一日」与左边那两列不是同一件事。</strong>
+            左边报的是<strong>采样点</strong>（权重类只到年，见下）；
+            这一列报的是<strong>交点本身那一刻</strong>。
+            要把它定到日，就得先回答「两个采样点之间曲线是什么」——
+            图上画的是直线，而那条直线是<strong>画出来的，不是算出来的</strong>。
+            真正的形状有四种，对应四种完全不同的「日」，所以每一行都把来历摆出来：
+          </p>
+          <div className="scroll">
+            <table>
+              <thead><tr><th>来历</th><th>这一刻由什么定</th><th>误差来自哪里</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td className="mono">换柱</td>
+                  <td>立春，或大运换柱那一刻 —— 曲线在那里是<strong>真的阶跃</strong></td>
+                  <td>节气求解容差（60 秒）；大运边界按构造精确</td>
+                </tr>
+                <tr>
+                  <td className="mono">交节</td>
+                  <td>流月换支那一刻，即那个<strong>节</strong>（只有扰动类吃流月）</td>
+                  <td>同上，60 秒</td>
+                </tr>
+                <tr>
+                  <td className="mono">插值</td>
+                  <td>运内斜坡：两采样连线与门槛的交点</td>
+                  <td>曲线偏离那条弦的程度，逐行现算</td>
+                </tr>
+                <tr>
+                  <td className="mono">区间内</td>
+                  <td><strong>定不出来</strong>：区间里确有跳变，但没有可归因的边界</td>
+                  <td>半个采样间隔，约 15 日</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="sub">
+            <strong>「交节」为什么不直接取采样点那一天。</strong>
+            采样点是「立春 + m × 30.44 日」——<strong>回归年的等分，不是真节</strong>。
+            实测 1960–2060 共 252 个节，等分与真节相差
+            <strong>中位 0.96 日、最大 3.00 日</strong>（寒露），
+            而且是系统性的：立春处为零，春季偏正，寒露偏负近三日，再回零 ——
+            来历是地球轨道偏心，近日点附近太阳走得快，等时长的格子装不下等黄经的月。
+            报到月时这三天看不见；报到日时它就是全部误差。所以这一列去解真节。
+          </p>
+          <p className="sub">
+            <strong>⚠️ 「穿入 2008 年」旁边却写着 2008-08-07，这不是自相矛盾。</strong>
+            左边那一列只报到年，理由是<strong>采样网格的月不携带信息</strong> ——
+            权重类在一个立春年内只有大运斜坡在动，拿网格的月当证据是伪精度。
+            但这一行的交点落在<strong>大运换柱</strong>那一刻，
+            而那一刻是算出来的、精确到秒的，不是从网格上读的。
+            所以它比年更精确，而且不违反那条规矩：
+            那条规矩从来不是「真相只到年」，而是<strong>「网格的月不算证据」</strong>。
+            凡是来历写着「换柱」或「交节」的行，日期都不出自网格。
+          </p>
+          <p className="sub">
+            <strong>「插值」那几行为什么敢给到分钟。</strong>
+            因为运内权重<strong>对时间是线性的</strong>——
+            大运天干占比线性推移，权重是它的线性组合，于是那条弦就是函数本身
+            （实测块内 z 的二阶差分 ≤ 6e-3，而域与扰动是 1.8–3.4，差三个量级）。
+            但曲线若近乎相切地擦过门槛，同样的偏差折成的日期误差会放大 ——
+            那时误差半径自己会涨上去，而<strong>那种情况下「哪一天」本就没有意义</strong>：
+            曲线在门槛上趴着，等于问一条水平线哪天穿过自己。
+          </p>
+          </>)}
+          <p className="sub" style={{ marginTop: 10 }}>
+            <strong>⚠️ 权重类序列只报到年，不报到月。</strong>
+            流月不进权重，真正的跳变全发生在立春换柱那一刻 ——
+            对它们写「某年某月穿越」是伪精度，说的其实是「那一个立春年」。
+            只有扰动类的流月真的进了序列，才报得到月。
+          </p>
+          {on("notes") && (<>
+          <p className="sub">
+            <strong>点一行会跳到该段 |z| 最大的那个采样点</strong>，「此刻的权重」随之打开。
+            注意那里会显示到月（如<span className="mono">2008 年 酉月</span>）——
+            那是<strong>被取出的那一个采样点</strong>，不是「峰在酉月」：
+            权重类在立春年内只有大运斜坡在动，年内取哪个月都代表同一个立春年。
+            要看月真的有意义的峰，看扰动类那一组。
+          </p>
+          <p className="sub">
+            所以权重类那几行会出现<span className="mono">穿出「某年内」</span> ——
+            那<strong>不是零长度的事件</strong>：曲线在那一年里穿了出去又落回来，
+            大运份额在年内是连续移动的，所以年内摆回门槛以内是常事。
+            压成同一个年份是分辨率的结果，不是时间的结果。
+          </p>
+          <p className="sub">
+            <strong>穿越不等于吉凶。</strong>高于与低于都算穿越；
+            「用意」那一栏说的是这条序列<strong>本身</strong>偏用神还是偏忌神，
+            而不是这一次穿越是好是坏。点任意一行可跳到那个峰值点看当时的神煞。
+          </p>
+          <p className="sub">
+            这与「统计节点」页不是一回事：那边取 max(|z|, |ż|)，
+            把「一直很极端」与「正在急速穿过」都算节点；
+            这里只看 |z| 本身，是曲线与那两条横线的<strong>几何交点</strong>。
+            两者给出不同的区间，那不是矛盾 —— 问的不是同一个问题。
+          </p>
+          </>)}
+        </div>
+      )}
+
+      {atFrame !== null && on("reason") && (
         <div className="card" style={{ marginTop: 14 }}>
           <h3>
             {atFrame.f.year} 年 · {"寅卯辰巳午未申酉戌亥子丑"[atFrame.f.monthIndex]}月
@@ -368,7 +631,7 @@ export default function CurvesPage() {
         </div>
       )}
 
-      {atFrame !== null && (
+      {atFrame !== null && on("weights") && (
         <div className="card" style={{ marginTop: 14 }}>
           <h3>此刻的权重　<span className="sub" style={{ fontSize: 12 }}>
             {atFrame.f.year} 年 {atFrame.f.fleetingMonth.branch}月
@@ -401,6 +664,7 @@ export default function CurvesPage() {
         </div>
       )}
 
+      {on("stats") && (<>
       <h2 style={{ marginTop: 20 }}>
         {GROUPS.find(([k]) => k === group)?.[1] ?? group}的全部序列
       </h2>
@@ -434,17 +698,24 @@ export default function CurvesPage() {
           </tbody>
         </table>
       </div>
+      {on("notes") && (
       <p className="sub" style={{ fontSize: 12 }}>
         μ 与 σ 即图上 ±θσ 界线所依的那两个量，按<b>统计窗内的月度全样本</b>算。
         域张力<b>恒不判方向</b> —— 张力本身就是「顺逆并存」的度量，给它定吉凶
         等于把已经拆开的东西又合回去。宫位权重同理，只报「该宫变动」。
       </p>
+      )}
+      </>)}
+      </div>
+      </div>
 
+      {on("notes") && (
       <p className="sub" style={{ fontSize: 12, marginTop: 14 }}>
-        点击图上任意位置可取该时点，下方随即列出当时的神煞与结构事件。
+        点击图上任意位置可取该时点，右侧（或下方）随即列出当时的神煞与结构事件。
         曲线用 Catmull-Rom 平滑 —— 采样是月度的，而底下的量本就连续，
         折线会把每个采样点画成拐点，那是采样的伪影，不是数据的性质。
       </p>
+      )}
     </>
   );
 }
