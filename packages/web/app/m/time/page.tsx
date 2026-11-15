@@ -6,7 +6,8 @@ import {
   AXIS_DIRECTIONAL, favorPlain, SYSTEM_LABEL, type BirthInput,
 } from "@fate/core";
 import { Card } from "../Card";
-import { loadAudience, loadBirth } from "../store";
+import { loadAudience, loadBirth, monthParams } from "../store";
+import { useMonthRatio } from "../useMonthRatio";
 import { SpanPicker } from "../Span";
 import { useSpan } from "../useSpan";
 import { Disclaimer } from "../page";
@@ -25,6 +26,8 @@ export default function TimePage() {
   const [tab, setTab] = useState<"今年" | "本月" | "今天" | "按年">("今天");
   // 时间跨度：选中的与已用于计算的分开，见 useSpan
   const { span, applied: spanApplied, set: setSpan, pending: spanPending } = useSpan();
+  // 流月比例在「关于你」那一页改；这里按同一个本机偏好算，两页的报告才是同一份参数
+  const { applied: ratioApplied } = useMonthRatio();
 
   useEffect(() => { setBirth(loadBirth()); setReady(true); }, []);
 
@@ -34,11 +37,11 @@ export default function TimePage() {
     const now = { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
     try {
       const chart = buildChart(birth);
-      const params = loadParams({ report: { audience: loadAudience() } });
+      const params = loadParams({ report: { audience: loadAudience() }, ...monthParams(ratioApplied) });
       const r = buildReport(chart, { includeNodes: true, now, params, span: spanApplied });
       return { plain: plainCards(r), report: r, daily: dailyOutlook(chart, now, params) };
     } catch { return null; }
-  }, [birth, spanApplied]);
+  }, [birth, spanApplied, ratioApplied]);
 
   if (!ready) return <p className="m-lede">载入中…</p>;
   if (birth === null) {

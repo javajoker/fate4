@@ -1,6 +1,9 @@
 "use client";
 
-import { DEFAULT_SPAN, isSpanYears, type Audience, type BirthInput, type SpanYears } from "@fate/core";
+import {
+  DEFAULT_PARAMS, DEFAULT_SPAN, isSpanYears,
+  type Audience, type BirthInput, type PartialParams, type SpanYears,
+} from "@fate/core";
 
 /**
  * 移动版只记一份出生信息，存在本机。
@@ -188,4 +191,39 @@ export function savePartner(r: PartnerRecord): void {
 
 export function clearPartner(): void {
   try { localStorage.removeItem(PARTNER_KEY); } catch { /* 同上 */ }
+}
+
+/**
+ * 流月的分量：占流年的比例。可选 0 / 25% / 50%，默认取参数（50%）。
+ *
+ * **只存在移动版这一侧，与桌面版不共用。**桌面版的流月比例是**这张盘的参数**
+ * （参数校准页里改，随盘保存、随分享链接走）；移动版只有一份出生信息、没有逐盘的参数，
+ * 这里存的是「看的人」的偏好。两边各管各的，不让一边的改动悄悄改掉另一边的盘。
+ */
+const RATIO_KEY = "fate.m.monthRatio.v1";
+
+export const MONTH_RATIOS: readonly number[] = Object.freeze([0, 0.25, 0.5]);
+
+export const DEFAULT_MONTH_RATIO: number = DEFAULT_PARAMS.series.fleetingMonthInWeights
+  ? DEFAULT_PARAMS.weights.fleetingMonth.ratioToYear : 0;
+
+export function loadMonthRatio(): number {
+  try {
+    const raw = localStorage.getItem(RATIO_KEY);
+    if (raw === null) return DEFAULT_MONTH_RATIO;
+    const v = Number(raw);
+    return MONTH_RATIOS.includes(v) ? v : DEFAULT_MONTH_RATIO;
+  } catch { return DEFAULT_MONTH_RATIO; }
+}
+
+export function saveMonthRatio(v: number): void {
+  try { localStorage.setItem(RATIO_KEY, String(v)); } catch { /* 隐私模式下写不进，无妨 */ }
+}
+
+/** 把比例变成参数覆盖。0 时连开关一起关 —— 与「不进」逐位相同。 */
+export function monthParams(ratio: number): PartialParams {
+  return {
+    series: { fleetingMonthInWeights: ratio > 0 },
+    weights: { fleetingMonth: { ratioToYear: ratio } },
+  } as PartialParams;
 }
