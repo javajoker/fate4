@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  buildFindings, buildSeries, findNodes, formatEvidence,
-  SCALE_LABEL, type NodeScale,
+  buildFindings, buildSeries, scanNodes, formatEvidence,
+  SCALE_LABEL, NODE_ORDER_LABEL, type NodeScale, type NodeOrder,
   discloses, isFutureWindow, FUTURE_WITHHELD_NOTE,
 } from "@fate/core";
 import { useChart } from "../../../lib/chartContext";
 
 const SCALES: readonly NodeScale[] = ["large", "medium", "small"];
+const ORDERS: readonly NodeOrder[] = ["deviation", "time"];
 
 /**
  * 基准窗固定为起运后 60 年，**不随跨度变**；跨度只决定扫多远。
@@ -41,24 +42,62 @@ export default function NodesPage() {
   // 节点是「指向某个时段」的输出。普通读者档只给已经过去的那些 ——
   // 与 plainCards 同一条线，同一个判据（当前年本身算当下）。
   const nowYear = new Date().getFullYear();
-  const F = useMemo(() => {
-    if (S === null) return null;
-    // 只算当前选中的那一个尺度 —— 另外两个此刻不显示
-    const set = findNodes(S, scale, { threshold });
-    return { set, findings: buildFindings(S, [set]) };
-  }, [S, scale, threshold]);
+  const withhold = !discloses(audience, "futureWindows");
 
-  if (base === null || S === null || F === null) return <p className="sub">节点计算中…</p>;
-  const all = F.findings.findings;
-  const enteredYear = (f: (typeof all)[number]) => {
-    const v = f.detail.evidence.find((e) => e.label === "进入")?.value;
-    return typeof v === "number" ? v : null;
-  };
-  const future = discloses(audience, "futureWindows")
-    ? []
-    : all.filter((f) => { const y = enteredYear(f); return y !== null && isFutureWindow(y, nowYear); });
-  const shown = discloses(audience, "futureWindows")
-    ? all : all.filter((f) => !future.includes(f));
+  // 扫描一次，之后翻页、换排序都不重扫。只算当前选中的那一个尺度 ——
+  // 另外两个此刻不显示（每个约 300 ms，120 / 180 年更久）。
+  const scan = useMemo(
+    () => (S === null ? null : scanNodes(S, scale, { threshold })),
+    [S, scale, threshold]);
+
+  // 「略去未到来的」必须在排序与切页**之前**做：先切页再略去，
+  // 一页 12 条里略去 5 条，读者看到的是一页 7 条，总页数还按没略去的算。
+  const filter = useMemo(
+    () => (withhold ? (n: { enter: { year: number } }) => !isFutureWindow(n.enter.year, nowYear) : undefined),
+    [withhold, nowYear]);
+
+  const [order, setOrder] = useState<NodeOrder>("deviation");
+  const [page, setPage] = useState(0);
+  // 换尺度、门槛、排序、跨度、读者档，页码都回到第一页 —— 旧页码指向的已是另一份清单
+  useEffect(() => { setPage(0); setOpen(null); }, [scale, threshold, order, span, withhold]);
+
+  const size = S?.base.params.nodes.maxShown ?? 12;
+  const matched = scan === null ? 0 : scan.count(filter);
+  const pages = Math.max(1, Math.ceil(matched / size));
+  const pageIdx = Math.min(page, pages - 1);
+
+  // 只给当前这一页生成依据（每条约 4 ms）；翻回来的页内核有缓存
+  const F = useMemo(() => {
+    if (S === null || scan === null) return null;
+    const set = scan.page({ order, offset: pageIdx * size, size, ...(filter === undefined ? {} : { filter }) });
+    return { set, findings: buildFindings(S, [set]) };
+  }, [S, scan, order, pageIdx, size, filter]);
+
+  if (base === null || S === null || scan === null || F === null) {
+    return <p className="sub">节点计算中…</p>;
+  }
+  const shown = F.findings.findings;
+  const withheldCount = scan.total - matched;
+  const from = matched === 0 ? 0 : pageIdx * size + 1;
+  const to = pageIdx * size + shown.length;
+
+  /** 页码条 —— 顶上与底下各一条，翻到底不必滚回去 */
+  const Pager = () => (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "10px 0" }}>
+      <button className="ghost" disabled={pageIdx === 0} onClick={() => setPage(pageIdx - 1)}>‹ 上一页</button>
+      <label style={{ fontSize: 13, display: "flex", gap: 6, alignItems: "center" }}>
+        第
+        <select value={pageIdx} onChange={(e) => setPage(Number(e.target.value))}>
+          {Array.from({ length: pages }, (_, i) => <option key={i} value={i}>{i + 1}</option>)}
+        </select>
+        / {pages} 页
+      </label>
+      <button className="ghost" disabled={pageIdx >= pages - 1} onClick={() => setPage(pageIdx + 1)}>下一页 ›</button>
+      <span className="dim" style={{ fontSize: 12 }}>
+        本页第 {from}–{to} 条，共 {matched} 条
+      </span>
+    </div>
+  );
 
   return (
     <>
@@ -95,28 +134,42 @@ export default function NodesPage() {
             {t.toFixed(1)}σ
           </button>
         ))}
+        <span className="dim" style={{ fontSize: 13, marginLeft: 12 }}>排序</span>
+        {ORDERS.map((o) => (
+          <button key={o} className={order === o ? undefined : "ghost"} onClick={() => setOrder(o)}>
+            {NODE_ORDER_LABEL[o]}
+          </button>
+        ))}
       </div>
       <p className="sub" style={{ fontSize: 12 }}>{scaleNote(span)[scale]}</p>
       <p className="sub" style={{ fontSize: 12 }}>
-        越阈 <b>{F.set.total}</b> 段，按偏离程度列前 {shown.length} 条
+        越阈 <b>{scan.total}</b> 段，{NODE_ORDER_LABEL[order]}，每页 {size} 条
         {F.set.excluded.length > 0 && <> · 另有 {F.set.excluded.length} 条序列因散布为零而不参与</>}。
+        {order === "deviation"
+          ? "偏离程度 = 峰值偏离的绝对值，大者在前。"
+          : "年份先后 = 进入那一刻，早者在前；同一时刻进入的，偏离大的在前。"}
         门槛是取舍旋钮，不是显著性水平 —— 序列由出生时刻完全决定，
         越阈的采样点在任何一张盘上都是那么多；调门槛改的是列出几条。
       </p>
 
-      {future.length > 0 && (
+      {withheldCount > 0 && (
         <div className="card" style={{ margin: "10px 0" }}>
           <p className="sub" style={{ margin: 0 }}>
-            另有 <b>{future.length}</b> 段落在今年之后。{FUTURE_WITHHELD_NOTE}
+            另有 <b>{withheldCount}</b> 段落在今年之后。{FUTURE_WITHHELD_NOTE}
           </p>
         </div>
       )}
 
-      {shown.length === 0 && <p className="sub">此尺度下没有越过门槛的时段。</p>}
+      {matched === 0 && <p className="sub">此尺度下没有越过门槛的时段。</p>}
 
-      {shown.map((f) => (
+      {matched > size && <Pager />}
+
+      {shown.map((f, i) => (
         <div key={f.id} className="card" style={{ margin: "10px 0" }}>
           <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
+            <span className="dim mono" style={{ fontSize: 12, minWidth: "2.2em" }}>
+              {pageIdx * size + i + 1}
+            </span>
             <span>{f.summary.text}</span>
             <button className="ghost" style={{ fontSize: 12, padding: "2px 8px" }}
               onClick={() => setOpen(open === f.id ? null : f.id)}>
@@ -152,6 +205,8 @@ export default function NodesPage() {
           )}
         </div>
       ))}
+
+      {matched > size && <Pager />}
 
       {F.findings.guidanceEmptyNote !== null && (
         <p className="sub">{F.findings.guidanceEmptyNote.text}</p>

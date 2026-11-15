@@ -5,9 +5,10 @@ import { buildSeries, type Series, type SeriesSet } from "../src/temporal/series
 import { evaluateAt } from "../src/temporal/evaluate.js";
 import { splineAt } from "../src/temporal/spline.js";
 import {
-  allNodes, findNodes, robustSigma, curveStats, drawnCrossings,
+  allNodes, findNodes, scanNodes, robustSigma, curveStats, drawnCrossings,
 } from "../src/temporal/nodes.js";
 import { loadParams } from "../src/params/load.js";
+import type { NodeInterval } from "../src/temporal/nodes.js";
 import { aggregateDomains } from "../src/yingqi/domains.js";
 import { runYingqi } from "../src/yingqi/engine.js";
 import { ELEMENTS, type Element } from "../src/types/ganzhi.js";
@@ -603,5 +604,100 @@ describe("**图上的交点：穿入与穿出各自的大致日期**", () => {
     const cs = everyCrossing(keepYear, 1.5);
     expect(cs.some((c) => c.sign > 0), "应有高于").toBe(true);
     expect(cs.some((c) => c.sign < 0), "应有低于").toBe(true);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+//  分页与排序 —— 越阈段有几百条时，读者要能翻到后面、也要能换排序
+// ═══════════════════════════════════════════════════════════
+
+describe("**分页与排序**", () => {
+  // 120 年的跨度，大尺度的越阈段有几百条，才谈得上翻页
+  const S2 = buildSeries(base, { years: 120 });
+  const scan = scanNodes(S2, "large");
+  const BIG = 100_000;
+  const full = (order: "deviation" | "time", filter?: Parameters<typeof scan.count>[0]) =>
+    scan.page({ order, offset: 0, size: BIG, ...(filter === undefined ? {} : { filter }) }).nodes;
+  const keyOf = (n: { seriesId: string; enter: { year: number; monthIndex: number } }) =>
+    `${n.seriesId}@${n.enter.year}.${n.enter.monthIndex}`;
+
+  it("前提：越阈段足够多，翻页才不是空话", () => {
+    expect(scan.total).toBeGreaterThan(100);
+    expect(full("deviation")).toHaveLength(scan.total);
+  });
+
+  it("**各页拼起来恰是完整清单** —— 不重、不漏", () => {
+    for (const order of ["deviation", "time"] as const) {
+      const size = 12;
+      const pages: NodeInterval[] = [];
+      for (let off = 0; off < scan.total; off += size) {
+        const pg = scan.page({ order, offset: off, size }).nodes;
+        expect(pg.length, `${order} 偏移 ${off}`).toBeLessThanOrEqual(size);
+        pages.push(...pg);
+      }
+      expect(pages.map(keyOf), order).toEqual(full(order).map(keyOf));
+      expect(new Set(pages.map(keyOf)).size, "没有重复").toBe(pages.length);
+    }
+  });
+
+  it("**两种排序是同一批节点** —— 只是次序不同", () => {
+    const a = full("deviation").map(keyOf).sort();
+    const b = full("time").map(keyOf).sort();
+    expect(b).toEqual(a);
+    expect(full("deviation").map(keyOf)).not.toEqual(full("time").map(keyOf));
+  });
+
+  it("按偏离程度：|峰值 z| 整条清单单调不增", () => {
+    const zs = full("deviation").map((n) => Math.abs(n.peakZ));
+    for (let i = 1; i < zs.length; i++) expect(zs[i]!, `第 ${i} 条`).toBeLessThanOrEqual(zs[i - 1]! + 1e-12);
+  });
+
+  it("**按年份：进入时刻整条清单单调不减**，且同一时刻的偏离大的在前", () => {
+    const ns = full("time");
+    for (let i = 1; i < ns.length; i++) {
+      const a = ns[i - 1]!; const b = ns[i]!;
+      const ta = a.enter.year * 12 + a.enter.monthIndex;
+      const tb = b.enter.year * 12 + b.enter.monthIndex;
+      expect(tb, `第 ${i} 条`).toBeGreaterThanOrEqual(ta);
+      if (ta === tb) expect(Math.abs(b.peakZ)).toBeLessThanOrEqual(Math.abs(a.peakZ) + 1e-12);
+    }
+  });
+
+  it("**过滤在切页之前** —— 过滤后每一页仍是满的，页数是真的", () => {
+    // 去掉偏离最大的前 20 条。若是先切页再过滤，第一页只剩零星几条。
+    const top = new Set(full("deviation").slice(0, 20).map(keyOf));
+    const filter = (n: { seriesId: string; enter: { year: number; monthIndex: number } }) => !top.has(keyOf(n));
+    expect(scan.count(filter)).toBe(scan.total - 20);
+    const pg = scan.page({ order: "deviation", offset: 0, size: 12, filter });
+    expect(pg.nodes).toHaveLength(12);
+    expect(pg.matched).toBe(scan.total - 20);
+    expect(pg.nodes.some((n) => top.has(keyOf(n))), "被过滤的不得出现在任何一页").toBe(false);
+    // 最后一页也只含没被过滤的，且条数恰是余数
+    const last = scan.page({ order: "deviation", offset: Math.floor((scan.total - 21) / 12) * 12, size: 12, filter });
+    expect(last.nodes.length).toBe((scan.total - 20) % 12 === 0 ? 12 : (scan.total - 20) % 12);
+  });
+
+  it("越过末页的偏移给空页，而不是报错或回绕", () => {
+    const pg = scan.page({ order: "time", offset: scan.total + 50, size: 12 });
+    expect(pg.nodes).toEqual([]);
+    expect(pg.matched).toBe(scan.total);
+  });
+
+  it("**翻回来的页是同一批对象** —— 理由只找一次", () => {
+    const a = scan.page({ order: "deviation", offset: 24, size: 12 }).nodes;
+    const b = scan.page({ order: "deviation", offset: 24, size: 12 }).nodes;
+    expect(a).toHaveLength(12);
+    a.forEach((n, i) => expect(b[i], `第 ${i} 条`).toBe(n));
+    // 两种排序里同一个节点也是同一个对象
+    const x = full("deviation")[0]!;
+    expect(full("time").find((n) => keyOf(n) === keyOf(x))).toBe(x);
+  });
+
+  it("**findNodes 就是「偏离程度、第一页」** —— 前 maxShown 条与完整清单的开头一致", () => {
+    const f = findNodes(S2, "large");
+    const max = S2.base.params.nodes.maxShown;
+    expect(f.nodes).toHaveLength(max);
+    expect(f.nodes.map(keyOf)).toEqual(full("deviation").slice(0, max).map(keyOf));
+    expect(f.total).toBe(scan.total);
   });
 });

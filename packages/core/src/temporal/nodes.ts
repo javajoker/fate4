@@ -464,6 +464,87 @@ export function findNodes(
   S: SeriesSet, scale: NodeScale, override?: Partial<NodesParams>,
 ): NodeSet {
   const p: NodesParams = { ...S.base.params.nodes, ...override };
+  // 与取一页的唯一区别：这里固定按偏离程度、取前 maxShown 条。
+  // 走同一条路径，二者就不会各自漂开。
+  const pg = scanNodes(S, scale, override).page({ order: "deviation", offset: 0, size: p.maxShown });
+  return {
+    base: pg.base, scale: pg.scale, total: pg.total,
+    nodes: pg.nodes, excluded: pg.excluded, threshold: pg.threshold,
+  };
+}
+
+/** 节点的排序。偏离程度 = |峰值 z|，大者在前；年份 = 进入的先后，早者在前。 */
+export type NodeOrder = "deviation" | "time";
+
+export const NODE_ORDER_LABEL: Readonly<Record<NodeOrder, string>> = Object.freeze({
+  deviation: "按偏离程度", time: "按年份先后",
+});
+
+/**
+ * 扫描一次，之后可以任意次取页。
+ *
+ * ## 为什么要拆开
+ *
+ * `findNodes` 只留前 `maxShown` 条，而且是按偏离程度排好之后才截断的。
+ * 要让读者翻到后面的条目、或者换成按年份排，就得有完整的越阈清单 ——
+ * 但**不能**对全部越阈段都找理由：理由要跑 `evaluateAt` 与一遍应期，每条约 4 ms，
+ * 120 / 180 年的跨度下越阈段有几百条，全算一遍是好几秒。
+ * 所以扫描只算一次，**理由只给被取走的那一页找**，并缓存 ——
+ * 翻回来的页不重算，是同一批对象。
+ */
+export interface NodeScan {
+  readonly base: BaseChart;
+  readonly scale: NodeScale;
+  readonly threshold: number;
+  /** 越阈的总段数 —— 过滤与分页**之前**的数目。 */
+  readonly total: number;
+  readonly excluded: readonly { readonly seriesId: string; readonly why: string }[];
+  /** 过滤之后还剩多少条。不给 `filter` 就等于 `total`。算页数用它。 */
+  count(filter?: NodeFilter): number;
+  /** 取一页。 */
+  page(o: NodePageRequest): NodePage;
+}
+
+/** 过滤只看区间本身，不看理由 —— 理由是取页之后才找的。 */
+export type NodeFilter = (n: Omit<NodeInterval, "reasons">) => boolean;
+
+export interface NodePageRequest {
+  readonly order: NodeOrder;
+  /** 过滤并排序之后的第几条起（从 0 起）。 */
+  readonly offset: number;
+  readonly size: number;
+  /**
+   * 在排序与切页**之前**应用。
+   *
+   * 普通读者档要略去未到来的时段：若先切页再略去，一页 12 条里略去 5 条，
+   * 读者看到的是一页 7 条，而总页数还按没略去的算 —— 页是被切短的。
+   * 先过滤再切页，每一页才是满的，页数才是真的。
+   */
+  readonly filter?: NodeFilter;
+}
+
+export interface NodePage extends NodeSet {
+  /** 过滤之后的总条数（分页的分母）。 */
+  readonly matched: number;
+  readonly offset: number;
+  readonly order: NodeOrder;
+}
+
+const byDeviation = (a: { peakZ: number }, b: { peakZ: number }) =>
+  Math.abs(b.peakZ) - Math.abs(a.peakZ);
+const byTime = (
+  a: { enter: TimeMark; peakZ: number; seriesId: string },
+  b: { enter: TimeMark; peakZ: number; seriesId: string },
+) => a.enter.year - b.enter.year
+  || a.enter.monthIndex - b.enter.monthIndex
+  // 同一时刻进入的，偏离大的在前；仍相同则按序列名，保证次序确定
+  || Math.abs(b.peakZ) - Math.abs(a.peakZ)
+  || (a.seriesId < b.seriesId ? -1 : a.seriesId > b.seriesId ? 1 : 0);
+
+export function scanNodes(
+  S: SeriesSet, scale: NodeScale, override?: Partial<NodesParams>,
+): NodeScan {
+  const p: NodesParams = { ...S.base.params.nodes, ...override };
   const nodes: Pending[] = [];
   const excluded: { seriesId: string; why: string }[] = [];
 
@@ -546,15 +627,35 @@ export function findNodes(
     }
   }
 
-  nodes.sort((a, b) => Math.abs(b.peakZ) - Math.abs(a.peakZ));
   // 理由要跑 evaluateAt 与一遍应期，每条约 4 ms。对全部越阈段都算，
   // 而后只留前十二条，就是把九成五的工作丢掉 —— 实测浏览器里主线程
-  // 因此卡住近一秒。故先排序截断，再给留下来的那几条找理由。
-  const kept = nodes.slice(0, p.maxShown).map(({ resolve, ...n }): NodeInterval =>
-    ({ ...n, reasons: resolve() }));
+  // 因此卡住近一秒。故先排序、过滤、切页，**再**给留下来的那一页找理由；
+  // 找过的缓存起来，翻回来的页不重算。
+  const cache = new Map<Pending, NodeInterval>();
+  const finish = (n: Pending): NodeInterval => {
+    const hit = cache.get(n);
+    if (hit !== undefined) return hit;
+    const { resolve, ...rest } = n;
+    const done: NodeInterval = { ...rest, reasons: resolve() };
+    cache.set(n, done);
+    return done;
+  };
+
   return {
-    base: S.base, scale, total: nodes.length,
-    nodes: kept, excluded, threshold: p.threshold,
+    base: S.base, scale, threshold: p.threshold,
+    total: nodes.length, excluded,
+    count: (filter) => (filter === undefined ? nodes.length : nodes.filter(filter).length),
+    page: ({ order, offset, size, filter }) => {
+      const pool = filter === undefined ? [...nodes] : nodes.filter(filter);
+      // 排序是稳定的：偏离程度相同的，保持扫描时的先后 —— 与此前截断前的排法一致
+      pool.sort(order === "time" ? byTime : byDeviation);
+      return {
+        base: S.base, scale, threshold: p.threshold,
+        total: nodes.length, excluded,
+        matched: pool.length, offset, order,
+        nodes: pool.slice(offset, offset + size).map(finish),
+      };
+    },
   };
 }
 
