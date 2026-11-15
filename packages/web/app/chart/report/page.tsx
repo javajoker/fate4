@@ -10,17 +10,18 @@ import { Narrative } from "../../../components/Narrative";
 import { encodeShare } from "../../../lib/storage";
 
 export default function ReportPage() {
-  const { base, params, record, overrides, audience } = useChart();
+  const { base, spanBase, span, params, record, overrides, audience } = useChart();
   const today = useToday();
   const [tab, setTab] = useState<"read" | "markdown" | "json">("read");
   const [subject, setSubject] = useState<"self" | "other">("self");
   const [copied, setCopied] = useState("");
 
   const r = useMemo(() => {
-    if (base === null || today === null) return null;
+    if (spanBase === null || today === null) return null;
     // 卡片窗口不在此处指定 —— 默认值在 core 里，Web 与 CLI 因此同源。
-    return buildReport(base, { subject, now: today });
-  }, [base, subject, today]);
+    // 跨度由全局的那一个开关给，与 CLI 的 --span 是同一个选项。
+    return buildReport(spanBase, { subject, now: today, span });
+  }, [spanBase, span, subject, today]);
 
   if (r === null || base === null || record === null) return <p className="sub">生成中…</p>;
 

@@ -357,17 +357,17 @@ describe("🧪 流月入权重（实验）", () => {
       .filter((c) => c.position.pillar === k)
       .reduce((a, c) => a + c.trace[0]!.to, 0);
     expect(initial("annual")).toBeCloseTo(110, 6);
-    expect(initial("fleetingMonth")).toBeCloseTo(110 / 3, 6);
+    expect(initial("fleetingMonth")).toBeCloseTo(110 * 0.25, 6);
   });
 
   it("干支内部按流年的 40:70 同比缩放", () => {
     const ev = at(on);
     const stem = ev.carriers.find((c) => c.position.pillar === "fleetingMonth" && c.position.layer === "stem")!;
-    expect(stem.trace[0]!.to).toBeCloseTo(40 / 3, 6);
+    expect(stem.trace[0]!.to).toBeCloseTo(40 * 0.25, 6);
     const branchSum = ev.carriers
       .filter((c) => c.position.pillar === "fleetingMonth" && c.position.layer === "branch")
       .reduce((a, c) => a + c.trace[0]!.to, 0);
-    expect(branchSum).toBeCloseTo(70 / 3, 6);
+    expect(branchSum).toBeCloseTo(70 * 0.25, 6);
   });
 
   it("**比例参数真的在起作用，而且线性** —— 不依赖默认值是多少", () => {

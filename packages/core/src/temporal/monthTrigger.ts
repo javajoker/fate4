@@ -24,9 +24,9 @@
  *
  * ## 怎么算
  *
- * 复用结构层的偵测函数（`detectHe` / `detectClash` / `detectXing`），不另写一套。
+ * 复用结构层的侦测函数（`detectHe` / `detectClash` / `detectXing`），不另写一套。
  * 它们只看支与干，不看载体与权重，所以不需要先把盘算一遍。
- * 每条触发都是**差分**：带流月偵测一遍、不带流月偵测一遍，只报「因为流月在场
+ * 每条触发都是**差分**：带流月侦测一遍、不带流月侦测一遍，只报「因为流月在场
  * 才成立」的那些 —— 本命、大运、流年自己已经成立的，不算流月引动的。
  *
  * 不依赖 `series.fleetingMonthInWeights`：实验开关关着时也能算、能展示。
@@ -65,7 +65,7 @@ interface Detected {
   readonly xings: ReturnType<typeof detectXing>;
 }
 
-/** 偵测只看支与干。载体与权重给占位 —— 偵测函数不读它们。 */
+/** 侦测只看支与干。载体与权重给占位 —— 侦测函数不读它们。 */
 function detectOver(ps: readonly Placed[]): Detected {
   const branches: BranchSlot[] = ps.map(([k, p]) => ({
     pillar: k, branch: p.branch, carriers: [], weight: 1,

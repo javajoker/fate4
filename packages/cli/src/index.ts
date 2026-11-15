@@ -23,12 +23,12 @@ import {
   plainCards, plainQuestion, scanPlain, renderCrossMarkdown, renderQuestionMarkdown, crossReading,
   type PlainCard,
   scanText, TOPICS, TOPIC_BY_ID, yearView,
-  loadParams, paramsHash, buildChart, buildBaseChart,
+  loadParams, paramsHash, buildChart, buildBaseChart, baseForSpan, pillarsForSpan, toBaseChart,
   buildZiweiChart, readZiwei, drawSpread, baziPairing, SUIT_NAME,
   type BirthInput, type CastInput, type CoinThrow, type Liuqin, type PartialParams,
 } from "@fate/core";
 import { UsageError, type Io } from "./io.js";
-import { num, oneOf, parse, parseDate, parseTime, req, reqNum } from "./args.js";
+import { num, oneOf, parse, parseDate, parseTime, req, reqNum, spanOf } from "./args.js";
 import { findCity, CITIES } from "./cities.js";
 import { makeChartFile, readChartFile, rebuild } from "./chartFile.js";
 import { appendEntry, findEntry, fingerprintOf, keyOf, readJournal } from "./journal.js";
@@ -48,13 +48,13 @@ const USAGE = `fate —— 四柱推演命令行
               (--city 城市 | --tz 时区 --lon 经度) [--lat 纬度]
               --gender male|female [--params f.json] [--json] [-o f.json]
 
-  fate luck   --chart c.json [--json]
+  fate luck   --chart c.json [--span 60|120|180] [--json]
   fate year   --chart c.json --year 2026 [--json]
   fate month  --chart c.json --year 2026 --month 1..12 [--json]
   fate day    --chart c.json --date YYYY-MM-DD [--json]
   fate report --chart c.json [--format markdown|json] [--now YYYY-MM-DD]
               [--subject self|other] [--locale zh-Hans|zh-Hant|en]
-              [--nodes [--node-threshold 2.0]]
+              [--span 60|120|180] [--nodes [--node-threshold 2.0]]
 
   fate ask    --topic 占事id [--question 问题文本 | --question-hash 指纹]
               (--city 城市 | --tz 时区 --lon 经度)
@@ -87,8 +87,11 @@ const USAGE = `fate —— 四柱推演命令行
             lay 不出量化数字，也不给指向未来的时段（应期、未到来的起伏段）。
   --params  参数覆盖文件（.json，或 .yaml/.yml）。覆盖项与默认深合并后校验。
   --json    输出结构化 JSON，供程序消费。
-  --nodes   加算 §6.5 统计节点。默认关闭 —— 它要按月跑满六十年，
-            约 1.3 秒，比其余全部章节加起来还久。
+  --span    时间跨度，自起运起算：60（默认）| 120 | 180 年。
+            决定大运列几柱（跨度 / 10）、流年曲线多少年、节点的基准窗多长。
+            ⚠️ 统计节点的 σ 随它重算 —— 同一年的 z 分数在不同跨度下不同。
+  --nodes   加算 §6.5 统计节点。默认关闭 —— 它要按月跑满整个跨度（60 年时
+            约 1.3 秒，120 / 180 年相应更久），比其余全部章节加起来还久。
             「--subject other」时即便开了也不产出。
   --journal 问卜记录。一事不二占：同一问题同一日再问，返回首卦。
             只存问题的**指纹**，不存原文。默认不落盘（即不设防）。
@@ -233,9 +236,13 @@ function cmdChart(argv: readonly string[], io: Io): void {
 }
 
 function cmdLuck(argv: readonly string[], io: Io): void {
-  const v = parse(argv, CHART_REF);
+  const v = parse(argv, { span: { type: "string" }, ...CHART_REF });
   const { chart, params } = loadChart(io, v);
-  const steps = luckTimeline(chart, params);
+  // 与 Web 大运页、报告 §5 同一口径：跨度 / 10 柱，柱数不够则另建基础盘
+  const span = spanOf(v);
+  // 基础盘自己带参数 —— 再传一套会被 luckTimeline 拒绝（此处不静默丢弃参数）
+  const steps = luckTimeline(baseForSpan(toBaseChart(chart, params), span))
+    .slice(0, pillarsForSpan(span));
   if (v["json"] === true) {
     emit(io, { luck: { direction: chart.luck.direction, startAgeYears: chart.luck.startAgeYears,
       traditional: chart.luck.traditional }, steps }, true, v["out"] as string | undefined);
@@ -297,9 +304,11 @@ function cmdReport(argv: readonly string[], io: Io): void {
     format: { type: "string" }, now: { type: "string" },
     subject: { type: "string" }, locale: { type: "string" },
     nodes: { type: "boolean" }, "node-threshold": { type: "string" },
+    span: { type: "string" },
     ...CHART_REF,
   });
   const { chart, params } = loadChart(io, v);
+  const span = spanOf(v);
   const format = oneOf(v, "format", ["markdown", "json"] as const, "markdown");
   const subject = oneOf(v, "subject", ["self", "other"] as const, "self");
   const locale = oneOf(v, "locale", ["zh-Hans", "zh-Hant", "en"] as const, params.report.locale);
@@ -318,7 +327,7 @@ function cmdReport(argv: readonly string[], io: Io): void {
 
   // 与 Web 完全相同的一次调用。窗口等默认值都在 core 里，此处不另作决定。
   const report = buildReport(chart, {
-    params, subject, locale, now, includeNodes,
+    params, subject, locale, now, includeNodes, span,
     ...(nodeThreshold === undefined ? {} : { nodeThreshold }),
   });
 

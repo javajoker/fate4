@@ -9,6 +9,7 @@
  */
 
 import { parseArgs, type ParseArgsConfig } from "node:util";
+import { DEFAULT_SPAN, isSpanYears, SPANS, type SpanYears } from "@fate/core";
 import { UsageError } from "./io.js";
 
 export type Options = Record<string, string | boolean | undefined>;
@@ -65,6 +66,20 @@ export function parseTime(s: string): { hour: number; minute: number } {
   const hour = Number(m[1]); const minute = Number(m[2]);
   if (hour > 23 || minute > 59) throw new UsageError(`--time 超出范围：${s}`);
   return { hour, minute };
+}
+
+/**
+ * `--span 60|120|180`。报告的时间跨度，默认值取自 core 的 `DEFAULT_SPAN` ——
+ * CLI 不自己决定默认，才与 Web 同源。
+ */
+export function spanOf(v: Options): SpanYears {
+  const raw = v["span"];
+  if (raw === undefined) return DEFAULT_SPAN;
+  const n = typeof raw === "string" ? Number(raw) : NaN;
+  if (!isSpanYears(n)) {
+    throw new UsageError(`--span 须为 ${SPANS.join(" | ")} 之一，实为 ${JSON.stringify(raw)}`);
+  }
+  return n;
 }
 
 export function oneOf<T extends string>(

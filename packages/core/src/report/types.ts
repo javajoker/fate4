@@ -11,6 +11,7 @@ import type { Conclusions, KinReading } from "../conclude/types.js";
 import type { BodyCorrespondence, Persona } from "../conclude/persona.js";
 import type { ShenshaHit, PalaceName } from "../shensha/scan.js";
 import type { DayView, LuckStep, MonthView, YearView } from "../temporal/types.js";
+import type { SpanYears } from "../temporal/span.js";
 import type { Audience } from "./audience.js";
 import type { PrecisionHorizon } from "../astro/horizon.js";
 import type { Locale } from "./templates.js";
@@ -186,7 +187,23 @@ export interface MethodSection {
 
 export interface ReportMeta {
   readonly engineVersion: string;
+  /**
+   * 参数指纹，取**传入的那份基础盘**的参数。
+   *
+   * 切 60 / 120 / 180 年时，报告内部会另建一份大运柱数更多的基础盘，它的
+   * `luckPillarCount` 与传入的不同。若指纹跟着它走，同一张盘同样的参数、
+   * 只因换了跨度就得到不同的指纹 —— 而逐年的数其实一位不差。
+   * 故指纹不随跨度变；跨度单独记在 `span`。
+   */
   readonly paramsHash: string;
+  /**
+   * 报告的时间跨度（自起运起算的年数）。
+   *
+   * ⚠️ 与指纹分开记，因为**节点的 z 分数随它变**：统计节点的基准窗就是这一整段，
+   * 换跨度，μ 与 σ 重算。指纹相同、跨度不同的两份报告，逐年的数相同，
+   * 节点的 z 分数不同。
+   */
+  readonly span: SpanYears;
   readonly locale: Locale;
   readonly subject: "self" | "other";
   /** 生成这份报告时用的读者档 —— 同一份推演三种深度，故要记在案。 */

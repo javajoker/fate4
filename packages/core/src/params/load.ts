@@ -61,7 +61,6 @@ const RANGES: readonly RangeRule[] = [
   { path: "conclusion.specialGe.huaqiConfidenceCap", min: 0, max: 1 },
 
   { path: "temporal.luckPillarCount", min: 1, max: 30 },
-  { path: "temporal.yearRangeYears", min: 1, max: 200 },
   { path: "temporal.index.a", min: 0, max: 50 },
   { path: "temporal.index.b", min: 0, max: 50 },
 

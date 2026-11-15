@@ -10,7 +10,7 @@ import { num, pillarText } from "../../../lib/format";
 import { useToday } from "../../../lib/today";
 
 export default function YearPage() {
-  const { chart, base } = useChart();
+  const { chart, base, spanBase, span } = useChart();
   const today = useToday();
   const [picked, setPicked] = useState<number | null>(null);
   // 构建期预渲染时没有「今天」，故当前年份只能在客户端确定。
@@ -18,13 +18,11 @@ export default function YearPage() {
   const setYear = setPicked;
 
   // 曲线与卡片各自成环，故换年份只重算那一张卡片，整条曲线不动。
+  // 曲线的年数 = 全局跨度（60 / 120 / 180）；高张力年份取自这一整段。
   const r = useMemo(() => {
-    if (base === null || year === null) return null;
-    return buildReport(base, {
-      curveYears: base.params.temporal.yearRangeYears,
-      cardYears: { from: year, to: year },
-    });
-  }, [base, year]);
+    if (spanBase === null || year === null) return null;
+    return buildReport(spanBase, { span, cardYears: { from: year, to: year } });
+  }, [spanBase, span, year]);
 
   const detail = useMemo(() => {
     if (base === null || r === null) return null;

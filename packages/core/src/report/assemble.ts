@@ -41,6 +41,9 @@ import { DOMAIN_LABEL } from "../yingqi/types.js";
 import type { Locale } from "./templates.js";
 import { toHant } from "./hant.js";
 import { buildSeries } from "../temporal/series.js";
+import {
+  baseForSpan, DEFAULT_SPAN, pillarsForSpan, type SpanYears,
+} from "../temporal/span.js";
 import { allNodes } from "../temporal/nodes.js";
 import { buildFindings } from "./finding.js";
 import {
@@ -79,7 +82,16 @@ export interface ReportOptions {
    * 时时维护的约定。能由构造保证的事，不要交给约定。
    */
   readonly cardYears?: { readonly from: number; readonly to: number };
-  /** §6.1 三线曲线的年数。默认取 params.temporal.yearRangeYears。 */
+  /**
+   * 报告的时间跨度：60 / 120 / 180 年（自起运起算）。默认 60。
+   *
+   * 决定大运列几柱（跨度 / 10）、§6.1 三线曲线多少年、§6.5 节点的基准窗多长。
+   * **σ 随它重算** —— 同一年的 z 分数在不同跨度下不同，见 `temporal/span.ts`。
+   *
+   * 默认值放在这里而不是调用方 —— Web 与 CLI 才同源。
+   */
+  readonly span?: SpanYears;
+  /** §6.1 三线曲线的年数。默认取 `span`；显式给了就以它为准。 */
   readonly curveYears?: number;
   readonly maxFlows?: number;
   readonly engineVersion?: string;
@@ -226,7 +238,10 @@ export function buildReport(
 ): Report {
   // **基础盘算一次。**下文全部时间层视图共用这一份 ——
   // 每张即时盘都持有指回它的引用，同一次报告内是同一个对象。
-  const base = toBaseChart(from, options.params);
+  const base0 = toBaseChart(from, options.params);
+  // 🧪 跨度：60 / 120 / 180 年。大运柱数不够就另建一份，不改传入的那份。
+  const spanYears: SpanYears = options.span ?? DEFAULT_SPAN;
+  const base = baseForSpan(base0, spanYears);
   const chart = base.chart;
   const params = base.params;
   const locale = options.locale ?? params.report.locale;
@@ -579,7 +594,8 @@ export function buildReport(
 
   // ── §5 大运 ──
   const L5 = new Lines(locale);
-  const steps = luckTimeline(base);
+  // 只列跨度之内的柱：一步十年，60 年 6 柱、120 年 12 柱、180 年 18 柱
+  const steps = luckTimeline(base).slice(0, pillarsForSpan(spanYears));
   const birthYear = chart.input.year;
   for (const s of steps) {
     // LuckPillar.index 自 1 起（第一步即月柱的下一柱），此处不再加一。
@@ -602,7 +618,7 @@ export function buildReport(
 
   // ── §6 流年 ──
   const L6 = new Lines(locale);
-  const curveYears = options.curveYears ?? params.temporal.yearRangeYears;
+  const curveYears = options.curveYears ?? spanYears;
   const curve: YearCurvePoint[] = [];
   const highTension: { year: number; domain: string; tension: number }[] = [];
   const centre = options.now?.year ?? birthYear;
@@ -654,7 +670,8 @@ export function buildReport(
   // 节点要按月跑满六十年，代价高一个量级，故按需开启。
   let nodesSection: NodesSection | null = null;
   if (options.includeNodes === true && subject === "self") {
-    const S = buildSeries(base);
+    // 基准窗 = 整个跨度：换跨度，μ 与 σ 重算，同一年的 z 分数随之改变
+    const S = buildSeries(base, { years: spanYears, statsYears: spanYears });
     const override = options.nodeThreshold === undefined
       ? undefined : { threshold: options.nodeThreshold };
     const sets = allNodes(S, override);
@@ -719,7 +736,9 @@ export function buildReport(
     tiaohou: label(SCHOOL_LABEL, C.schoolsUsed.tiaohouSource),
     childStar: label(SCHOOL_LABEL, C.schoolsUsed.femaleChildStarVariant),
   });
-  const hash = base.paramsHash;
+  // 指纹取传入的那份：换跨度另建的基础盘不该让指纹变，见 ReportMeta.paramsHash
+  const hash = base0.paramsHash;
+  L8.add("method.span", { span: String(spanYears) });
   L8.add("method.provenance", {
     engineVersion, paramsHash: hash, solarProvider: chart.rulesUsed.solarProviderId,
   });
@@ -767,7 +786,7 @@ export function buildReport(
 
   const raw: Report = {
     meta: {
-      engineVersion, paramsHash: hash, locale, subject,
+      engineVersion, paramsHash: hash, span: spanYears, locale, subject,
       audience: params.report.audience,
       warnings: chart.warnings,
     },

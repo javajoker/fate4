@@ -5,3 +5,4 @@ export * from "./series.js";
 export * from "./nodes.js";
 export * from "./spline.js";
 export * from "./monthTrigger.js";
+export * from "./span.js";

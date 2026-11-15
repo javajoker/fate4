@@ -11,9 +11,10 @@ import {
   createContext, useContext, useEffect, useMemo, useState, type ReactNode,
 } from "react";
 import {
-  buildBaseChart, buildChart, chartOptionsOf, loadParams,
+  baseForSpan, buildBaseChart, buildChart, chartOptionsOf, DEFAULT_SPAN,
+  isSpanYears, loadParams,
   type Audience, type BaseChart, type BirthInput, type NatalChart,
-  type Params, type PartialParams,
+  type Params, type PartialParams, type SpanYears,
 } from "@fate/core";
 import { decodeShare, getChart, type ChartRecord } from "./storage";
 
@@ -39,11 +40,29 @@ interface Ctx {
    */
   readonly audience: Audience;
   readonly setAudience: (a: Audience) => void;
+  /**
+   * 报告的时间跨度：60 / 120 / 180 年（自起运起算）。
+   *
+   * 与读者档同理，**不进 `overrides`**：它是看的人的偏好，不是这张盘的参数。
+   * 一处切换，大运 / 流年 / 生命曲线 / 统计节点 / 完整报告一起跟着换 ——
+   * 各页各管各的，迟早有一页停在旧跨度上，而别的页已经换了。
+   *
+   * ⚠️ 统计节点与曲线 ±θσ 界线的 σ 取**这一整段**，换跨度就重算，
+   * 同一年的 z 分数随之改变。
+   */
+  readonly span: SpanYears;
+  readonly setSpan: (s: SpanYears) => void;
+  /**
+   * 带足够大运柱数的基础盘。柱数够时就是 `base` 本身（同一个对象）；
+   * 不够才另建一份。要按跨度取数的页面用它，不用 `base`。
+   */
+  readonly spanBase: BaseChart | null;
   readonly error: string | null;
   readonly loading: boolean;
 }
 
 const AUD_KEY = "fate.audience.v1";
+const SPAN_KEY = "fate.span.v1";
 
 const ChartCtx = createContext<Ctx | null>(null);
 
@@ -101,6 +120,18 @@ export function ChartProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(AUD_KEY, a); } catch { /* 同上 */ }
   };
 
+  const [span, setSpanState] = useState<SpanYears>(DEFAULT_SPAN);
+  useEffect(() => {
+    try {
+      const v = Number(localStorage.getItem(SPAN_KEY));
+      if (isSpanYears(v)) setSpanState(v);
+    } catch { /* 隐私模式下读不到，用默认 */ }
+  }, []);
+  const setSpan = (s: SpanYears) => {
+    setSpanState(s);
+    try { localStorage.setItem(SPAN_KEY, String(s)); } catch { /* 同上 */ }
+  };
+
   // 读者档合进 params 但不进 overrides —— 见 Ctx.audience 的说明
   const params = useMemo(
     () => loadParams({ ...overrides, report: { ...overrides.report, audience } }),
@@ -124,10 +155,16 @@ export function ChartProvider({ children }: { children: ReactNode }) {
     [chart, params],
   );
 
+  // 柱数够时就是 base 本身；不够才另建。随 (基础盘, 跨度) 记忆
+  const spanBase = useMemo(
+    () => (base === null ? null : baseForSpan(base, span)),
+    [base, span],
+  );
+
   return (
     <ChartCtx.Provider
       value={{ record, chart, base, params, overrides, setOverrides,
-        audience, setAudience, error, loading }}
+        audience, setAudience, span, setSpan, spanBase, error, loading }}
     >
       {children}
     </ChartCtx.Provider>

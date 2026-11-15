@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { AUDIENCE_LABEL, AUDIENCE_NOTE, AUDIENCES } from "@fate/core";
+import { AUDIENCE_LABEL, AUDIENCE_NOTE, AUDIENCES, SPANS, SPAN_LABEL } from "@fate/core";
 import { ChartProvider, useChart, useFragment } from "../../lib/chartContext";
 import { withFrag } from "../../lib/format";
 
@@ -42,10 +42,18 @@ const OTHER_TABS: readonly [string, string][] = [
   ["/chart/ziwei", "紫微斗数"],
 ];
 
+/**
+ * 跟着时间跨度走的页面。其余页（盘面、性格、旺衰……）读的是本命，与跨度无关，
+ * 不摆这个开关 —— 一个与当前页无关的开关，只会让人以为它也管这一页。
+ */
+const SPAN_PAGES: ReadonlySet<string> = new Set([
+  "/chart/luck", "/chart/year", "/chart/curves", "/chart/nodes", "/chart/report",
+]);
+
 function Shell({ children }: { children: ReactNode }) {
   const path = usePathname();
   const frag = useFragment();
-  const { record, error, loading, audience, setAudience } = useChart();
+  const { record, error, loading, audience, setAudience, span, setSpan } = useChart();
 
   return (
     <>
@@ -85,6 +93,20 @@ function Shell({ children }: { children: ReactNode }) {
               </button>
             ))}
             <span className="dim">{AUDIENCE_NOTE[audience]}</span>
+          </div>
+        )}
+        {!loading && error === null && record !== null && SPAN_PAGES.has(path) && (
+          <div className="audbar">
+            <span className="dim">时间跨度（自起运起算）</span>
+            {SPANS.map((s) => (
+              <button key={s} className={s === span ? "" : "ghost"} onClick={() => setSpan(s)}>
+                {SPAN_LABEL[s]}
+              </button>
+            ))}
+            <span className="dim">
+              大运 {span / 10} 柱。统计节点与曲线界线的 σ 取<b>这一整段</b>：
+              换跨度会重算，同一年的 z 分数随之改变；逐年的数值不变。
+            </span>
           </div>
         )}
         {!loading && error === null && record !== null && audience === "lay" && (

@@ -130,7 +130,8 @@ describe("各子命令产出", () => {
   it("luck / year / month / day 皆可出 JSON", () => {
     const luck = cli(["luck", "--chart", "c.json", "--json"], files);
     expect(luck.code, luck.err).toBe(0);
-    expect(JSON.parse(luck.out).steps).toHaveLength(12);
+    // 默认跨度 60 年，一步十年，故 6 柱（旧默认 12 柱 = 120 年，现在要 --span 120）
+    expect(JSON.parse(luck.out).steps).toHaveLength(6);
 
     const year = cli(["year", "--chart", "c.json", "--year", "2026", "--json"], files);
     expect(year.code, year.err).toBe(0);
@@ -175,6 +176,63 @@ describe("各子命令产出", () => {
 
   it("--month 越界报错", () => {
     expect(cli(["month", "--chart", "c.json", "--year", "2026", "--month", "13"], files).code).toBe(2);
+  });
+});
+
+describe("--span：60 / 120 / 180 年", () => {
+  const files = withChart();
+
+  it("luck：6 / 12 / 18 柱；不给就是 60 年", () => {
+    const n = (extra: string[]) => {
+      const r = cli(["luck", "--chart", "c.json", "--json", ...extra], files);
+      expect(r.code, `${extra.join(" ")} → ${r.err}`).toBe(0);
+      return JSON.parse(r.out).steps.length;
+    };
+    expect(n([])).toBe(6);
+    expect(n(["--span", "60"])).toBe(6);
+    expect(n(["--span", "120"])).toBe(12);
+    expect(n(["--span", "180"])).toBe(18);
+  });
+
+  it("**非法跨度报错，而不是静默取默认值**", () => {
+    // "-60" 要写成 --span=-60，否则 parseArgs 把它当成另一个选项
+    for (const bad of ["90", "0", "abc", "=-60"]) {
+      const r = cli(["luck", "--chart", "c.json", ...(bad.startsWith("=") ? [`--span${bad}`] : ["--span", bad])], files);
+      expect(r.code, bad).toBe(2);
+      expect(r.err).toContain("--span");
+      expect(r.err).toContain("60 | 120 | 180");
+    }
+    expect(cli(["report", "--chart", "c.json", "--span", "100"], files).code).toBe(2);
+  });
+
+  it("report：曲线年数、大运柱数、节点基准窗都随跨度走", () => {
+    for (const span of [60, 120, 180]) {
+      const r = JSON.parse(cli(["report", "--chart", "c.json", "--format", "json",
+        "--now", "2026-09-01", "--nodes", "--span", String(span)], files).out);
+      expect(r.meta.span).toBe(span);
+      expect(r.years.curve).toHaveLength(span);
+      expect(r.luck.steps).toHaveLength(span / 10);
+      expect(r.nodes.statsTo - r.nodes.statsFrom + 1, `${span} 年`).toBe(span);
+    }
+  });
+
+  it("**参数指纹不随跨度变**", () => {
+    const h = (span: string) => JSON.parse(cli(["report", "--chart", "c.json", "--format", "json",
+      "--now", "2026-09-01", "--span", span], files).out).meta.paramsHash;
+    expect(h("120")).toBe(h("60"));
+    expect(h("180")).toBe(h("60"));
+  });
+
+  it("**--span 120 的 Markdown 与内核直调逐字节相同** —— Web 与 CLI 同一次调用", () => {
+    const params = loadParams({});
+    const chart = buildChart(EXAMPLE, chartOptionsOf(params));
+    const direct = renderMarkdown(buildReport(chart, {
+      params, subject: "self", locale: params.report.locale,
+      now: { year: 2026, month: 9, day: 1 }, span: 120,
+    }));
+    const r = cli(["report", "--chart", "c.json", "--now", "2026-09-01", "--span", "120"], files);
+    expect(r.code, r.err).toBe(0);
+    expect(r.out).toBe(direct);
   });
 });
 

@@ -1,40 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  buildSeries, curveStats, evaluateAt, buildChart, buildBaseChart,
-  chartOptionsOf, loadParams, precisionBandOf, drawnCrossings,
+  buildSeries, curveStats, evaluateAt,
+  precisionBandOf, drawnCrossings, baseForSpan, SPAN_LABEL,
   monthView, fleetingTriggers, MONTH_TRIGGER_FRAME,
 } from "@fate/core";
 import { useChart } from "../../../lib/chartContext";
 import { LifeCurves, type CurveWindow } from "../../../components/charts";
 import { num, pillarText } from "../../../lib/format";
-
-/**
- * 可选的绘制跨度。
- *
- * ## 为什么换跨度要连大运一起换
- *
- * 大运的柱数由 `temporal.luckPillarCount` 定，默认 12 柱 = 120 年。
- * 若只把绘制年数拉到 180 而不加柱，**最后六十年根本没有大运那一层** ——
- * 曲线照画，但它少了一整层，而那个断口看起来像一个真实的转折。
- * 实测：180 年里有三分之一的帧 `luckPillar === null`。
- *
- * 故每一档都带上它需要的柱数：跨度 N 年要 ⌈N/10⌉ 柱。
- *
- * ## σ 的基准窗**不随跨度变**
- *
- * `series.spanYears` 恒为 60，`buildSeries` 里取 `min(spanYears, years)`。
- * 这是对的，而且重要：若基准窗跟着跨度走，同一年的 z 分数就会随
- * **你把滑块拖到哪里**而变 —— 一个节点会因为显示选择而出现或消失。
- * 统计节点必须是盘的性质，不是界面状态的函数。
- */
-const SPANS: readonly { readonly years: number; readonly pillars: number;
-  readonly label: string }[] = [
-  { years: 60, pillars: 6, label: "60 年" },
-  { years: 120, pillars: 12, label: "120 年" },
-  { years: 180, pillars: 18, label: "180 年" },
-];
 
 const GROUPS: readonly [string, string][] = [
   ["tenGod", "十神"], ["element", "五行"], ["palace", "宫位"],
@@ -49,8 +23,8 @@ const PANELS: readonly (readonly [string, string])[] = [
 ];
 
 export default function CurvesPage() {
-  const { base, record, params: ctxParams } = useChart();
-  const [span, setSpan] = useState(60);
+  // 跨度由顶栏的全局开关给，与大运 / 流年 / 节点 / 完整报告同一个
+  const { base, spanBase: ctxSpanBase, span, params: ctxParams } = useChart();
   // 取景窗。null = 全幅。下标在**抽稀之后**那个空间里，与 keep 同一口径。
   const [win, setWin] = useState<CurveWindow | null>(null);
   const [group, setGroup] = useState("tenGod");
@@ -76,8 +50,6 @@ export default function CurvesPage() {
   const flip = (k: string) => setPanels((cur) =>
     cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]);
 
-  const spanDef = SPANS.find((x) => x.years === span) ?? SPANS[0]!;
-
   /**
    * 🧪 实验分支（exp/fleeting-month-weights）：让流月进权重。
    *
@@ -86,35 +58,32 @@ export default function CurvesPage() {
    * 它**不进**命盘、报告与参数指纹之外的任何地方，只改这一页的曲线。
    */
   const [fmw, setFmw] = useState(false);
-  const [fmwRatio, setFmwRatio] = useState(1 / 3);
+  const [fmwRatio, setFmwRatio] = useState(0.25);
 
   /**
-   * 跨度超过默认柱数能覆盖的范围时，**另建一份带足够大运柱的基础盘**。
-   * 不改全局参数 —— 那会连带改掉大运页、报告与节点页的范围，
-   * 而用户只是想把这一张图拉长。
+   * 带足够大运柱的基础盘 —— 平时直接用全局的那一份（跨度够用就是 `base` 本身）。
+   * 只有实验开着时才另建：实验改动按字段叠在用户**当前参数**之上，不整段替换，
+   * 否则用户校准过的权重会被悄悄换回默认值。
    */
   const spanBase = useMemo(() => {
-    if (base === null || record === null) return base;
-    const needSpan = spanDef.pillars > ctxParams.temporal.luckPillarCount;
-    if (!needSpan && !fmw) return base;
-    // 实验改动按字段叠在用户**当前参数**之上，不整段替换 ——
-    // 否则用户校准过的权重会被悄悄换回默认值
-    const p = loadParams({
-      ...ctxParams,
-      ...(needSpan ? { temporal: { luckPillarCount: spanDef.pillars } } : {}),
-      ...(fmw ? {
+    if (base === null || ctxSpanBase === null) return ctxSpanBase;
+    if (!fmw) return ctxSpanBase;
+    try {
+      return baseForSpan(base, span, {
         series: { ...ctxParams.series, fleetingMonthInWeights: true },
         weights: { ...ctxParams.weights, fleetingMonth: { ratioToYear: fmwRatio } },
-      } : {}),
-    } as never);
-    try {
-      return buildBaseChart(buildChart(record.input, chartOptionsOf(p)), p);
-    } catch { return base; }
-  }, [base, record, ctxParams, spanDef.pillars, fmw, fmwRatio]);
+      });
+    } catch { return ctxSpanBase; }
+  }, [base, ctxSpanBase, span, ctxParams, fmw, fmwRatio]);
 
+  // 基准窗 = 整个跨度：换跨度，μ 与 σ 重算，±θσ 界线随之移动
   const S = useMemo(
-    () => (spanBase === null ? null : buildSeries(spanBase, { years: span })),
+    () => (spanBase === null ? null : buildSeries(spanBase, { years: span, statsYears: span })),
     [spanBase, span]);
+
+  // 跨度一变，抽稀之后的下标空间就变了 —— 旧窗口的下标指向的是另一段时间，
+  // 旧的选中点也一样。必须清掉，不能留着「看起来还能用」。
+  useEffect(() => { setPicked(null); setWin(null); }, [span]);
 
   // 取点处的即时盘 —— 神煞与结构事件由它来，解释曲线为何在此处变化
   const atFrame = useMemo(() => {
@@ -251,13 +220,15 @@ export default function CurvesPage() {
             而 60 年只够看见其中一轮。
           </p>
           <p className="sub">
-            <strong>σ 的基准窗仍是头 60 年，不随跨度变。</strong>
-            若基准跟着跨度走，同一年的 z 分数就会随你把跨度拖到哪里而变 ——
-            一个节点会因为显示选择而出现或消失。那不该发生：
-            统计节点是盘的性质，不是界面状态的函数。
+            <strong>σ 的基准窗 = 这一整段（{span} 年），随跨度重算。</strong>
+            所以 ±θσ 界线会随跨度移动，同一年的 z 分数、哪些年越线也随之改变 ——
+            <b>这是尺子换了，不是那一年变了</b>：逐年的数值本身一位不差。
+            切到 120 / 180 年时，基准里纳入了第 60 年之后那些已超出寿数的年份，
+            它们拉大或压低 σ，前 60 年里越线的集合因此会变。
+            想知道一个节点是不是「盘的性质」，换几个跨度看它在不在。
           </p>
           <p className="sub">
-            大运柱数也跟着加到 {spanDef.pillars} 柱。
+            大运柱数也跟着加到 {span / 10} 柱。
             不加的话最后那几十年<strong>根本没有大运这一层</strong>，
             曲线照画，而那个断口看起来像一个真实的转折。
           </p>
@@ -292,20 +263,9 @@ export default function CurvesPage() {
               <option value="weight">权重对齐（同一把尺，看谁大谁小）</option>
             </select>
           </label>
-          <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
-            跨度
-            <select value={span} onChange={(e) => {
-              // ⚠️ 跨度一变，抽稀之后的下标空间就变了 —— 旧窗口的下标
-              // 指向的是另一段时间。必须清掉，不能留着「看起来还能用」。
-              setSpan(Number(e.target.value)); setPicked(null); setWin(null);
-            }}>
-              {SPANS.map((x) => (
-                <option key={x.years} value={x.years}>
-                  {x.label}（{x.pillars} 柱大运）
-                </option>
-              ))}
-            </select>
-          </label>
+          <span className="dim" style={{ fontSize: 13 }}>
+            跨度 <b>{SPAN_LABEL[span]}</b>（顶栏切换，{span / 10} 柱大运）
+          </span>
           <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
             采样
             <select value={density}
@@ -379,12 +339,9 @@ export default function CurvesPage() {
             总量占流年
             <select value={fmwRatio} disabled={!fmw}
               onChange={(e) => setFmwRatio(Number(e.target.value))}>
-              <option value={0.05}>5%</option>
-              <option value={0.1}>10%</option>
+              <option value={0}>0%（等同关闭）</option>
               <option value={0.25}>25%（1/4）</option>
-              <option value={1 / 3}>33%（1/3）</option>
               <option value={0.5}>50%</option>
-              <option value={1}>100%（与流年等量）</option>
             </select>
           </label>
           {fmw && (
@@ -597,7 +554,8 @@ export default function CurvesPage() {
               <ul className="tight">
                 {atFrame.ev.shensha.filter(
                   (h) => h.tone === "activated" && h.landsOn.pillar !== "fleetingMonth").map((h) => (
-                  <li key={`${h.name}-${h.palace}-${h.basis}`}>
+                  // 大运与流年的神煞都落在「外部」，name-palace-basis 会撞 —— 加上落在哪一柱哪一层
+                  <li key={`${h.name}-${h.palace}-${h.basis}-${h.landsOn.pillar}-${h.landsOn.layer}`}>
                     <b>{h.name}</b> 落{h.palace}　{h.toneReason}
                     {h.narrativeTags.length === 0 ? ""
                       : `　—— 传统上与「${h.narrativeTags.join("、")}」一类的事相联系`}
@@ -620,8 +578,8 @@ export default function CurvesPage() {
             ? <p className="sub">此月无。</p>
             : (
               <ul className="tight">
-                {atFrame.month.shensha.map((h) => (
-                  <li key={`m-${h.name}-${h.basis}-${h.landsOn.layer}`}>
+                {atFrame.month.shensha.map((h, k) => (
+                  <li key={`m-${k}-${h.name}-${h.basis}-${h.landsOn.layer}`}>
                     <b>{h.name}</b> 落流月{h.landsOn.layer === "stem" ? h.stem : h.branch}
                     {h.narrativeTags.length === 0 ? ""
                       : `　—— 传统上与「${h.narrativeTags.join("、")}」一类的事相联系`}

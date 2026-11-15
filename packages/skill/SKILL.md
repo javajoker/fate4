@@ -208,6 +208,11 @@ Web 界面与本 Skill 共用同一份内核、同一套模板。
 ## 统计节点：两层结论与趋吉避凶
 
 用户问「哪几年要注意」「什么时候会有变化」一类问题时，用 `report.sh --nodes`。
+默认只看起运后 60 年；用户要看更远的，加 `--span 120` 或 `--span 180`。
+**跨度一变，σ 就重算** —— 同一年的 z 分数在不同跨度下不同，节点会出现或消失，
+那是尺子换了、不是那一年变了。`meta.span` 与 `nodes.statsFrom / statsTo` 会写明基准窗。
+超过 100 年的部分已超出任何人的寿数，**不要把它说成「这个人的一生」**。
+
 返回的 `nodes.findings` 是**两层**结构：
 
 ```
@@ -241,7 +246,7 @@ guidance  趋吉避凶。只有压力向的节点有
 | `scripts/year_view.sh` | 某年的盘面、应期与域聚合 |
 | `scripts/month_view.sh` | 某月的神煞与引动（无权重） |
 | `scripts/day_view.sh` | 某日的五行冲突（无权重） |
-| `scripts/report.sh` | 完整报告，Markdown 或 JSON；`--nodes` 加算 §6.5 统计节点 |
+| `scripts/report.sh` | 完整报告，Markdown 或 JSON；`--nodes` 加算 §6.5 统计节点；`--span 60\|120\|180` 定时间跨度 |
 
 全部脚本以 `--json` 产出结构化数据。脚本失败时以非零码退出并在 stderr 说明原因，
 **不要忽略非零退出码继续编造内容**。

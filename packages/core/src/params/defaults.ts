@@ -53,7 +53,7 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
     }),
     // 🧪 实验：仅当 series.fleetingMonthInWeights 为真时才铺
     fleetingMonth: Object.freeze({
-      ratioToYear: 1 / 3,       // 流月总量 = 流年的三分之一（110 → 36.67）
+      ratioToYear: 0.25,        // 流月总量 = 流年的四分之一（110 → 27.5）。可选 0 / 0.25 / 0.5
     }),
     kongwang: Object.freeze({
       enabled: true,
@@ -198,7 +198,6 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
     qiyun: Object.freeze({ mode: "continuous", daysPerYear: 3, reportBothModes: true }),
     luckPillarCount: 12,
     includeXiaoyun: false,
-    yearRangeYears: 120,
     sampleLuckAt: Object.freeze(["start", "mid", "end"]),
     // [硬约束] 月与日是引动的扳机，不是力量的来源
     monthLayer: Object.freeze({ recomputeWeights: false as const, maxInteractionsShown: 3 }),

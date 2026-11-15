@@ -10,21 +10,26 @@ import { useChart } from "../../../lib/chartContext";
 
 const SCALES: readonly NodeScale[] = ["large", "medium", "small"];
 
-const SCALE_NOTE: Readonly<Record<NodeScale, string>> = {
-  large: "起运后六十年整段为基准，问的是「这在一生里有多异常」。",
-  medium: "每步大运一个均值，六十年只有六个样本 —— 故用中位数与绝对中位差，样本标准差在 n=6 时会被离群的那一步自己撑大。",
+/** 说明随跨度走 —— 写死「六十年」，切到 120 / 180 年时这几句就成了错的。 */
+const scaleNote = (span: number): Readonly<Record<NodeScale, string>> => ({
+  large: `起运后 ${span} 年整段为基准，问的是「这在这一整段里有多异常」。`
+    + (span > 60 ? "超过 60 年的部分已超出任何人的寿数，反映的是这套方法本身的结构。" : ""),
+  medium: `每步大运一个均值，${span} 年只有 ${span / 10} 个样本 —— 故用中位数与绝对中位差，样本标准差在 n 这么小时会被离群的那一步自己撑大。`,
   small: "基准是所在的那一步大运，问的是「这个月在本运中有多异常」。区间不跨步：跨步的两点参照的是不同基准。",
-};
+});
 
 export default function NodesPage() {
-  const { base, audience } = useChart();
+  const { base, spanBase, span, audience } = useChart();
   const [threshold, setThreshold] = useState(2);
   const [scale, setScale] = useState<NodeScale>("large");
   const [open, setOpen] = useState<string | null>(null);
 
   // 两段记忆化分开：曲线只随命盘变（约 700 ms），节点随尺度与门槛变（约 300 ms）。
   // 合成一个 useMemo 会让每次点门槛都重跑曲线，实测主线程一次卡住 1.6 秒。
-  const S = useMemo(() => (base === null ? null : buildSeries(base)), [base]);
+  // 基准窗 = 整个跨度：换跨度，μ 与 σ 重算，同一年的 z 分数随之改变
+  const S = useMemo(
+    () => (spanBase === null ? null : buildSeries(spanBase, { years: span, statsYears: span })),
+    [spanBase, span]);
   // 节点是「指向某个时段」的输出。普通读者档只给已经过去的那些 ——
   // 与 plainCards 同一条线，同一个判据（当前年本身算当下）。
   const nowYear = new Date().getFullYear();
@@ -58,12 +63,14 @@ export default function NodesPage() {
       </p>
       <p className="sub">
         每条曲线越过 ±{threshold.toFixed(1)} 个标准差的<b>时段</b>，基准取
-        {" "}{S.statsFrom}–{S.statsTo} 年这一段本身的散布。
+        {" "}{S.statsFrom}–{S.statsTo} 年（{span} 年）这一段本身的散布。
+        <b>换时间跨度，σ 就重算</b> —— 同一年的 z 分数在 60 / 120 / 180 年下不同，
+        节点会因此出现或消失；这是尺子换了，不是那一年变了。
       </p>
       <p className="sub">
         <b>这是排序，不是概率。</b>命盘的时间序列由出生时刻完全决定，是确定性的准周期序列，
         不是从某个分布里抽出的随机样本。对它算标准差，得到的是这条序列自身的经验散布 ——
-        越阈的采样点在任何一张盘上都是那么多。「本命六十年中最偏离常态的三段」成立；
+        越阈的采样点在任何一张盘上都是那么多。「本命这一段里最偏离常态的三段」成立；
         「这一年发生巨变的概率是 5%」不成立。
       </p>
 
@@ -80,7 +87,7 @@ export default function NodesPage() {
           </button>
         ))}
       </div>
-      <p className="sub" style={{ fontSize: 12 }}>{SCALE_NOTE[scale]}</p>
+      <p className="sub" style={{ fontSize: 12 }}>{scaleNote(span)[scale]}</p>
       <p className="sub" style={{ fontSize: 12 }}>
         越阈 <b>{F.set.total}</b> 段，按偏离程度列前 {shown.length} 条
         {F.set.excluded.length > 0 && <> · 另有 {F.set.excluded.length} 条序列因散布为零而不参与</>}。

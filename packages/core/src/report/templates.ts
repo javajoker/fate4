@@ -407,6 +407,11 @@ const methodTemplates: NarrativeTemplate[] = [
     zhHans: "所用流派：日界{ziHour}；命宫月界{mingGong}；十二长生{changsheng}；土的长生{earth}；调候来源{tiaohou}；女命子女星{childStar}。换一套开关，同一张盘可能得出不同结论 —— 故随盘声明。",
     en: "Schools in force: day boundary {ziHour}; life-palace month boundary {mingGong}; twelve-stage cycle {changsheng}; earth's cycle {earth}; climatic source {tiaohou}; female child star {childStar}. A different set of switches can yield a different reading of the same chart, which is why they travel with it.",
   }),
+  // 跨度要说清楚，因为它改变一件事：统计节点的基准窗就是这一整段，换跨度 σ 重算。
+  T("method.span", "data", "method", ["span"], {
+    zhHans: "时间跨度 {span} 年，自起运起算。统计节点与曲线界线的 σ 取这一整段：换一个跨度，同一年的 z 分数会随之改变，节点也会出现或消失；逐年的数值则不受影响。",
+    en: "Time span {span} years, counted from the start of the first luck pillar. The sigma behind statistical nodes and curve bands is taken over this whole span: change the span and the z-score of the same year changes with it, and nodes appear or disappear; the year-by-year values themselves do not change.",
+  }),
   T("method.provenance", "data", "method", ["engineVersion", "paramsHash", "solarProvider"], {
     zhHans: "引擎版本 {engineVersion}，参数快照 {paramsHash}，太阳黄经算法 {solarProvider}。半年后若同一生辰算出不同结果，这三项是唯一能回答「为什么」的依据。",
     en: "Engine {engineVersion}, parameter snapshot {paramsHash}, solar longitude provider {solarProvider}. If the same birth data yields a different result half a year from now, these three fields are the only way to answer why.",

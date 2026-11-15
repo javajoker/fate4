@@ -8,11 +8,12 @@ import { LuckBars } from "../../../components/charts";
 import { num, pillarText } from "../../../lib/format";
 
 export default function LuckPage() {
-  const { chart, base } = useChart();
+  const { chart, spanBase, span } = useChart();
   const [pick, setPick] = useState<number | null>(null);
+  // 大运列 span / 10 柱：60 年 6 柱、120 年 12 柱、180 年 18 柱
   const r = useMemo(
-    () => (base === null ? null : buildReport(base, { curveYears: 1 })),
-    [base],
+    () => (spanBase === null ? null : buildReport(spanBase, { span, curveYears: 1 })),
+    [spanBase, span],
   );
   if (r === null || chart === null) return null;
 

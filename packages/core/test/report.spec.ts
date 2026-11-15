@@ -512,11 +512,24 @@ describe("**精度地平线** —— 引擎自己给不出保证的那一段，�
     year, month: 5, day: 12, hour: 14, minute: 30,
     gender: "male", timeZone: "Asia/Shanghai", longitude: 121.47,
   });
-  const reportOf = (year: number) => buildReport(
+  // 这一组测的是「越过地平线时必须说出来」，所以要一份**确实越过**的报告。
+  // 默认跨度是 60 年，1990 年的盘只到 2058，不越 2100 —— 故显式取 120 年
+  // （旧默认的曲线长度），下面另有专门的用例看默认与 180 年各自落在哪一档。
+  const reportOf = (year: number, span: 60 | 120 | 180 = 120) => buildReport(
     buildBaseChart(buildChart(chartOf(year)), loadParams()),
-    { includeNodes: true, now: { year: 2026, month: 10, day: 15 } });
+    { includeNodes: true, now: { year: 2026, month: 10, day: 15 }, span });
   const methodText = (year: number) =>
     reportOf(year).method.narrative.map((l) => l.text).join("\n");
+
+  it("**跨度决定报告覆盖到哪一年，也就决定落在哪一档** —— 60 越容差不越跨度，180 越跨度", () => {
+    const h60 = reportOf(1990, 60).method.horizon;
+    expect(h60.furthestYear).toBeLessThan(2100);
+    expect(h60.band, "默认 60 年只到 2058：越过 2050 的容差，没越 2100 的跨度").toBe("beyondTolerance");
+    const h180 = reportOf(1990, 180).method.horizon;
+    expect(h180.furthestYear).toBeGreaterThan(2100);
+    expect(h180.band).toBe("beyondSpan");
+    expect(h180.beyondSpanCount).toBeGreaterThan(reportOf(1990, 120).method.horizon.beyondSpanCount);
+  });
 
   it("三段的分界就在 2050 与 2100 上，不差一年", () => {
     expect(precisionBandOf(2050)).toBe("guaranteed");

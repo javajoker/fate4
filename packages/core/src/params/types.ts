@@ -275,9 +275,13 @@ export interface TemporalParams {
   readonly qiyun: { readonly mode: "continuous" | "traditionalDiscrete"; readonly daysPerYear: number; readonly reportBothModes: boolean };
   readonly luckPillarCount: number;
   readonly includeXiaoyun: boolean;
-  readonly yearRangeYears: number;
   readonly sampleLuckAt: readonly string[];
-  /** [硬约束] 流月不重算权重。改为 true 则构建期报错。 */
+  /**
+   * [硬约束] **月历视图（monthView）**的月层不重算权重。改为 true 则构建期报错。
+   *
+   * 🧪 这条只管月历视图。曲线上「流月入权重」的实验另有开关
+   * `series.fleetingMonthInWeights`（默认 false），两者管的是不同的东西。
+   */
   readonly monthLayer: { readonly recomputeWeights: false; readonly maxInteractionsShown: number };
   /** [硬约束] 流日不重算权重。 */
   readonly dayLayer: { readonly recomputeWeights: false; readonly severityLevels: number };

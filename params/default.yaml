@@ -69,7 +69,7 @@ weights:
     stemBranchSwing: false         # 上下半年干支主次切换（实验）
 
   fleetingMonth:                   # 🧪 实验分支：流月入权重时的配重
-    ratioToYear: 0.3333333333333333  # 总量 = 流年 × 此比例（= 1/3，110 → 36.67）；仅 series.fleetingMonthInWeights 为真时生效
+    ratioToYear: 0.25              # 总量 = 流年 × 此比例（110 → 27.5）；仅 series.fleetingMonthInWeights 为真时生效。网页上可选 0 / 0.25 / 0.5
 
   kongwang:
     enabled: true
@@ -288,7 +288,6 @@ temporal:
     reportBothModes: true
   luckPillarCount: 12
   includeXiaoyun: false
-  yearRangeYears: 120
   sampleLuckAt: [start, mid, end]
 
   monthLayer:
