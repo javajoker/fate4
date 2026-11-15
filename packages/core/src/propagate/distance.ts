@@ -24,14 +24,24 @@ export function isNatalPillar(p: PillarKind): boolean {
   return NATAL_ORDER[p] !== undefined;
 }
 
+/**
+ * 🧪 流月在距离上按**流年**同类处理。
+ *
+ * 只借流年的方向系数，不另造一套：流月的总量已经缩到流年的比例
+ * （`weights.fleetingMonth.ratioToYear`），影响力的大小由量表达，
+ * 不再在距离上重复打折 —— 两处各折一次，就成了平方。
+ * 但「太岁君临」那条日主加成是流年**独有**的，不借。
+ */
+const asDistanceClass = (k: PillarKind): PillarKind => (k === "fleetingMonth" ? "annual" : k);
+
 /** 载体 from 施力于载体 to 的距离系数。 */
 export function propagationDistance(
   from: Carrier, to: Carrier, p: PropagationParams,
 ): number {
   const a = from.position;
   const b = to.position;
-  const pa = a.pillar;
-  const pb = b.pillar;
+  const pa = asDistanceClass(a.pillar);
+  const pb = asDistanceClass(b.pillar);
 
   const ia = NATAL_ORDER[pa];
   const ib = NATAL_ORDER[pb];
@@ -48,8 +58,8 @@ export function propagationDistance(
     else if (pb === "annual") base = e.natalToAnnual;
     else base = p.distance.adjacent;
 
-    // 流年施于日主另加成 —— 太岁君临，直冲本人
-    if (pa === "annual" && to.flags.includes("DAY_MASTER")) {
+    // 流年施于日主另加成 —— 太岁君临，直冲本人。⚠️ 判**原始**种类：流月没有这一条
+    if (a.pillar === "annual" && to.flags.includes("DAY_MASTER")) {
       base *= e.annualToDayMasterBonus;
     }
     return base;

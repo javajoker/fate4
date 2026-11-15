@@ -78,20 +78,38 @@ export default function CurvesPage() {
   const spanDef = SPANS.find((x) => x.years === span) ?? SPANS[0]!;
 
   /**
+   * 🧪 实验分支（exp/fleeting-month-weights）：让流月进权重。
+   *
+   * 主线上这是硬约束 —— 月、日是引动的扳机，不是力量的来源。这里放开它，
+   * 只为在实盘上看一眼：把流月按流年的一个比例铺成权重之后，曲线长什么样。
+   * 它**不进**命盘、报告与参数指纹之外的任何地方，只改这一页的曲线。
+   */
+  const [fmw, setFmw] = useState(false);
+  const [fmwRatio, setFmwRatio] = useState(0.25);
+
+  /**
    * 跨度超过默认柱数能覆盖的范围时，**另建一份带足够大运柱的基础盘**。
    * 不改全局参数 —— 那会连带改掉大运页、报告与节点页的范围，
    * 而用户只是想把这一张图拉长。
    */
   const spanBase = useMemo(() => {
     if (base === null || record === null) return base;
-    if (spanDef.pillars <= ctxParams.temporal.luckPillarCount) return base;
+    const needSpan = spanDef.pillars > ctxParams.temporal.luckPillarCount;
+    if (!needSpan && !fmw) return base;
+    // 实验改动按字段叠在用户**当前参数**之上，不整段替换 ——
+    // 否则用户校准过的权重会被悄悄换回默认值
     const p = loadParams({
-      ...ctxParams, temporal: { luckPillarCount: spanDef.pillars },
+      ...ctxParams,
+      ...(needSpan ? { temporal: { luckPillarCount: spanDef.pillars } } : {}),
+      ...(fmw ? {
+        series: { ...ctxParams.series, fleetingMonthInWeights: true },
+        weights: { ...ctxParams.weights, fleetingMonth: { ratioToYear: fmwRatio } },
+      } : {}),
     } as never);
     try {
       return buildBaseChart(buildChart(record.input, chartOptionsOf(p)), p);
     } catch { return base; }
-  }, [base, record, ctxParams, spanDef.pillars]);
+  }, [base, record, ctxParams, spanDef.pillars, fmw, fmwRatio]);
 
   const S = useMemo(
     () => (spanBase === null ? null : buildSeries(spanBase, { years: span })),
@@ -196,10 +214,17 @@ export default function CurvesPage() {
         其余四行相对它才有生我、我生、克我、我克之分。
         十神一组里的<b>比肩</b>与<b>劫财</b>同属{dm.element}，是同一路的两个面。
       </p>
+      {fmw ? (
+        <p className="sub">
+          <b>🧪 实验中：流月已进权重。</b>总量为流年的 {Math.round(fmwRatio * 100)}%。
+          月度上的变化现在有两个来源：大运份额的推移，和流月自己的权重。
+        </p>
+      ) : (
       <p className="sub">
         <b>流月不参与权重。</b>月度上之所以有变化，是大运份额在推移，不是流月加了分。
         流月只进符号层：它在扰动序列里，不在权重序列里。
       </p>
+      )}
       </>)}
 
       {span > 60 && (
@@ -309,8 +334,11 @@ export default function CurvesPage() {
           μ 与 σ 取自与<b>节点层同一个估计量</b>（按<b>月度全样本</b>算，
           与采样密度无关），故图上的穿越点与 §6.5 列出的节点对得上。
           按年采样只是抽稀了画的点，没有换一把尺子。
-          月度视图里那些锯齿是<b>立春换柱的真实阶跃</b> —— 权重类序列在一个立春年内
-          近乎恒定，跳变都发生在换柱那一刻。
+          {fmw
+            ? <>🧪 实验中：月度视图里权重类序列<b>年内每个月都会跳一次</b>（流月在加权），
+              不再只有立春那一下。</>
+            : <>月度视图里那些锯齿是<b>立春换柱的真实阶跃</b> —— 权重类序列在一个立春年内
+              近乎恒定，跳变都发生在换柱那一刻。</>}
         </p>
         )}
       </div>
@@ -328,6 +356,44 @@ export default function CurvesPage() {
             </button>
           );
         })}
+      </div>
+
+      <div className="card" style={{
+        marginTop: 14, borderColor: fmw ? "var(--accent)" : undefined,
+      }}>
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
+          <strong style={{ fontSize: 13 }}>🧪 实验</strong>
+          <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
+            <input type="checkbox" checked={fmw}
+              onChange={(e) => setFmw(e.target.checked)} />
+            让流月进权重
+          </label>
+          <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
+            总量占流年
+            <select value={fmwRatio} disabled={!fmw}
+              onChange={(e) => setFmwRatio(Number(e.target.value))}>
+              <option value={0.1}>10%</option>
+              <option value={0.25}>25%（≈ 1/4）</option>
+              <option value={0.5}>50%</option>
+              <option value={1}>100%（与流年等量）</option>
+            </select>
+          </label>
+          {fmw && (
+            <span className="dim" style={{ fontSize: 12 }}>
+              流月 {num(110 * fmwRatio, 1)}（流年 110 × {fmwRatio}），干支按 40:70 同比缩放；
+              距离系数借流年的
+            </span>
+          )}
+        </div>
+        {fmw && (
+          <p className="sub" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+            <strong>⚠️ 这违反主线的硬约束，下面凡写着「流月不参与权重」的说明在此模式下都不成立。</strong>
+            此时权重类序列年内每个月都会跳一次，月才真的携带信息 ——
+            所以权重类的交点与节点按月报，不再只报到年。
+            这只改这一页的曲线，不进命盘、报告与其他页面；
+            参数指纹与主线不同，数不可与主线的报告相比。
+          </p>
+        )}
       </div>
 
       <div className="panelbar">
@@ -465,7 +531,10 @@ export default function CurvesPage() {
           </p>
           <p className="sub">
             <strong>⚠️ 这是「图上」的交点，不是「模型里某一天发生了什么」。</strong>
-            权重类序列在立春那一刻<strong>真的阶跃</strong>，年内几乎不动；
+            {fmw
+              ? <>🧪 实验中，权重类序列年内每个月都在跳，所以按年画的平滑线与模型更不像 ——
+                  它只穿过每年立春那一个点，月内的起伏全被抽掉了；想看实情请切到按月。</>
+              : <>权重类序列在立春那一刻<strong>真的阶跃</strong>，年内几乎不动；</>}
             但按年采样时，图上画的是相邻两个立春之间一条平滑的坡。
             于是一次阶跃在图上会被画成「上一个立春与下一个立春之间某处穿过」——
             表上给的是前者，模型里它发生在后一个立春。

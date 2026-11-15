@@ -41,6 +41,16 @@ export interface WeightParams {
     readonly branch: number;
     readonly stemBranchSwing: boolean;
   };
+  /**
+   * 🧪 实验（`exp/fleeting-month-weights` 分支）：流月入权重时的配重。
+   *
+   * 只在 `series.fleetingMonthInWeights` 为真时生效。总量取**流年的这个比例**
+   * （干支内部按流年的 40:70 同比缩放），而不是另给一个绝对数 ——
+   * 流年的总量若日后重新校准，流月跟着走，两者的相对大小不会悄悄漂开。
+   */
+  readonly fleetingMonth: {
+    readonly ratioToYear: number;
+  };
   readonly kongwang: {
     readonly enabled: boolean;
     readonly factor: number;
@@ -358,7 +368,16 @@ export interface SeriesParams {
    * `fleetingMonthInWeights` 硬约束禁止。
    */
   readonly samplesPerYear: number;
-  /** [硬约束] 流月不参与权重。只入符号层（神煞、扰动）。 */
+  /**
+   * 🧪 实验：流月是否参与权重。**默认 false，主线上它是硬约束。**
+   *
+   * 为 false 时流月只入符号层（神煞、扰动）—— 月、日是引动的扳机，
+   * 不是力量的来源（docs/08 §1）。为 true 时流月另铺一柱载体，总量为
+   * `weights.year.total × weights.fleetingMonth.ratioToYear`。
+   *
+   * 这会改变曲线的含义：权重类序列在年内不再只有大运斜坡在动，
+   * 而是每个月都跳一次。参数指纹因此不同，数不可与主线的报告相比。
+   */
   readonly fleetingMonthInWeights: boolean;
   /** [校准] 扰动系数。 */
   readonly agitation: {

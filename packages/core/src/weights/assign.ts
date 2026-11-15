@@ -114,6 +114,8 @@ export function layExternalCarriers(
   luck: LuckContext | null | undefined,
   annual: Pillar | null | undefined,
   params: Params = DEFAULT_PARAMS,
+  /** 🧪 实验：给了且 `series.fleetingMonthInWeights` 为真才铺。 */
+  fleetingMonth?: Pillar | null,
 ): { carriers: Carrier[]; luckStemShare: number | null } {
   const w = params.weights;
   const carriers: Carrier[] = [];
@@ -130,6 +132,14 @@ export function layExternalCarriers(
   if (annual != null) {
     carriers.push(...layPillar("annual", annual, w.year.stem, w.year.branch,
       { total: w.year.total }));
+  }
+  // 🧪 流月：总量取流年的一个比例，干支内部同流年的 40:70 同比缩放。
+  // 开关关着时这一支根本不走 —— 默认行为与主线逐字相同。
+  if (fleetingMonth != null && params.series.fleetingMonthInWeights) {
+    const r = w.fleetingMonth.ratioToYear;
+    carriers.push(...layPillar("fleetingMonth", fleetingMonth,
+      w.year.stem * r, w.year.branch * r,
+      { total: w.year.total * r, ratioToYear: r }));
   }
   return { carriers, luckStemShare };
 }

@@ -31,6 +31,7 @@ const RANGES: readonly RangeRule[] = [
   { path: "weights.luck.stemShareEnd", min: 0, max: 1 },
   { path: "weights.luck.stepFirstHalf", min: 0, max: 1 },
   { path: "weights.luck.stepSecondHalf", min: 0, max: 1 },
+  { path: "weights.fleetingMonth.ratioToYear", min: 0, max: 1 },
   { path: "weights.year.total", min: 1, max: 1000 },
   { path: "weights.year.stem", min: 0, max: 1000 },
   { path: "weights.year.branch", min: 0, max: 1000 },
@@ -278,13 +279,14 @@ function validateInvariants(p: Params): string[] {
     );
   }
 
-  // [硬约束] 月度采样与流月不加权。放开任一条，曲线的含义就变了：
-  // 前者会抹掉运内的连续变化，后者会让三十天的短期因素与终生不变的月令同台竞争。
+  // [硬约束] 月度采样。放开它，会抹掉运内的连续变化。
   if (p.series.samplesPerYear !== 12) {
     errors.push("series.samplesPerYear 必须为 12（硬约束：月度采样）");
   }
-  if (p.series.fleetingMonthInWeights !== false) {
-    errors.push("series.fleetingMonthInWeights 必须为 false（硬约束：流月只入符号层）");
+  // 🧪 实验分支：流月入权重的硬约束在这里**放开**了（主线上此处报错）。
+  // 放开后要对得上的只有一件事 —— 它必须是个布尔，不能是别的什么。
+  if (typeof p.series.fleetingMonthInWeights !== "boolean") {
+    errors.push("series.fleetingMonthInWeights 必须为布尔值");
   }
   // 统计基准窗不得长于绘制跨度 —— 否则窗内有一段没有采样点
   if (p.series.spanYears > p.series.drawYears) {

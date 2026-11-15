@@ -260,14 +260,19 @@ export function buildSeries(base: BaseChart, opts: SeriesOptions = {}): SeriesSe
   });
 
   const out: Series[] = [];
-  // 除扰动外一律 monthResolving: false —— 流月不加权，见 Series.monthResolving
+  // 除扰动外一律 monthResolving: false —— 流月不加权，见 Series.monthResolving。
+  // 🧪 实验分支：流月入权重时，权重类序列的月**确实**携带信息，故随开关走。
+  // 应期域不随：它按构造是年尺度（scope: "year"），流月的权重只让它的数轻微晃动，
+  // 不让它真的变成月尺度。
+  const weightsSeeMonth = base.params.series.fleetingMonthInWeights;
   const push = (
     id: string, kind: SeriesKind, label: string, baseValue: number,
     polarity: Series["polarity"], pick: (ev: EvaluatedChart, i: number) => number,
   ) => {
     const values = evs.map(pick);
     out.push({ id, kind, label, baseValue, values,
-      deltas: values.map((v) => v - baseValue), polarity, monthResolving: false });
+      deltas: values.map((v) => v - baseValue), polarity,
+      monthResolving: weightsSeeMonth && kind !== "domain" });
   };
 
   // ── 十神 10 条 ──

@@ -5,7 +5,7 @@ import { buildSeries, relationStrength } from "../src/temporal/series.js";
 import { curveStats } from "../src/temporal/nodes.js";
 import { evaluateAt } from "../src/temporal/evaluate.js";
 import { annualPillarOf } from "../src/temporal/views.js";
-import { loadParams, ParamsValidationError } from "../src/params/load.js";
+import { loadParams, paramsHash, ParamsValidationError } from "../src/params/load.js";
 import { DEFAULT_PARAMS } from "../src/params/defaults.js";
 import type { BirthInput } from "../src/chart/types.js";
 import { BRANCHES } from "../src/types/ganzhi.js";
@@ -219,10 +219,16 @@ describe("扰动序列", () => {
 });
 
 describe("硬约束", () => {
-  it("月度采样与流月不加权，改则参数校验拦下", () => {
+  it("月度采样是硬约束，改则参数校验拦下", () => {
     expect(() => loadParams({ series: { samplesPerYear: 1 as never } }))
       .toThrow(ParamsValidationError);
-    expect(() => loadParams({ series: { fleetingMonthInWeights: true as never } }))
+  });
+
+  it("🧪 实验分支：流月入权重的硬约束已放开，但必须是布尔、比例必须在 [0,1]", () => {
+    expect(() => loadParams({ series: { fleetingMonthInWeights: true } })).not.toThrow();
+    expect(() => loadParams({ series: { fleetingMonthInWeights: "yes" as never } }))
+      .toThrow(ParamsValidationError);
+    expect(() => loadParams({ weights: { fleetingMonth: { ratioToYear: 1.5 } } as never }))
       .toThrow(ParamsValidationError);
   });
 
@@ -309,5 +315,107 @@ describe("**绘制跨度与大运柱数必须配套**", () => {
     for (let i = 0; i < av.length; i++) {
       expect(cv[i], `第 ${i} 帧`).toBeCloseTo(av[i]!, 9);
     }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+//  🧪 实验分支 exp/fleeting-month-weights：流月入权重
+//  主线上这是硬约束。这一组只在实验分支存在。
+// ═══════════════════════════════════════════════════════════
+
+describe("🧪 流月入权重（实验）", () => {
+  const mk = (over: Parameters<typeof loadParams>[0]) => {
+    const p = loadParams(over);
+    return buildBaseChart(buildChart(EXAMPLE, chartOptionsOf(p)), p);
+  };
+  const off = base;
+  const on = mk({ series: { fleetingMonthInWeights: true } });
+  const sample = buildSeries(on, { years: 12, statsYears: 12 });
+  const f = sample.frames[30]!;
+  const at = (b: typeof off, month = f.fleetingMonth) => evaluateAt(b, {
+    luck: f.luckPillar === null ? null : { pillar: f.luckPillar, elapsedYears: f.elapsedYears },
+    annual: f.annual, fleetingMonth: month,
+  });
+
+  it("**反向对照：开关关着时，传不传流月，权重逐位相同** —— 默认行为与主线不变", () => {
+    const withMonth = at(off);
+    const without = evaluateAt(off, {
+      luck: f.luckPillar === null ? null : { pillar: f.luckPillar, elapsedYears: f.elapsedYears },
+      annual: f.annual,
+    });
+    expect(withMonth.carriers.map((c) => c.weight)).toEqual(without.carriers.map((c) => c.weight));
+    expect(withMonth.carriers.some((c) => c.position.pillar === "fleetingMonth")).toBe(false);
+  });
+
+  it("**开关打开：流月载体存在，总量恰为流年的 ratio**", () => {
+    const ev = evaluateAt(on, {
+      luck: f.luckPillar === null ? null : { pillar: f.luckPillar, elapsedYears: f.elapsedYears },
+      annual: f.annual, fleetingMonth: f.fleetingMonth,
+    });
+    // 传导之前的初始配重 —— 传导会改 weight，故直接看 trace 的第一条
+    const initial = (k: string) => ev.carriers
+      .filter((c) => c.position.pillar === k)
+      .reduce((a, c) => a + c.trace[0]!.to, 0);
+    expect(initial("annual")).toBeCloseTo(110, 6);
+    expect(initial("fleetingMonth")).toBeCloseTo(110 * 0.25, 6);
+  });
+
+  it("干支内部按流年的 40:70 同比缩放", () => {
+    const ev = at(on);
+    const stem = ev.carriers.find((c) => c.position.pillar === "fleetingMonth" && c.position.layer === "stem")!;
+    expect(stem.trace[0]!.to).toBeCloseTo(40 * 0.25, 6);
+    const branchSum = ev.carriers
+      .filter((c) => c.position.pillar === "fleetingMonth" && c.position.layer === "branch")
+      .reduce((a, c) => a + c.trace[0]!.to, 0);
+    expect(branchSum).toBeCloseTo(70 * 0.25, 6);
+  });
+
+  it("**比例参数真的在起作用，而且线性**", () => {
+    const half = mk({ series: { fleetingMonthInWeights: true }, weights: { fleetingMonth: { ratioToYear: 0.5 } } } as never);
+    const initial = (b: typeof off) => at(b).carriers
+      .filter((c) => c.position.pillar === "fleetingMonth").reduce((a, c) => a + c.trace[0]!.to, 0);
+    expect(initial(half)).toBeCloseTo(2 * initial(on), 6);
+  });
+
+  it("**换一个流月，权重类序列就变** —— 与主线上「毫无变化」恰成反向", () => {
+    const other = { stem: f.fleetingMonth.stem === "甲" ? "乙" : "甲", branch: f.fleetingMonth.branch === "子" ? "午" : "子" } as typeof f.fleetingMonth;
+    const a = at(on); const b = at(on, other);
+    const differs = Object.keys(a.conclusions.tenGods).some((g) =>
+      Math.abs(a.conclusions.tenGods[g as keyof typeof a.conclusions.tenGods]
+        - b.conclusions.tenGods[g as keyof typeof b.conclusions.tenGods]) > 1e-9);
+    expect(differs).toBe(true);
+    // 主线对照：同样换法，开关关着时十神一位不动
+    const c = at(off); const d = at(off, other);
+    for (const g of Object.keys(c.conclusions.tenGods)) {
+      expect(c.conclusions.tenGods[g as keyof typeof c.conclusions.tenGods])
+        .toBe(d.conclusions.tenGods[g as keyof typeof d.conclusions.tenGods]);
+    }
+  });
+
+  it("monthResolving 随开关走：权重类为真，应期域仍为假，关着时全为假（扰动除外）", () => {
+    const Son = buildSeries(on, { years: 3, statsYears: 3 });
+    const Soff = buildSeries(off, { years: 3, statsYears: 3 });
+    for (const s of Son.series) {
+      if (s.kind === "agitation") expect(s.monthResolving).toBe(true);
+      else if (s.kind === "domain") expect(s.monthResolving).toBe(false);
+      else expect(s.monthResolving, s.id).toBe(true);
+    }
+    for (const s of Soff.series) expect(s.monthResolving, s.id).toBe(s.kind === "agitation");
+  });
+
+  it("**流月在距离上借流年的系数，但不借「太岁君临」那条日主加成**", async () => {
+    const { propagationDistance } = await import("../src/propagate/distance.js");
+    const ev = at(on);
+    const dm = ev.carriers.find((c) => c.flags.includes("DAY_MASTER"))!;
+    const ann = ev.carriers.find((c) => c.position.pillar === "annual" && c.position.layer === "stem")!;
+    const mon = ev.carriers.find((c) => c.position.pillar === "fleetingMonth" && c.position.layer === "stem")!;
+    const P = on.params.propagation;
+    const dAnn = propagationDistance(ann, dm, P);
+    const dMon = propagationDistance(mon, dm, P);
+    expect(dAnn / dMon).toBeCloseTo(P.external.annualToDayMasterBonus, 9);
+  });
+
+  it("参数指纹因此不同 —— 数不可与主线的报告相比", () => {
+    expect(paramsHash(on.params)).not.toBe(paramsHash(off.params));
   });
 });

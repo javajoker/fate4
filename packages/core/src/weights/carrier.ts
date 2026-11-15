@@ -10,7 +10,10 @@
 
 import type { Branch, Element, HiddenRole, Polarity, Stem } from "../types/ganzhi.js";
 
-export type PillarKind = "year" | "month" | "day" | "hour" | "luck" | "annual" | "taiyuan";
+export type PillarKind =
+  | "year" | "month" | "day" | "hour" | "luck" | "annual" | "taiyuan"
+  /** 🧪 实验：流月作为权重载体。仅当 `series.fleetingMonthInWeights` 为真时出现。 */
+  | "fleetingMonth";
 export type Layer = "stem" | "branch";
 
 export interface Position {

@@ -68,6 +68,9 @@ weights:
     branch: 70                     # 注意：40:70，非本命的 40:60
     stemBranchSwing: false         # 上下半年干支主次切换（实验）
 
+  fleetingMonth:                   # 🧪 实验分支：流月入权重时的配重
+    ratioToYear: 0.25              # 总量 = 流年 × 此比例（110 → 27.5）；仅 series.fleetingMonthInWeights 为真时生效
+
   kongwang:
     enabled: true
     factor: 0.80                   # [校准]
@@ -339,7 +342,9 @@ series:
   # 而结构的结局也在运内变化 —— 实测 528 步运里 191 次出现
   # 「冲而拔根 ⇄ 相冲」「合解冲 ⇄ 相冲」这类翻转。年度采样会把它们整个抹掉。
   samplesPerYear: 12
-  # [硬约束] 流月不参与权重。月度上之所以有变化，是大运份额在推移，不是流月加了分。
+  # 🧪 实验分支 exp/fleeting-month-weights：流月是否参与权重。
+  # 主线上这是硬约束 false —— 月度上之所以有变化，是大运份额在推移，不是流月加了分。
+  # 本分支放开了校验；为 true 时流月另铺一柱，总量见 weights.fleetingMonth。
   fleetingMonthInWeights: false
   agitation:                       # [校准] 扰动序列的系数
     chong: 1.00

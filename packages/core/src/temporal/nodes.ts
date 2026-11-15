@@ -305,7 +305,9 @@ function reasonsAt(base: BaseChart, frames: readonly SeriesFrame[], enterIndex: 
     }
     for (const e of ev.events) {
       // 只取牵动大运或流年的 —— 纯本命的结构在基础盘里就有，不是这一刻的变化
-      if (!e.pillars.includes("luck") && !e.pillars.includes("annual")) continue;
+      // 🧪 流月入权重时，牵动流月的结构也是这一刻的变化
+      if (!e.pillars.includes("luck") && !e.pillars.includes("annual")
+        && !e.pillars.includes("fleetingMonth")) continue;
       out.push({ kind: "structure", distanceMonths: dist,
         text: `${e.narrativeTag}（${e.pillars.join("、")}）` });
     }
