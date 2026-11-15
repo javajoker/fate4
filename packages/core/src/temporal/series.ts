@@ -59,6 +59,7 @@ import { DOMAIN_LABEL, type Domain } from "../yingqi/types.js";
 import { aggregateDomains } from "../yingqi/domains.js";
 import { runYingqi } from "../yingqi/engine.js";
 import { evaluateAt, type EvaluatedChart } from "./evaluate.js";
+import { monthInWeights } from "../weights/assign.js";
 import { annualPillarOf, lichunJdOf, favorIndexOf } from "./views.js";
 import { PALACE, type PalaceName } from "../shensha/scan.js";
 import type { PillarKind } from "../weights/carrier.js";
@@ -249,8 +250,22 @@ export function buildSeries(base: BaseChart, opts: SeriesOptions = {}): SeriesSe
     fleetingMonth: f.fleetingMonth,
   }));
 
-  // 域需要跑一遍应期规则
-  const domainsAt = evs.map((ev, i) => {
+  // 域需要跑一遍应期规则 —— **在不含流月的即时盘上跑**。
+  //
+  // 应期规则是年这一级的（scope: "year"），写的时候外部柱只有大运与流年：
+  // 「流年六合本命」只查事件里有没有流年，于是流年与流月相合也会被当成流年合本命；
+  // 「空亡填实」「驿马被合」看的是神煞修饰，而修饰由即时盘的结构事件算出 ——
+  // 流月一冲一合，它们就逐月出现又消失。实测（1990 例盘，流月 50%）：720 帧里
+  // 387 帧的年级应期命中因流月而不同。流月照样进曲线的权重，但不改变年级应期；
+  // 流月引动了什么另由 monthTrigger 按「流年大运应期」展示。
+  // 流月不进权重时两者是同一份，不多算一遍。
+  const monthIn = monthInWeights(base.params);
+  const yearEvs: readonly EvaluatedChart[] = !monthIn ? evs : frames.map((f) => evaluateAt(base, {
+    luck: f.luckPillar === null ? null
+      : { pillar: f.luckPillar, elapsedYears: f.elapsedYears },
+    annual: f.annual,
+  }));
+  const domainsAt = yearEvs.map((ev, i) => {
     const f = frames[i]!;
     return aggregateDomains(runYingqi({
       chart: base.chart, natal: base, now: ev,
@@ -260,11 +275,11 @@ export function buildSeries(base: BaseChart, opts: SeriesOptions = {}): SeriesSe
   });
 
   const out: Series[] = [];
-  // 除扰动外一律 monthResolving: false —— 流月不加权，见 Series.monthResolving。
-  // 🧪 实验分支：流月入权重时，权重类序列的月**确实**携带信息，故随开关走。
-  // 应期域不随：它按构造是年尺度（scope: "year"），流月的权重只让它的数轻微晃动，
-  // 不让它真的变成月尺度。
-  const weightsSeeMonth = base.params.series.fleetingMonthInWeights;
+  // monthResolving：流月进权重时，权重类序列的月**确实**携带信息，报到月；
+  // 流月不进（开关关着或比例为 0）时只报到年。判据与铺不铺流月载体是同一个 ——
+  // 只看开关会把「开着但比例 0」误标为报到月，而那时权重类其实没在动。
+  // 应期域永远只报到年：它在不含流月的盘面上判（见上）。
+  const weightsSeeMonth = monthIn;
   const push = (
     id: string, kind: SeriesKind, label: string, baseValue: number,
     polarity: Series["polarity"], pick: (ev: EvaluatedChart, i: number) => number,

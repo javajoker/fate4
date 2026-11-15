@@ -45,7 +45,7 @@ describe("跨度 60 / 120 / 180", () => {
   });
 });
 
-describe("**σ 的基准窗固定为起运后 60 年，不随跨度变**", () => {
+describe("**σ 的基准窗固定为起运后 60 年，不随跨度变**", { timeout: 90_000 }, () => {
   const S60 = seriesForSpan(base, 60);
   const S120 = seriesForSpan(base, 120);
   const S180 = seriesForSpan(base, 180);
@@ -121,13 +121,23 @@ describe("**σ 的基准窗固定为起运后 60 年，不随跨度变**", () =>
   });
 });
 
-describe("**统计节点：窗外的年份也被扫描，用同一把尺子**", () => {
+// 180 年的序列要按月算 2160 帧（流月进权重时还要多算一遍不含流月的即时盘），放宽超时
+describe("**统计节点：窗外的年份也被扫描，用同一把尺子**", { timeout: 90_000 }, () => {
   const S60 = seriesForSpan(base, 60);
   const S120 = seriesForSpan(base, 120);
   const S180 = seriesForSpan(base, 180);
-  const big = (S: typeof S60) => findNodes(S, "large", { maxShown: 99999 });
-  const mid = (S: typeof S60) => findNodes(S, "medium", { maxShown: 99999 });
-  const sml = (S: typeof S60) => findNodes(S, "small", { maxShown: 99999 });
+  // 同一份序列的节点只算一次 —— 每条用例各算一遍，三个跨度乘起来要几十秒
+  const memo = (scale: "large" | "medium" | "small") => {
+    const m = new Map<typeof S60, ReturnType<typeof findNodes>>();
+    return (S: typeof S60) => {
+      let v = m.get(S);
+      if (v === undefined) { v = findNodes(S, scale, { maxShown: 99999 }); m.set(S, v); }
+      return v;
+    };
+  };
+  const big = memo("large");
+  const mid = memo("medium");
+  const sml = memo("small");
   const winEnd = S60.statsTo;
 
   it("**跨度越长，节点覆盖的年份越远** —— 60 年时一个窗外的节点都没有", () => {
@@ -197,7 +207,7 @@ describe("**统计节点：窗外的年份也被扫描，用同一把尺子**", 
   });
 });
 
-describe("报告随跨度走", () => {
+describe("报告随跨度走", { timeout: 90_000 }, () => {
   const rep = (span?: 60 | 120 | 180) => buildReport(base, {
     includeNodes: true, ...(span === undefined ? {} : { span }),
   });

@@ -160,7 +160,8 @@ export function renderMonth(v: MonthView): string {
         + `${h.toneIsDefault ? "常态" : `${label(TONE_LABEL, h.tone)}　${h.toneReason}`}`);
     }
   }
-  o.push("\n  流月只作引动，不参与权重计算。");
+  // 月视图从不给权重；流月的分量（默认流年的一半）另在曲线与统计节点里
+  o.push("\n  这一视图报的是这个月引动了什么，不给权重。流月的分量另在曲线与统计节点里。");
   return o.join("\n");
 }
 

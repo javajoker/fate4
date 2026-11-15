@@ -110,11 +110,21 @@ function layPillar(
  * 与本命部分**完全分开** —— 基础盘只含本命的 L1，即时盘在它之上追加外部柱。
  * 这样「四柱的初始配重不随时点改变」是构造上的事实，而不是碰巧相等。
  */
+/**
+ * 流月此刻是否真的进权重：开关开着，**且比例大于 0**。
+ *
+ * 与 `layExternalCarriers` 铺不铺流月载体是同一个判据 —— 各处若各写一份，
+ * 迟早有一处把「比例 0」当成「开着」。
+ */
+export function monthInWeights(p: Params): boolean {
+  return p.series.fleetingMonthInWeights && p.weights.fleetingMonth.ratioToYear > 0;
+}
+
 export function layExternalCarriers(
   luck: LuckContext | null | undefined,
   annual: Pillar | null | undefined,
   params: Params = DEFAULT_PARAMS,
-  /** 🧪 实验：给了且 `series.fleetingMonthInWeights` 为真才铺。 */
+  /** 流月。给了且 `monthInWeights(params)` 为真才铺。 */
   fleetingMonth?: Pillar | null,
 ): { carriers: Carrier[]; luckStemShare: number | null } {
   const w = params.weights;
@@ -133,12 +143,11 @@ export function layExternalCarriers(
     carriers.push(...layPillar("annual", annual, w.year.stem, w.year.branch,
       { total: w.year.total }));
   }
-  // 🧪 流月：总量取流年的一个比例，干支内部同流年的 40:70 同比缩放。
+  // 流月：总量取流年的一个比例，干支内部同流年的 40:70 同比缩放。
   // 开关关着时这一支根本不走 —— 默认行为与主线逐字相同。
   // 比例为 0 时一个载体都不铺 —— 零权重的载体照样触发结构事件，
   // 「比例 0」才不是「关」。这样两者逐位相同，是连续性的端点。
-  if (fleetingMonth != null && params.series.fleetingMonthInWeights
-    && w.fleetingMonth.ratioToYear > 0) {
+  if (fleetingMonth != null && monthInWeights(params)) {
     const r = w.fleetingMonth.ratioToYear;
     carriers.push(...layPillar("fleetingMonth", fleetingMonth,
       w.year.stem * r, w.year.branch * r,

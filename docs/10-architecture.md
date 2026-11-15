@@ -80,7 +80,10 @@ core/src/
 │   ├── types.ts  helpers.ts  rules.ts  engine.ts  domains.ts
 ├── temporal/
 │   ├── series.ts                 # L5c 生命曲线（月度采样）
-│   ├── nodes.ts                  # L5n 统计节点（θσ 穿越区间）
+│   ├── nodes.ts                  # L5n 统计节点（θσ 穿越区间；scanNodes 分页、drawnCrossings 图上交点）
+│   ├── span.ts                   # 报告时间跨度 60 / 120 / 180 年（baseForSpan、seriesForSpan）
+│   ├── spline.ts                 # 曲线页的平滑曲线数学 —— 图与交点表共用一份
+│   ├── monthTrigger.ts           # 流月应期：三条对流月看不见的结构规则，按「流年大运应期」展示
 │   ├── evaluate.ts               # 瞬时求解
 │   ├── views.ts                  # 大运/流年/流月/流日四视图
 │   └── types.ts
@@ -485,8 +488,10 @@ description: 四柱（八字）排盘与推演。当用户提供出生年月日�
 | L4p | 内外分布归一化；特质表四栏齐全且全中文 | vitest（P12） |
 | 内经 | 配属表十三行逐格对账；病名无条件禁；框定语与免责语缺一即拦 | vitest |
 | L6 | 模板文本不得含 Markdown（同一份要进 Web、CLI、JSON 三处） | vitest |
-| L5c | 序列条数与分组；月内变化的两个来源可分；流月不入权重；扰动只取最强一条 | vitest |
-| L5n | 三尺度；中节点用 MAD；**平直序列不产出节点**的反向对照 | vitest（`nodes.spec.ts`，29 条） |
+| L5c | 序列条数与分组；月内变化的两个来源可分；流月进权重（默认 50%）且比例 0 ≡ 关、向 0 连续；应期域不看流月；扰动只取最强一条 | vitest（`series.spec.ts`） |
+| L5n | 三尺度；中节点用 MAD；**平直序列不产出节点**的反向对照；分页拼回完整清单、过滤在切页之前 | vitest（`nodes.spec.ts`，55 条） |
+| 跨度 | 60 / 120 / 180 年；σ 基准窗固定 60 年，z 分数三个跨度逐位相同；窗外的年份用同一把尺子扫描 | vitest（`span.spec.ts`，21 条） |
+| 流月应期 | 开库 / 会局夺合 / 争合三类与旧结构层的漏出逐帧一致（10 / 9 / 67） | vitest（`monthTrigger.spec.ts`，13 条） |
 | L6 两层 | 摘要里的每个数字都能在证据里找到；**凭空多一个数必被报出**的反向对照 | vitest（`finding.spec.ts`，21 条） |
 | 端到端 | CLI 的 Markdown 与内核直调**逐字节相同** | vitest |
 

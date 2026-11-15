@@ -41,6 +41,7 @@ import { DOMAIN_LABEL } from "../yingqi/types.js";
 import type { Locale } from "./templates.js";
 import { toHant } from "./hant.js";
 import { buildSeries } from "../temporal/series.js";
+import { monthInWeights } from "../weights/assign.js";
 import {
   baseForSpan, DEFAULT_SPAN, pillarsForSpan, type SpanYears,
 } from "../temporal/span.js";
@@ -117,6 +118,7 @@ const PENDING_CALIBRATION: readonly string[] = Object.freeze([
   "《穷通宝鉴》120 格调候表（通行本，凭记忆转录，未经实体书逐格核对；31 格标为版本有出入）",
   "藏干变体（申 / 亥）",
   "女命子女星分配",
+  "流月进权重的比例（默认流年的 50%，可选 0 / 25% / 50%；改变曲线与统计节点，没有文献依据）",
 ]);
 
 // ─────────────────────────────────────────────────────────
@@ -239,7 +241,7 @@ export function buildReport(
   // **基础盘算一次。**下文全部时间层视图共用这一份 ——
   // 每张即时盘都持有指回它的引用，同一次报告内是同一个对象。
   const base0 = toBaseChart(from, options.params);
-  // 🧪 跨度：60 / 120 / 180 年。大运柱数不够就另建一份，不改传入的那份。
+  // 跨度：60 / 120 / 180 年。大运柱数不够就另建一份，不改传入的那份。
   const spanYears: SpanYears = options.span ?? DEFAULT_SPAN;
   const base = baseForSpan(base0, spanYears);
   const chart = base.chart;
@@ -716,7 +718,12 @@ export function buildReport(
         neutral: "与本命用忌皆不直接相干，本月外部条件平缓",
       }[mv.tone.relationToYongshen],
     });
-    L7.add("month.noWeightNote", {});
+    // 月视图从不给权重；流月有没有分量看参数，两种情形各用各的说法
+    if (monthInWeights(params)) {
+      L7.add("month.viewNote", { pct: String(Math.round(params.weights.fleetingMonth.ratioToYear * 100)) });
+    } else {
+      L7.add("month.noWeightNote", {});
+    }
     if (dv.conflicts.length === 0) {
       L7.add("day.calm", { pillar: `${dv.pillar.stem}${dv.pillar.branch}` });
     } else {

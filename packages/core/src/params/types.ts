@@ -42,9 +42,10 @@ export interface WeightParams {
     readonly stemBranchSwing: boolean;
   };
   /**
-   * 🧪 实验（`exp/fleeting-month-weights` 分支）：流月入权重时的配重。
+   * [校准] 流月进权重时的配重。默认 0.5：流月总量 = 流年的一半（110 → 55）。
    *
-   * 只在 `series.fleetingMonthInWeights` 为真时生效。总量取**流年的这个比例**
+   * 只在 `series.fleetingMonthInWeights` 为真时生效；为 0 时一个载体都不铺，
+   * 与关掉开关逐位相同。总量取**流年的这个比例**
    * （干支内部按流年的 40:70 同比缩放），而不是另给一个绝对数 ——
    * 流年的总量若日后重新校准，流月跟着走，两者的相对大小不会悄悄漂开。
    */
@@ -279,8 +280,9 @@ export interface TemporalParams {
   /**
    * [硬约束] **月历视图（monthView）**的月层不重算权重。改为 true 则构建期报错。
    *
-   * 🧪 这条只管月历视图。曲线上「流月入权重」的实验另有开关
-   * `series.fleetingMonthInWeights`（默认 false），两者管的是不同的东西。
+   * 这条只管月历视图：那一页报的是这个月引动了什么（神煞与引动事件），从不给权重。
+   * 曲线与统计节点里流月进不进权重，另由 `series.fleetingMonthInWeights` 管（默认进），
+   * 两者管的是不同的东西。
    */
   readonly monthLayer: { readonly recomputeWeights: false; readonly maxInteractionsShown: number };
   /** [硬约束] 流日不重算权重。 */
@@ -368,19 +370,22 @@ export interface SeriesParams {
    * 实测 528 步运里 191 次出现同一组参与者的事件结局翻转
    * （冲而拔根 ⇄ 相冲、合解冲 ⇄ 相冲）。年度采样会把这些整个抹掉。
    *
-   * 月度上有变化是因为大运份额在推移，**不是流月加了分** —— 后者由
-   * `fleetingMonthInWeights` 硬约束禁止。
+   * 月度上的变化有两个来源：大运份额的推移，和流月自己的权重
+   * （`fleetingMonthInWeights`，默认开，流年的一半）。关掉流月时只剩前者。
    */
   readonly samplesPerYear: number;
   /**
-   * 🧪 实验：流月是否参与权重。**默认 false，主线上它是硬约束。**
+   * 流月是否进权重。**默认 true**，比例见 `weights.fleetingMonth.ratioToYear`（默认 0.5）。
    *
-   * 为 false 时流月只入符号层（神煞、扰动）—— 月、日是引动的扳机，
-   * 不是力量的来源（docs/08 §1）。为 true 时流月另铺一柱载体，总量为
-   * `weights.year.total × weights.fleetingMonth.ratioToYear`。
+   * 为 true 时流月另铺一柱载体，总量为 `weights.year.total × ratioToYear`；
+   * 它对别人的作用（结构事件、通根、受方耦合）同比缩放；墓库被冲刑则开、会局夺合、
+   * 争合妒合三条只看有无的规则对流月看不见（改在神煞里按「流年大运应期」展示）；
+   * 年级的应期域在不含流月的盘面上判。见 docs/12 §9。
    *
-   * 这会改变曲线的含义：权重类序列在年内不再只有大运斜坡在动，
-   * 而是每个月都跳一次。参数指纹因此不同，数不可与主线的报告相比。
+   * 为 false（或比例为 0）时流月只入符号层（神煞、扰动）：权重类序列年内只有
+   * 大运斜坡在动，月序不携带信息，节点只报到年。
+   *
+   * 开与关的参数指纹不同，数不可相比。
    */
   readonly fleetingMonthInWeights: boolean;
   /** [校准] 扰动系数。 */

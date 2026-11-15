@@ -119,7 +119,7 @@ export function propagate(
         // 在同一方向同时计入正反两种作用，是这类实现最常见的重复计数 bug。
         if (rel === "无") continue;
         const Y = rel === "同" ? 1 : polarityCoefOf(ci, carriers[j]!, rel, p);
-        // 🧪 受方耦合缩放：流月载体按比例少分流量，见 Carrier.couplingScale
+        // 受方耦合缩放：流月载体按比例少分流量，见 Carrier.couplingScale
         buckets[rel].push({
           j, w: Y * propagationDistance(ci, carriers[j]!, p) * (carriers[j]!.couplingScale ?? 1),
         });

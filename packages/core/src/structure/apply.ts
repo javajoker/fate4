@@ -79,7 +79,7 @@ export function applyStructure(
   const p = params.structure;
   const events: StructureEvent[] = [];
 
-  // 🧪 流月入权重时，它**对别人的作用**也要按比例缩。
+  // 流月进权重时，它**对别人的作用**也要按比例缩。
   //
   // 第一版只缩了流月自己的分量（总量 = 流年 × 比例），结果实测：比例设成 0、
   // 流月载体权重为零，年内月间变化仍有 0.115σ（关时 0.004σ），23% 的月间跳变 ≥0.3σ。
@@ -94,7 +94,7 @@ export function applyStructure(
   const mf = (pillars: readonly PillarKind[]): number =>
     pillars.includes("fleetingMonth") ? fmRatio : 1;
 
-  // 🧪 三条**只看「有没有」、不读权重**的离散规则，对流月一律看不见。
+  // 三条**只看「有没有」、不读权重**的离散规则，对流月一律看不见。
   //
   // 实测（1990 例盘，720 帧）：它们在比例 10% 与 1/3 下受影响的帧数**完全相同**
   // （开库 10、会局夺合 9、争合 67）—— 权重根本不是它们的输入，调比例无济于事。
@@ -121,7 +121,7 @@ export function applyStructure(
   const heCount = new Map<string, number>();
   const keyOf = (pillar: PillarKind, layer: string) => `${pillar}.${layer}`;
   for (const h of heCands) {
-    if (involvesMonthly(h)) continue;     // 🧪 流月不引起别人的争合
+    if (involvesMonthly(h)) continue;     // 流月不引起别人的争合
     for (const s of h.slots) heCount.set(keyOf(s.pillar, "branch"), (heCount.get(keyOf(s.pillar, "branch")) ?? 0) + 1);
     for (const s of h.stemSlots ?? []) heCount.set(keyOf(s.pillar, "stem"), (heCount.get(keyOf(s.pillar, "stem")) ?? 0) + 1);
   }
@@ -130,7 +130,7 @@ export function applyStructure(
     || (h.stemSlots ?? []).some((s) => (heCount.get(keyOf(s.pillar, "stem")) ?? 0) > 1);
 
   // ── 墓库定态：被冲或被刑则开 ──
-  // 🧪 牵涉流月的冲、刑不开库；流月自己的支也不论开闭（它的藏干分量本就是比例缩过的）
+  // 牵涉流月的冲、刑不开库；流月自己的支也不论开闭（它的藏干分量本就是比例缩过的）
   const chongOnly = clashes.filter((c) => c.kind === "chong"
     && !isMonthly((c.a as BranchSlot).pillar) && !isMonthly((c.b as BranchSlot).pillar));
   const tombOpened = new Set<PillarKind>();
@@ -232,7 +232,7 @@ export function applyStructure(
   const consumedByBigger = new Set<PillarKind>();
   for (const h of heCands) {
     if (h.kind === "sanhui" || h.kind === "sanhe") {
-      if (involvesMonthly(h)) continue;   // 🧪 流月成的局不夺别人的合
+      if (involvesMonthly(h)) continue;   // 流月成的局不夺别人的合
       for (const s of h.slots) consumedByBigger.add(s.pillar);
     }
   }
@@ -276,7 +276,7 @@ export function applyStructure(
     } else {
       const f = contested ? p.transform.contentionFactor : p.transform.bindFactorOnFailure;
       for (const c of parts) {
-        // 🧪 绑缚不经 coef，单独按比例向 1 靠拢
+        // 绑缚不经 coef，单独按比例向 1 靠拢
         damp(c, 1 - (1 - f) * mf(pillars), aDelta);
         c.flags.push(contested ? "CONTESTED" : "BOUND");
       }

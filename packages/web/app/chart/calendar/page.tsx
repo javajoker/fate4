@@ -16,7 +16,10 @@ const TONE_TEXT = {
 } as const;
 
 export default function CalendarPage() {
-  const { chart, base } = useChart();
+  const { chart, base, params } = useChart();
+  // 流月有没有分量、有多大，看参数 —— 这一页本身从不给权重
+  const monthPct = params.series.fleetingMonthInWeights
+    ? Math.round(params.weights.fleetingMonth.ratioToYear * 100) : 0;
   const today = useToday();
   const [pick, setPick] = useState<number | null>(null);
 
@@ -40,9 +43,11 @@ export default function CalendarPage() {
     <>
       <h1>月历 · 今日</h1>
       <p className="sub">
-        流月与流日<b>不参与权重计算</b>。把一个三十天的短期因素放进权重迭代，
-        等于让它与终生不变的月令同台竞争数值 —— 既无理论依据，也会让年度曲线被高频噪声淹没。
-        它们只作引动的扳机。
+        这一页报的是每个月<b>引动了什么</b> —— 神煞与引动事件，<b>不给权重</b>。
+        {monthPct > 0
+          ? <>流月的分量另在生命曲线与统计节点里：按流年的 {monthPct}% 进权重（参数可调，0 即不进）。</>
+          : <>这份盘的参数里流月不进权重，流月只作引动。</>}
+        流日不进权重。
       </p>
 
       <h2>{today.year} 年逐月</h2>

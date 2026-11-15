@@ -66,7 +66,7 @@ export function chongDistanceCoef(
   if (gap !== null) {
     return gap <= 1 ? p.adjacent : gap === 2 ? p.gap1 : p.gap2;
   }
-  // 🧪 流月按流年同类处理（理由见 propagate/distance.ts）
+  // 流月按流年同类处理（理由见 propagate/distance.ts）
   const set = new Set([a, b].map((k) => (k === "fleetingMonth" ? "annual" : k)));
   if (set.has("luck") && set.has("annual")) return p.luckToAnnual;
   if (set.has("luck")) return p.luckToNatal;

@@ -112,7 +112,7 @@ function slotsOf(
   luck: Pillar | null, annual: Pillar | null, fleeting: Pillar | null,
 ): Slot[] {
   const out: Slot[] = [];
-  // 流月不受 scanTargets 约束：它只在流月视图里出现，且调用方给了才有。
+  // 流月不受 scanTargets 约束：调用方给了才有（流月视图、曲线上逐月的即时盘）。
   const targets = new Set<string>([...p.scanTargets, "fleetingMonth"]);
   const add = (pillar: ShenshaTarget, pil: { stem: Stem; branch: Branch } | null) => {
     if (pil === null || !targets.has(pillar)) return;

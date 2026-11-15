@@ -25,7 +25,7 @@ export function isNatalPillar(p: PillarKind): boolean {
 }
 
 /**
- * 🧪 流月在距离上按**流年**同类处理。
+ * 流月在距离上按**流年**同类处理。
  *
  * 只借流年的方向系数，不另造一套：流月的总量已经缩到流年的比例
  * （`weights.fleetingMonth.ratioToYear`），影响力的大小由量表达，

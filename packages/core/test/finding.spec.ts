@@ -159,7 +159,9 @@ describe("时点写法", () => {
     for (const f of F.findings) {
       const ids = f.detail.narrative.map((l) => l.templateId);
       const monthly = /月/.test(f.summary.text);
-      expect(ids.includes("node.monthNote"), f.id).toBe(!monthly);
+      // 应期域用 node.monthNote.domain（年级，不看流月），权重类在流月关掉时用 node.monthNote
+      const noted = ids.includes("node.monthNote") || ids.includes("node.monthNote.domain");
+      expect(noted, f.id).toBe(!monthly);
     }
   });
 });

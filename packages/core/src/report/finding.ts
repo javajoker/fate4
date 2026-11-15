@@ -154,7 +154,8 @@ const monthLabel = (m: TimeMark) => `${MONTH_BRANCH_ORDER[m.monthIndex]!}月`;
 /**
  * 区间的可读写法。
  *
- * `monthResolved` 为 false 时**只报到年** —— 权重类序列在立春年内近乎恒定，
+ * `monthResolved` 为 false 时**只报到年**：应期域是年级的（在不含流月的盘面上判）；
+ * 权重类序列只有在流月不进权重时才如此 —— 那时它们在立春年内近乎恒定，
  * 边界恒为寅起丑止，写成某月是它没有的精度。见 `Series.monthResolving`。
  */
 export function spanText(n: NodeInterval): string {
@@ -278,8 +279,10 @@ export function buildFindings(
       }
       narrative.push(renderTemplate(`node.shape.${n.shape}`, {}, { locale, source: src }));
       if (!n.monthResolved) {
-        narrative.push(renderTemplate("node.monthNote", { label: n.label },
-          { locale, source: src }));
+        // 应期域是年级的（不看流月）；权重类只有在流月关掉时才会走到这里
+        narrative.push(renderTemplate(
+          n.seriesId.startsWith("domain.") ? "node.monthNote.domain" : "node.monthNote",
+          { label: n.label }, { locale, source: src }));
       }
       narrative.push(n.reasons.length > 0
         ? renderTemplate("node.reasons",

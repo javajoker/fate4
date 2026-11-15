@@ -368,9 +368,16 @@ const currentTemplates: NarrativeTemplate[] = [
     zhHans: "{month}：月柱{pillar}，其气属{element}，{relation}。",
     en: "{month}: month pillar {pillar}, phase {element}; {relation}.",
   }),
+  // 月视图本身从不给权重（MonthView 的类型里不许出现权重字段）。流月有没有分量、
+  // 有多大，取决于参数 —— 两条模板各说各的那一种，不让读者把「这一节没有权重」
+  // 读成「流月没有分量」，也不在关掉流月时还声称它有。
+  T("month.viewNote", "data", "month", ["pct"], {
+    zhHans: "这一节报的是这个月引动了什么 —— 神煞与引动事件，不给权重。流月的分量另在曲线与统计节点里：按流年的 {pct}% 进权重。流日不进权重。",
+    en: "This section reports what the month sets in motion — symbolic stars and triggered interactions — without weights. The month's own force appears in the curves and statistical nodes instead, entering the weights at {pct}% of the year pillar's. The day layer carries no weight.",
+  }),
   T("month.noWeightNote", "data", "month", [], {
-    zhHans: "流月与流日只作引动，不参与权重计算。把一个三十天的短期因素放进权重迭代，等于让它与终生不变的月令同台竞争数值 —— 既无理论依据，也会让年度曲线被高频噪声淹没。",
-    en: "The month and day layers trigger; they do not supply force. Feeding a thirty-day factor into the weight iteration would let it compete numerically with the month command that holds for a lifetime — unfounded in theory, and enough to drown the annual curve in high-frequency noise.",
+    zhHans: "这份报告的参数里流月不进权重：流月与流日都只作引动，这一节报的是这个月引动了什么 —— 神煞与引动事件。",
+    en: "In this report's parameters the month carries no weight: the month and day layers only trigger, and this section reports what the month sets in motion — symbolic stars and triggered interactions.",
   }),
   T("day.calm", "data", "day", ["pillar"], {
     zhHans: "今日{pillar}，五行与本命无明显张力。",
@@ -699,10 +706,18 @@ const nodeTemplates: readonly NarrativeTemplate[] = [
     en: "Shape: surge. Level and rate cross the threshold together — the strongest of the three shapes.",
   }),
 
+  // 只报到年的两种来由，分开写：说错来由比不说更糟。
   T("node.monthNote", "data", "node", ["label"], {
-    zhHans: "{label}属权重类序列，而流月不参与权重。"
+    zhHans: "{label}属权重类序列，而这份报告的参数里流月不进权重。"
       + "故此段的边界是立春年的边界，报到年为止 —— 写成某月是它没有的精度。",
-    en: "{label} is a weight-bearing series, and the fleeting month carries no weight. "
+    en: "{label} is a weight-bearing series, and in this report's parameters the month carries no weight. "
+      + "Its boundaries are therefore the boundaries of solar years, and it is reported to the "
+      + "year only — naming a month would claim a precision the model does not have.",
+  }),
+  T("node.monthNote.domain", "data", "node", ["label"], {
+    zhHans: "{label}是年这一级的应期域，在不含流月的盘面上判。"
+      + "故此段的边界是立春年的边界，报到年为止 —— 写成某月是它没有的精度。",
+    en: "{label} is a year-level timing domain, judged on the chart without the month pillar. "
       + "Its boundaries are therefore the boundaries of solar years, and it is reported to the "
       + "year only — naming a month would claim a precision the model does not have.",
   }),

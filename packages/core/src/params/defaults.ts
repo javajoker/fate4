@@ -51,9 +51,9 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
       branch: 70,               // 注意 40:70，非本命的 40:60
       stemBranchSwing: false,
     }),
-    // 🧪 实验：仅当 series.fleetingMonthInWeights 为真时才铺
+    // 仅当 series.fleetingMonthInWeights 为真时才铺；比例 0 时一个载体都不铺
     fleetingMonth: Object.freeze({
-      ratioToYear: 0.25,        // 流月总量 = 流年的四分之一（110 → 27.5）。可选 0 / 0.25 / 0.5
+      ratioToYear: 0.5,         // [校准] 流月总量 = 流年的一半（110 → 55）。网页可选 0 / 0.25 / 0.5
     }),
     kongwang: Object.freeze({
       enabled: true,
@@ -222,7 +222,7 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
     spanYears: 60,
     drawYears: 60,
     samplesPerYear: 12 as const,          // [硬约束] 月度
-    fleetingMonthInWeights: false,        // 🧪 实验开关；主线为硬约束 false
+    fleetingMonthInWeights: true,         // 流月进权重（默认开）；比例见 weights.fleetingMonth
     agitation: Object.freeze({            // [校准]
       chong: 1.00, sanheSanhui: 0.85, liuhe: 0.70,
       xing: 0.60, hai: 0.40, po: 0.25,

@@ -146,7 +146,10 @@ describe("**月内确有变化，且两个来源可分**", () => {
     expect(switching, "换柱造成的跳变应远大于斜坡").toBeGreaterThan(ramp);
   });
 
-  it("**流月不参与权重** —— 权重类序列在同一时点与不给流月时相同", () => {
+  it("**流月关着（比例 0）时不参与权重** —— 权重类序列在同一时点与不给流月时相同", () => {
+    // 默认流月进权重（流年的 50%）。这一条测的是「关」的那一档，所以显式关掉。
+    const offP = loadParams({ series: { fleetingMonthInWeights: false } });
+    const base = buildBaseChart(buildChart(EXAMPLE, chartOptionsOf(offP)), offP);
     const f = S.frames[40]!;
     const withMonth = evaluateAt(base, {
       luck: f.luckPillar === null ? null : { pillar: f.luckPillar, elapsedYears: f.elapsedYears },
@@ -323,13 +326,20 @@ describe("**绘制跨度与大运柱数必须配套**", () => {
 //  主线上这是硬约束。这一组只在实验分支存在。
 // ═══════════════════════════════════════════════════════════
 
-describe("🧪 流月入权重（实验）", () => {
+describe("**流月进权重**（默认开，流年的 50%）", () => {
   const mk = (over: Parameters<typeof loadParams>[0]) => {
     const p = loadParams(over);
     return buildBaseChart(buildChart(EXAMPLE, chartOptionsOf(p)), p);
   };
-  const off = base;
-  const on = mk({ series: { fleetingMonthInWeights: true } });
+  // 默认就是开着的；「关」要显式给
+  const off = mk({ series: { fleetingMonthInWeights: false } });
+  const on = base;
+
+  it("默认：开关开着，比例 0.5", () => {
+    expect(DEFAULT_PARAMS.series.fleetingMonthInWeights).toBe(true);
+    expect(DEFAULT_PARAMS.weights.fleetingMonth.ratioToYear).toBe(0.5);
+    expect(on.params.series.fleetingMonthInWeights).toBe(true);
+  });
   const sample = buildSeries(on, { years: 12, statsYears: 12 });
   const f = sample.frames[30]!;
   const at = (b: typeof off, month = f.fleetingMonth) => evaluateAt(b, {
@@ -337,7 +347,7 @@ describe("🧪 流月入权重（实验）", () => {
     annual: f.annual, fleetingMonth: month,
   });
 
-  it("**反向对照：开关关着时，传不传流月，权重逐位相同** —— 默认行为与主线不变", () => {
+  it("**反向对照：开关关着时，传不传流月，权重逐位相同**", () => {
     const withMonth = at(off);
     const without = evaluateAt(off, {
       luck: f.luckPillar === null ? null : { pillar: f.luckPillar, elapsedYears: f.elapsedYears },
@@ -357,17 +367,17 @@ describe("🧪 流月入权重（实验）", () => {
       .filter((c) => c.position.pillar === k)
       .reduce((a, c) => a + c.trace[0]!.to, 0);
     expect(initial("annual")).toBeCloseTo(110, 6);
-    expect(initial("fleetingMonth")).toBeCloseTo(110 * 0.25, 6);
+    expect(initial("fleetingMonth")).toBeCloseTo(110 * 0.5, 6);
   });
 
   it("干支内部按流年的 40:70 同比缩放", () => {
     const ev = at(on);
     const stem = ev.carriers.find((c) => c.position.pillar === "fleetingMonth" && c.position.layer === "stem")!;
-    expect(stem.trace[0]!.to).toBeCloseTo(40 * 0.25, 6);
+    expect(stem.trace[0]!.to).toBeCloseTo(40 * 0.5, 6);
     const branchSum = ev.carriers
       .filter((c) => c.position.pillar === "fleetingMonth" && c.position.layer === "branch")
       .reduce((a, c) => a + c.trace[0]!.to, 0);
-    expect(branchSum).toBeCloseTo(70 * 0.25, 6);
+    expect(branchSum).toBeCloseTo(70 * 0.5, 6);
   });
 
   it("**比例参数真的在起作用，而且线性** —— 不依赖默认值是多少", () => {
@@ -380,7 +390,7 @@ describe("🧪 流月入权重（实验）", () => {
     expect(initial(at2(0.2))).toBeCloseTo(110 * 0.2, 6);
   });
 
-  it("**换一个流月，权重类序列就变** —— 与主线上「毫无变化」恰成反向", () => {
+  it("**换一个流月，权重类序列就变** —— 与关着时「毫无变化」恰成反向", () => {
     const other = { stem: f.fleetingMonth.stem === "甲" ? "乙" : "甲", branch: f.fleetingMonth.branch === "子" ? "午" : "子" } as typeof f.fleetingMonth;
     const a = at(on); const b = at(on, other);
     const differs = Object.keys(a.conclusions.tenGods).some((g) =>
@@ -521,7 +531,42 @@ describe("🧪 流月入权重（实验）", () => {
     expect(hi).toBeGreaterThan(lo);
   });
 
-  it("参数指纹因此不同 —— 数不可与主线的报告相比", () => {
+  // ───────── 年级应期不随流月变 ─────────
+  //
+  // 应期规则是年这一级的，写的时候外部柱只有大运与流年。流月进了即时盘之后，
+  // 「流年六合本命」会把流年与流月相合也算进去，「空亡填实」「驿马被合」会被流月的
+  // 冲合逐月改写。实测 720 帧里 387 帧的年级应期因此不同。所以应期在不含流月的即时盘上判。
+
+  it("**应期域序列在流月开与关下逐位相同** —— 年级应期不看流月", () => {
+    const So = buildSeries(on, { years: 20, statsYears: 20 });
+    const Sf = buildSeries(off, { years: 20, statsYears: 20 });
+    const doms = So.series.filter((x) => x.kind === "domain");
+    expect(doms.length).toBeGreaterThan(10);
+    for (const d of doms) {
+      expect(d.values, d.id).toEqual(Sf.series.find((x) => x.id === d.id)!.values);
+    }
+    // 而权重类确实不同 —— 证明 on 真的开着
+    const tg = So.series.find((x) => x.kind === "tenGod")!;
+    expect(tg.values).not.toEqual(Sf.series.find((x) => x.id === tg.id)!.values);
+  });
+
+  it("**反向对照：若在含流月的即时盘上判，年级应期会变** —— 证明上一条不是恒真", async () => {
+    const { runYingqi } = await import("../src/yingqi/engine.js");
+    const Sx = buildSeries(on, { years: 20, statsYears: 20 });
+    let differ = 0;
+    for (const fr of Sx.frames) {
+      const luck = fr.luckPillar === null ? null : { pillar: fr.luckPillar, elapsedYears: fr.elapsedYears };
+      const ids = (withMonth: boolean) => runYingqi({
+        chart: on.chart, natal: on,
+        now: evaluateAt(on, { luck, annual: fr.annual, ...(withMonth ? { fleetingMonth: fr.fleetingMonth } : {}) }),
+        luck: fr.luckPillar, annual: fr.annual, scope: "year", shareDelta: {} as never,
+      }, "year").map((h) => h.ruleId).sort().join(",");
+      if (ids(true) !== ids(false)) differ++;
+    }
+    expect(differ, "含流月的即时盘上，年级应期应有不少帧不同").toBeGreaterThan(Sx.frames.length / 10);
+  });
+
+  it("参数指纹因此不同 —— 开与关的数不可相比", () => {
     expect(paramsHash(on.params)).not.toBe(paramsHash(off.params));
   });
 });

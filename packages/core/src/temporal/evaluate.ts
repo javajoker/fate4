@@ -45,8 +45,8 @@ export interface Instant {
   readonly luck?: { readonly pillar: Pillar; readonly elapsedYears: number } | null;
   readonly annual?: Pillar | null;
   /**
-   * 流月。主线上**只入符号层**，不参与权重（硬约束）。
-   * 🧪 实验分支：`series.fleetingMonthInWeights` 为真时另铺一柱权重载体。
+   * 流月。总入符号层（神煞落点）；`series.fleetingMonthInWeights` 为真且比例大于 0 时
+   * （默认如此）另铺一柱权重载体。
    */
   readonly fleetingMonth?: Pillar | null;
 }
@@ -71,7 +71,7 @@ export function evaluateAt(base: BaseChart, at: Instant = {}): EvaluatedChart {
   // 四柱：拷贝基础盘的 L1，不重新配重
   const carriers: Carrier[] = cloneCarriers(base.l1);
   // 大运与流年：另铺
-  // 🧪 流月：开关关着（默认）时 layExternalCarriers 不铺它，行为与主线逐字相同
+  // 流月：开关关着或比例为 0 时 layExternalCarriers 不铺它，与不传流月逐位相同
   carriers.push(...layExternalCarriers(at.luck, at.annual, params, at.fleetingMonth).carriers);
   // 日主 / 透干 / 引出 —— 在合并后的集合上重标（幂等）
   markFlags(carriers);

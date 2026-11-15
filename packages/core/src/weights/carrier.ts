@@ -12,7 +12,7 @@ import type { Branch, Element, HiddenRole, Polarity, Stem } from "../types/ganzh
 
 export type PillarKind =
   | "year" | "month" | "day" | "hour" | "luck" | "annual" | "taiyuan"
-  /** 🧪 实验：流月作为权重载体。仅当 `series.fleetingMonthInWeights` 为真时出现。 */
+  /** 流月作为权重载体。仅当流月进权重（默认开、比例大于 0）时出现。 */
   | "fleetingMonth";
 export type Layer = "stem" | "branch";
 
@@ -65,7 +65,7 @@ export interface Carrier {
   /** 施加生克的能力系数，与自身权重独立。被合绊者仍在场，但施力打折。 */
   activity: number;
   /**
-   * 🧪 耦合缩放，缺省 1。仅实验分支的流月载体带它，值等于流月比例。
+   * 耦合缩放，缺省 1。只有流月载体带它，值等于流月比例。
    *
    * 凡**不看质量、只看「有没有」或「耦合多强」**的地方，一个零权重的载体都会
    * 与满权重的载体一样起作用。实测比例 0.0001 的效应与 0.05 几乎一样，

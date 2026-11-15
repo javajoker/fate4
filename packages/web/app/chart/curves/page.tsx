@@ -51,30 +51,34 @@ export default function CurvesPage() {
     cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]);
 
   /**
-   * 🧪 实验分支（exp/fleeting-month-weights）：让流月进权重。
+   * 流月进权重的比例。
    *
-   * 主线上这是硬约束 —— 月、日是引动的扳机，不是力量的来源。这里放开它，
-   * 只为在实盘上看一眼：把流月按流年的一个比例铺成权重之后，曲线长什么样。
-   * 它**不进**命盘、报告与参数指纹之外的任何地方，只改这一页的曲线。
+   * 默认跟随参数（`weights.fleetingMonth.ratioToYear`，默认 0.5；
+   * `series.fleetingMonthInWeights` 关着时视为 0）。这一页可以临时切成 0 / 25% / 50%
+   * 对照着看，**只改这一页的曲线** —— 统计节点页与报告仍按参数算。
    */
-  const [fmw, setFmw] = useState(false);
-  const [fmwRatio, setFmwRatio] = useState(0.25);
+  const paramRatio = ctxParams.series.fleetingMonthInWeights
+    ? ctxParams.weights.fleetingMonth.ratioToYear : 0;
+  const [pickedRatio, setPickedRatio] = useState<number | null>(null);   // null = 跟随参数
+  const ratio = pickedRatio ?? paramRatio;
+  const monthOn = ratio > 0;
+  const ratioOptions = [...new Set([0, 0.25, 0.5, paramRatio])].sort((a, b) => a - b);
 
   /**
-   * 带足够大运柱的基础盘 —— 平时直接用全局的那一份（跨度够用就是 `base` 本身）。
-   * 只有实验开着时才另建：实验改动按字段叠在用户**当前参数**之上，不整段替换，
-   * 否则用户校准过的权重会被悄悄换回默认值。
+   * 带足够大运柱的基础盘 —— 比例与参数一致时直接用全局的那一份
+   * （跨度够用就是 `base` 本身）；不一致才另建。改动按字段叠在用户**当前参数**之上，
+   * 不整段替换，否则用户校准过的权重会被悄悄换回默认值。
    */
   const spanBase = useMemo(() => {
     if (base === null || ctxSpanBase === null) return ctxSpanBase;
-    if (!fmw) return ctxSpanBase;
+    if (ratio === paramRatio) return ctxSpanBase;
     try {
       return baseForSpan(base, span, {
-        series: { ...ctxParams.series, fleetingMonthInWeights: true },
-        weights: { ...ctxParams.weights, fleetingMonth: { ratioToYear: fmwRatio } },
+        series: { ...ctxParams.series, fleetingMonthInWeights: ratio > 0 },
+        weights: { ...ctxParams.weights, fleetingMonth: { ratioToYear: ratio } },
       });
     } catch { return ctxSpanBase; }
-  }, [base, ctxSpanBase, span, ctxParams, fmw, fmwRatio]);
+  }, [base, ctxSpanBase, span, ctxParams, ratio, paramRatio]);
 
   // 扫描覆盖整个跨度，基准窗仍是起运后 60 年：μ 与 σ 不随跨度变，±θσ 界线不动
   const S = useMemo(
@@ -97,7 +101,7 @@ export default function CurvesPage() {
           : { pillar: f.luckPillar, elapsedYears: f.elapsedYears },
         annual: f.annual, fleetingMonth: f.fleetingMonth,
       }),
-      // 流月应期：不读权重，实验开关开着与关着都一样。
+      // 流月应期：不读权重，流月进不进权重都一样。
       // 一律按「流年大运应期」展示 —— 流月不是独立的力，它引动的是
       // 当前流年、大运已经摆好的局面。
       month: monthView(spanBase, f.year, f.monthIndex, spanBase.params),
@@ -190,14 +194,15 @@ export default function CurvesPage() {
         其余四行相对它才有生我、我生、克我、我克之分。
         十神一组里的<b>比肩</b>与<b>劫财</b>同属{dm.element}，是同一路的两个面。
       </p>
-      {fmw ? (
+      {monthOn ? (
         <p className="sub">
-          <b>🧪 实验中：流月已进权重。</b>总量为流年的 {Math.round(fmwRatio * 100)}%。
-          月度上的变化现在有两个来源：大运份额的推移，和流月自己的权重。
+          <b>流月按流年的 {Math.round(ratio * 100)}% 进权重。</b>
+          月度上的变化有两个来源：大运份额的推移，和流月自己的权重。
+          流日不进权重。
         </p>
       ) : (
       <p className="sub">
-        <b>流月不参与权重。</b>月度上之所以有变化，是大运份额在推移，不是流月加了分。
+        <b>流月不进权重（比例 0）。</b>月度上之所以有变化，是大运份额在推移，不是流月加了分。
         流月只进符号层：它在扰动序列里，不在权重序列里。
       </p>
       )}
@@ -300,9 +305,9 @@ export default function CurvesPage() {
           μ 与 σ 取自与<b>节点层同一个估计量</b>（按<b>月度全样本</b>算，
           与采样密度无关），故图上的穿越点与 §6.5 列出的节点对得上。
           按年采样只是抽稀了画的点，没有换一把尺子。
-          {fmw
-            ? <>🧪 实验中：月度视图里权重类序列<b>年内每个月都会跳一次</b>（流月在加权），
-              不再只有立春那一下。</>
+          {monthOn
+            ? <>月度视图里权重类序列<b>年内每个月都会动</b>（流月在加权），
+              不只有立春换柱那一下。</>
             : <>月度视图里那些锯齿是<b>立春换柱的真实阶跃</b> —— 权重类序列在一个立春年内
               近乎恒定，跳变都发生在换柱那一刻。</>}
         </p>
@@ -324,42 +329,39 @@ export default function CurvesPage() {
         })}
       </div>
 
-      <div className="card" style={{
-        marginTop: 14, borderColor: fmw ? "var(--accent)" : undefined,
-      }}>
+      <div className="card" style={{ marginTop: 14 }}>
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
-          <strong style={{ fontSize: 13 }}>🧪 实验</strong>
           <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
-            <input type="checkbox" checked={fmw}
-              onChange={(e) => setFmw(e.target.checked)} />
-            让流月进权重
-          </label>
-          <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
-            总量占流年
-            <select value={fmwRatio} disabled={!fmw}
-              onChange={(e) => setFmwRatio(Number(e.target.value))}>
-              <option value={0}>0%（等同关闭）</option>
-              <option value={0.25}>25%（1/4）</option>
-              <option value={0.5}>50%</option>
+            流月权重（占流年）
+            <select value={ratio} onChange={(e) => setPickedRatio(Number(e.target.value))}>
+              {ratioOptions.map((r) => (
+                <option key={r} value={r}>
+                  {r === 0 ? "0%（不进权重）" : `${Math.round(r * 100)}%`}
+                  {r === paramRatio ? "　· 参数" : ""}
+                </option>
+              ))}
             </select>
           </label>
-          {fmw && (
-            <span className="dim" style={{ fontSize: 12 }}>
-              流月 {num(110 * fmwRatio, 1)}（流年 110 × {Math.round(fmwRatio * 100)}%），
-              干支按 40:70 同比缩放；结构作用、通根、受方耦合同比缩放；
-              开库 · 会局夺合 · 争合三条对流月看不见，改在神煞里按应期展示
-            </span>
+          {pickedRatio !== null && pickedRatio !== paramRatio && (
+            <button className="ghost" style={{ fontSize: 12, padding: "2px 8px" }}
+              onClick={() => setPickedRatio(null)}>回到参数（{Math.round(paramRatio * 100)}%）</button>
           )}
         </div>
-        {fmw && (
-          <p className="sub" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
-            <strong>⚠️ 这违反主线的硬约束，下面凡写着「流月不参与权重」的说明在此模式下都不成立。</strong>
-            此时权重类序列年内每个月都会跳一次，月才真的携带信息 ——
-            所以权重类的交点与节点按月报，不再只报到年。
-            这只改这一页的曲线，不进命盘、报告与其他页面；
-            参数指纹与主线不同，数不可与主线的报告相比。
-          </p>
-        )}
+        <p className="sub" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+          {monthOn ? <>
+            流月 {num(110 * ratio, 1)}（流年 110 × {Math.round(ratio * 100)}%），干支按 40:70 同比缩放；
+            它对别人的作用（结构事件、通根、受方耦合）同比缩放；
+            开库 · 会局夺合 · 争合三条只看「有没有」的规则对流月看不见，改在神煞里按应期展示；
+            年级的应期域在不含流月的盘面上判。此时权重类序列年内每个月都会动，交点与节点按月报。
+          </> : <>
+            0%：流月只入符号层（神煞、扰动），权重类序列年内只有大运斜坡在动，
+            权重类的交点与节点只报到年。
+          </>}
+          {pickedRatio !== null && pickedRatio !== paramRatio && (
+            <> <strong>这一页的比例与参数不同</strong>，只改这一页的曲线 ——
+              这里的数与统计节点页、完整报告不可直接相比。</>
+          )}
+        </p>
       </div>
 
       <div className="panelbar">
@@ -497,15 +499,15 @@ export default function CurvesPage() {
           </p>
           <p className="sub">
             <strong>⚠️ 这是「图上」的交点，不是「模型里某一天发生了什么」。</strong>
-            {fmw
-              ? <>🧪 实验中，权重类序列年内每个月都在跳，所以按年画的平滑线与模型更不像 ——
-                  它只穿过每年立春那一个点，月内的起伏全被抽掉了；想看实情请切到按月。</>
-              : <>权重类序列在立春那一刻<strong>真的阶跃</strong>，年内几乎不动；</>}
-            但按年采样时，图上画的是相邻两个立春之间一条平滑的坡。
-            于是一次阶跃在图上会被画成「上一个立春与下一个立春之间某处穿过」——
-            表上给的是前者，模型里它发生在后一个立春。
-            两个日期都对，回答的是两个问题。
-            想看阶跃本身，把采样切到<strong>按月</strong>，它就原样画出来了。
+            {monthOn
+              ? <>流月进权重时，权重类序列年内每个月都在动；按年采样时图上只画每年立春那一个点，
+                  点与点之间是一条平滑的坡，月内的起伏全被抽掉了 ——
+                  按年看的交点日期只是那条坡穿线的位置。想看实情，把采样切到<strong>按月</strong>。</>
+              : <>流月不进权重时，权重类序列在立春那一刻<strong>真的阶跃</strong>，年内几乎不动；
+                  但按年采样时，图上画的是相邻两个立春之间一条平滑的坡。
+                  于是一次阶跃在图上会被画成「上一个立春与下一个立春之间某处穿过」——
+                  表上给的是前者，模型里它发生在后一个立春。两个日期都对，回答的是两个问题。
+                  想看阶跃本身，把采样切到<strong>按月</strong>，它就原样画出来了。</>}
           </p>
           <p className="sub">
             <strong>相邻的穿越并成一段。</strong>
@@ -569,7 +571,7 @@ export default function CurvesPage() {
           <p className="sub" style={{ fontSize: 12 }}>
             流月不是独立的力量，它引动的是当前流年、大运已经摆好的局面 ——
             这里列的是它<b>触发了什么</b>，不是它<b>改了多少分</b>。
-            {fmw && "实验里流月虽已入权重，但开库、会局夺合、争合这三条只看「有没有」的规则对它看不见，只在这里展示。"}
+            {monthOn && "流月虽已进权重，但开库、会局夺合、争合这三条只看「有没有」的规则对它看不见，只在这里展示。"}
           </p>
           {atFrame.month.shensha.length === 0
             && atFrame.month.interactions.length === 0

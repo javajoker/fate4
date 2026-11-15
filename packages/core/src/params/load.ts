@@ -282,8 +282,8 @@ function validateInvariants(p: Params): string[] {
   if (p.series.samplesPerYear !== 12) {
     errors.push("series.samplesPerYear 必须为 12（硬约束：月度采样）");
   }
-  // 🧪 实验分支：流月入权重的硬约束在这里**放开**了（主线上此处报错）。
-  // 放开后要对得上的只有一件事 —— 它必须是个布尔，不能是别的什么。
+  // 流月进不进权重是可选项（默认进），曾经是硬约束 —— 见 docs/12 §9。
+  // 现在要对得上的只有一件事：它必须是个布尔，不能是别的什么。
   if (typeof p.series.fleetingMonthInWeights !== "boolean") {
     errors.push("series.fleetingMonthInWeights 必须为布尔值");
   }

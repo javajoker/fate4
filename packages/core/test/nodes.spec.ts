@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildChart } from "../src/chart/buildChart.js";
+import { buildChart, chartOptionsOf } from "../src/chart/buildChart.js";
 import { buildBaseChart } from "../src/chart/baseChart.js";
 import { buildSeries, type Series, type SeriesSet } from "../src/temporal/series.js";
 import { evaluateAt } from "../src/temporal/evaluate.js";
@@ -257,7 +257,15 @@ describe("方向与形态", () => {
   });
 });
 
-describe("**立春 —— 月序何时携带信息，何时是伪精度**", () => {
+describe("**流月关着（比例 0）时 —— 月序何时携带信息，何时是伪精度**", () => {
+  // 默认流月进权重（流年的 50%），那时权重类的月是真的在动（见 series.spec）。
+  // 这一组测的是「关」的那一档：流月只入符号层，立春年内只有大运斜坡在动。
+  // 这几条性质是关掉流月时的事实，也是当初为什么要让流月进权重的出发点。
+  const offP = loadParams({ series: { fleetingMonthInWeights: false } });
+  const base = buildBaseChart(buildChart(EXAMPLE, chartOptionsOf(offP)), offP);
+  const S = buildSeries(base);
+  const N = allNodes(S, { maxShown: 9999 });
+
   it("只有扰动序列吃流月；权重类与应期域换个流月毫无变化", () => {
     const f = S.frames[300]!;
     const at = (fm: typeof f.fleetingMonth) => evaluateAt(base, {

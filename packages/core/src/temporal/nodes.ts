@@ -78,6 +78,7 @@
 import type { NodesParams } from "../params/types.js";
 import type { BaseChart } from "../chart/baseChart.js";
 import { evaluateAt } from "./evaluate.js";
+import { monthInWeights } from "../weights/assign.js";
 import { runYingqi } from "../yingqi/engine.js";
 import { DOMAIN_LABEL } from "../yingqi/types.js";
 import { ELEMENTS, type Element } from "../types/ganzhi.js";
@@ -305,16 +306,22 @@ function reasonsAt(base: BaseChart, frames: readonly SeriesFrame[], enterIndex: 
     }
     for (const e of ev.events) {
       // 只取牵动大运或流年的 —— 纯本命的结构在基础盘里就有，不是这一刻的变化
-      // 🧪 流月入权重时，牵动流月的结构也是这一刻的变化
+      // 流月进权重时，牵动流月的结构也是这一刻的变化
       if (!e.pillars.includes("luck") && !e.pillars.includes("annual")
         && !e.pillars.includes("fleetingMonth")) continue;
       out.push({ kind: "structure", distanceMonths: dist,
         text: `${e.narrativeTag}（${e.pillars.join("、")}）` });
     }
+    // 年级应期在不含流月的即时盘上判 —— 理由见 series.ts 的应期域那一段
+    const evYear = !monthInWeights(base.params) ? ev : evaluateAt(base, {
+      luck: f.luckPillar === null ? null
+        : { pillar: f.luckPillar, elapsedYears: f.elapsedYears },
+      annual: f.annual,
+    });
     for (const y of runYingqi({
-      chart: base.chart, natal: base, now: ev,
+      chart: base.chart, natal: base, now: evYear,
       luck: f.luckPillar, annual: f.annual, scope: "year",
-      shareDelta: shareDeltaOf(base.propagation.byElement, ev.propagation.byElement),
+      shareDelta: shareDeltaOf(base.propagation.byElement, evYear.propagation.byElement),
     }, "year")) {
       out.push({ kind: "yingqi", distanceMonths: dist,
         text: `${y.name}：${y.evidence}（${y.domains.map((d) => DOMAIN_LABEL[d]).join("、")}）` });

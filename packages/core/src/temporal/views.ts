@@ -192,7 +192,7 @@ export function yearView(
 }
 
 // ─────────────────────────────────────────────────────────
-// 流月 —— 不重算权重
+// 流月视图 —— 不给权重（流月的分量在曲线里，见 series.ts）
 // ─────────────────────────────────────────────────────────
 
 const pairHit = (t: readonly (readonly [Branch, Branch])[], a: Branch, b: Branch) =>
