@@ -87,12 +87,30 @@ export function applyStructure(
   // 合绊本命、刑破大运，把别人的载体削掉五六分。比例只是次要旋钮，主效应是
   // 「流月在结构层里在场」。
   //
-  // 这与「总权重约为流年的 1/4」的本意不符：本意是流月的**影响**弱，不是它的质量小。
+  // 这与「流月总权重只是流年的一部分」的本意不符：本意是流月的**影响**弱，不是它的质量小。
   // 故凡牵涉流月的事件，距离系数乘以比例；绑缚（damp）向「无操作」同比靠拢。
   const fmRatio = params.series.fleetingMonthInWeights
     ? params.weights.fleetingMonth.ratioToYear : 1;
   const mf = (pillars: readonly PillarKind[]): number =>
     pillars.includes("fleetingMonth") ? fmRatio : 1;
+
+  // 🧪 三条**只看「有没有」、不读权重**的离散规则，对流月一律看不见。
+  //
+  // 实测（1990 例盘，720 帧）：它们在比例 10% 与 1/3 下受影响的帧数**完全相同**
+  // （开库 10、会局夺合 9、争合 67）—— 权重根本不是它们的输入，调比例无济于事。
+  // 单次改动却不小：开库一次动 7.35 分，比 10% 时流月自己的全部分量（11.0）的
+  // 一半还多。
+  //
+  // 它们对流月照旧**成立**，只是不再改权重：流月冲开墓库、流月成局夺合、
+  // 流月引起争合，这些是引动 —— 月、日是扳机，不是力量的来源。信息没有丢，
+  // 由 `temporal/monthTrigger.ts` 单独算出，在神煞里以「流年大运应期」展示。
+  //
+  // 读权重的那一条不在此列：冲与合的互解（arbitrate.ts）按参与者权重裁决，
+  // 流月的权重自然进去 —— 比例 1/3 时 4 帧变 74 帧，正是传统说的「流月合解冲」。
+  const isMonthly = (pl: PillarKind): boolean => pl === "fleetingMonth";
+  const involvesMonthly = (h: HeCandidate): boolean =>
+    h.slots.some((s) => isMonthly(s.pillar))
+    || (h.stemSlots ?? []).some((s) => isMonthly(s.pillar));
   const { branches, stems } = slotsOf(carriers);
 
   const heCands = detectHe(branches, stems);
@@ -103,6 +121,7 @@ export function applyStructure(
   const heCount = new Map<string, number>();
   const keyOf = (pillar: PillarKind, layer: string) => `${pillar}.${layer}`;
   for (const h of heCands) {
+    if (involvesMonthly(h)) continue;     // 🧪 流月不引起别人的争合
     for (const s of h.slots) heCount.set(keyOf(s.pillar, "branch"), (heCount.get(keyOf(s.pillar, "branch")) ?? 0) + 1);
     for (const s of h.stemSlots ?? []) heCount.set(keyOf(s.pillar, "stem"), (heCount.get(keyOf(s.pillar, "stem")) ?? 0) + 1);
   }
@@ -111,17 +130,22 @@ export function applyStructure(
     || (h.stemSlots ?? []).some((s) => (heCount.get(keyOf(s.pillar, "stem")) ?? 0) > 1);
 
   // ── 墓库定态：被冲或被刑则开 ──
-  const chongOnly = clashes.filter((c) => c.kind === "chong");
+  // 🧪 牵涉流月的冲、刑不开库；流月自己的支也不论开闭（它的藏干分量本就是比例缩过的）
+  const chongOnly = clashes.filter((c) => c.kind === "chong"
+    && !isMonthly((c.a as BranchSlot).pillar) && !isMonthly((c.b as BranchSlot).pillar));
   const tombOpened = new Set<PillarKind>();
   for (const b of branches) {
+    if (isMonthly(b.pillar)) continue;
     if (!(FOUR_TOMBS as readonly Branch[]).includes(b.branch)) continue;
     const hitByChong = p.tomb.openOnChong && chongOnly.some(
       (c) => (c.a as BranchSlot).pillar === b.pillar || (c.b as BranchSlot).pillar === b.pillar);
     const hitByXing = p.tomb.openOnXing && xings.some(
-      (x) => x.complete && x.slots.some((s) => s.pillar === b.pillar));
+      (x) => x.complete && x.slots.some((s) => s.pillar === b.pillar)
+        && !x.slots.some((s) => isMonthly(s.pillar)));
     if (hitByChong || hitByXing) tombOpened.add(b.pillar);
   }
   for (const b of branches) {
+    if (isMonthly(b.pillar)) continue;
     if (!(FOUR_TOMBS as readonly Branch[]).includes(b.branch)) continue;
     const opened = tombOpened.has(b.pillar);
     const factor = opened ? p.tomb.releaseGain : p.tomb.sealedFactor;
@@ -208,6 +232,7 @@ export function applyStructure(
   const consumedByBigger = new Set<PillarKind>();
   for (const h of heCands) {
     if (h.kind === "sanhui" || h.kind === "sanhe") {
+      if (involvesMonthly(h)) continue;   // 🧪 流月成的局不夺别人的合
       for (const s of h.slots) consumedByBigger.add(s.pillar);
     }
   }

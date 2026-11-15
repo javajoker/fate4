@@ -53,7 +53,7 @@ export const DEFAULT_PARAMS: Params = Object.freeze({
     }),
     // 🧪 实验：仅当 series.fleetingMonthInWeights 为真时才铺
     fleetingMonth: Object.freeze({
-      ratioToYear: 0.25,        // 流月总量 ≈ 流年的四分之一（110 → 27.5）
+      ratioToYear: 1 / 3,       // 流月总量 = 流年的三分之一（110 → 36.67）
     }),
     kongwang: Object.freeze({
       enabled: true,

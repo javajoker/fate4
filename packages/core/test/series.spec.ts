@@ -357,24 +357,27 @@ describe("🧪 流月入权重（实验）", () => {
       .filter((c) => c.position.pillar === k)
       .reduce((a, c) => a + c.trace[0]!.to, 0);
     expect(initial("annual")).toBeCloseTo(110, 6);
-    expect(initial("fleetingMonth")).toBeCloseTo(110 * 0.25, 6);
+    expect(initial("fleetingMonth")).toBeCloseTo(110 / 3, 6);
   });
 
   it("干支内部按流年的 40:70 同比缩放", () => {
     const ev = at(on);
     const stem = ev.carriers.find((c) => c.position.pillar === "fleetingMonth" && c.position.layer === "stem")!;
-    expect(stem.trace[0]!.to).toBeCloseTo(40 * 0.25, 6);
+    expect(stem.trace[0]!.to).toBeCloseTo(40 / 3, 6);
     const branchSum = ev.carriers
       .filter((c) => c.position.pillar === "fleetingMonth" && c.position.layer === "branch")
       .reduce((a, c) => a + c.trace[0]!.to, 0);
-    expect(branchSum).toBeCloseTo(70 * 0.25, 6);
+    expect(branchSum).toBeCloseTo(70 / 3, 6);
   });
 
-  it("**比例参数真的在起作用，而且线性**", () => {
-    const half = mk({ series: { fleetingMonthInWeights: true }, weights: { fleetingMonth: { ratioToYear: 0.5 } } } as never);
+  it("**比例参数真的在起作用，而且线性** —— 不依赖默认值是多少", () => {
+    const at2 = (r: number) => mk({
+      series: { fleetingMonthInWeights: true }, weights: { fleetingMonth: { ratioToYear: r } },
+    } as never);
     const initial = (b: typeof off) => at(b).carriers
       .filter((c) => c.position.pillar === "fleetingMonth").reduce((a, c) => a + c.trace[0]!.to, 0);
-    expect(initial(half)).toBeCloseTo(2 * initial(on), 6);
+    expect(initial(at2(0.4))).toBeCloseTo(2 * initial(at2(0.2)), 6);
+    expect(initial(at2(0.2))).toBeCloseTo(110 * 0.2, 6);
   });
 
   it("**换一个流月，权重类序列就变** —— 与主线上「毫无变化」恰成反向", () => {
@@ -475,6 +478,47 @@ describe("🧪 流月入权重（实验）", () => {
       expect(m[i]!, `第 ${i} 档应不小于前一档`).toBeGreaterThanOrEqual(m[i - 1]! - 1e-9);
     }
     expect(m[m.length - 1]!, "整个量程里应有可观的跨度").toBeGreaterThan(m[1]! * 3);
+  });
+
+  // ───────── 三条离散规则对流月看不见 ─────────
+  //
+  // 墓库被冲刑则开、会局夺合、争合妒合，只看「有没有」、不读权重，所以
+  // 调比例对它们无效（实测 10% 与 1/3 下受影响的帧数完全相同），而单次改动不小。
+  // 结构层让它们对流月看不见；流月引动了什么另由 monthTrigger.ts 展示。
+  // 读权重的冲合互解不在此列 —— 那一条本来就该随流月的权重变。
+
+  it("**三条离散规则对流月看不见** —— 本命等自身的这类事件，逐帧与「关」相同", () => {
+    const watched = (ev: ReturnType<typeof at>) => ev.events
+      .filter((e) => !e.pillars.includes("fleetingMonth"))
+      .filter((e) => e.kind === "tombOpen" || e.kind === "tombSealed"
+        || e.narrativeTag === "会局夺合" || e.outcome === "contested")
+      .map((e) => `${e.kind}|${e.outcome}|${e.narrativeTag}|${e.pillars.join(",")}`)
+      .sort();
+    const Sx = buildSeries(off, { years: 60, statsYears: 60 });
+    for (const r of [1 / 3, 1]) {
+      const b = withRatio(r);
+      for (const fr of Sx.frames) {
+        const ev = (x: typeof off) => evaluateAt(x, {
+          luck: fr.luckPillar === null ? null : { pillar: fr.luckPillar, elapsedYears: fr.elapsedYears },
+          annual: fr.annual, fleetingMonth: fr.fleetingMonth,
+        });
+        expect(watched(ev(b)), `比例 ${r}，${fr.year} 年 ${fr.fleetingMonth.stem}${fr.fleetingMonth.branch}月`)
+          .toEqual(watched(ev(off)));
+      }
+    }
+  });
+
+  it("**读权重的冲合互解则随流月的权重变** —— 比例大时流月合解冲的帧更多", () => {
+    const Sx = buildSeries(off, { years: 60, statsYears: 60 });
+    const countHeJieChong = (b: typeof off) => Sx.frames.filter((fr) => evaluateAt(b, {
+      luck: fr.luckPillar === null ? null : { pillar: fr.luckPillar, elapsedYears: fr.elapsedYears },
+      annual: fr.annual, fleetingMonth: fr.fleetingMonth,
+    }).events.some((e) => e.narrativeTag === "合解冲" && !e.pillars.includes("fleetingMonth"))).length;
+    const base0 = countHeJieChong(off);
+    const lo = countHeJieChong(withRatio(0.1));
+    const hi = countHeJieChong(withRatio(1 / 3));
+    expect(lo, "比例越大，被流月的合解掉的冲越多").toBeGreaterThanOrEqual(base0);
+    expect(hi).toBeGreaterThan(lo);
   });
 
   it("参数指纹因此不同 —— 数不可与主线的报告相比", () => {

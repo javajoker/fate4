@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import {
   buildSeries, curveStats, evaluateAt, buildChart, buildBaseChart,
   chartOptionsOf, loadParams, precisionBandOf, drawnCrossings,
+  monthView, fleetingTriggers, MONTH_TRIGGER_FRAME,
 } from "@fate/core";
 import { useChart } from "../../../lib/chartContext";
 import { LifeCurves, type CurveWindow } from "../../../components/charts";
@@ -85,7 +86,7 @@ export default function CurvesPage() {
    * 它**不进**命盘、报告与参数指纹之外的任何地方，只改这一页的曲线。
    */
   const [fmw, setFmw] = useState(false);
-  const [fmwRatio, setFmwRatio] = useState(0.1);
+  const [fmwRatio, setFmwRatio] = useState(1 / 3);
 
   /**
    * 跨度超过默认柱数能覆盖的范围时，**另建一份带足够大运柱的基础盘**。
@@ -127,6 +128,12 @@ export default function CurvesPage() {
           : { pillar: f.luckPillar, elapsedYears: f.elapsedYears },
         annual: f.annual, fleetingMonth: f.fleetingMonth,
       }),
+      // 流月应期：不读权重，实验开关开着与关着都一样。
+      // 一律按「流年大运应期」展示 —— 流月不是独立的力，它引动的是
+      // 当前流年、大运已经摆好的局面。
+      month: monthView(spanBase, f.year, f.monthIndex, spanBase.params),
+      triggers: fleetingTriggers(
+        spanBase.chart, f.luckPillar, f.annual, f.fleetingMonth, spanBase.params),
     };
   }, [spanBase, S, picked]);
 
@@ -374,15 +381,17 @@ export default function CurvesPage() {
               onChange={(e) => setFmwRatio(Number(e.target.value))}>
               <option value={0.05}>5%</option>
               <option value={0.1}>10%</option>
-              <option value={0.25}>25%（≈ 1/4）</option>
+              <option value={0.25}>25%（1/4）</option>
+              <option value={1 / 3}>33%（1/3）</option>
               <option value={0.5}>50%</option>
               <option value={1}>100%（与流年等量）</option>
             </select>
           </label>
           {fmw && (
             <span className="dim" style={{ fontSize: 12 }}>
-              流月 {num(110 * fmwRatio, 1)}（流年 110 × {fmwRatio}），干支按 40:70 同比缩放；
-              结构作用与通根、受方耦合同比缩放
+              流月 {num(110 * fmwRatio, 1)}（流年 110 × {Math.round(fmwRatio * 100)}%），
+              干支按 40:70 同比缩放；结构作用、通根、受方耦合同比缩放；
+              开库 · 会局夺合 · 争合三条对流月看不见，改在神煞里按应期展示
             </span>
           )}
         </div>
@@ -581,16 +590,48 @@ export default function CurvesPage() {
           </p>
 
           <h4 style={{ fontSize: 13, margin: "10px 0 4px" }}>此刻被引动的神煞</h4>
-          {atFrame.ev.shensha.filter((h) => h.tone === "activated").length === 0
+          {atFrame.ev.shensha.filter(
+            (h) => h.tone === "activated" && h.landsOn.pillar !== "fleetingMonth").length === 0
             ? <p className="sub">无。</p>
             : (
               <ul className="tight">
-                {atFrame.ev.shensha.filter((h) => h.tone === "activated").map((h) => (
+                {atFrame.ev.shensha.filter(
+                  (h) => h.tone === "activated" && h.landsOn.pillar !== "fleetingMonth").map((h) => (
                   <li key={`${h.name}-${h.palace}-${h.basis}`}>
                     <b>{h.name}</b> 落{h.palace}　{h.toneReason}
                     {h.narrativeTags.length === 0 ? ""
                       : `　—— 传统上与「${h.narrativeTags.join("、")}」一类的事相联系`}
                   </li>
+                ))}
+              </ul>
+            )}
+
+          <h4 style={{ fontSize: 13, margin: "12px 0 4px" }}>
+            流月应期　<span className="pill" title="流月不是独立的力量">{MONTH_TRIGGER_FRAME}</span>
+          </h4>
+          <p className="sub" style={{ fontSize: 12 }}>
+            流月不是独立的力量，它引动的是当前流年、大运已经摆好的局面 ——
+            这里列的是它<b>触发了什么</b>，不是它<b>改了多少分</b>。
+            {fmw && "实验里流月虽已入权重，但开库、会局夺合、争合这三条只看「有没有」的规则对它看不见，只在这里展示。"}
+          </p>
+          {atFrame.month.shensha.length === 0
+            && atFrame.month.interactions.length === 0
+            && atFrame.triggers.length === 0
+            ? <p className="sub">此月无。</p>
+            : (
+              <ul className="tight">
+                {atFrame.month.shensha.map((h) => (
+                  <li key={`m-${h.name}-${h.basis}-${h.landsOn.layer}`}>
+                    <b>{h.name}</b> 落流月{h.landsOn.layer === "stem" ? h.stem : h.branch}
+                    {h.narrativeTags.length === 0 ? ""
+                      : `　—— 传统上与「${h.narrativeTags.join("、")}」一类的事相联系`}
+                  </li>
+                ))}
+                {atFrame.month.interactions.map((i, k) => (
+                  <li key={`i-${k}`}>{i.detail}，牵动{i.targetPalace}</li>
+                ))}
+                {atFrame.triggers.map((t, k) => (
+                  <li key={`t-${k}`}>{t.text}</li>
                 ))}
               </ul>
             )}
