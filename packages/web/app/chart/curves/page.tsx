@@ -85,7 +85,7 @@ export default function CurvesPage() {
    * 它**不进**命盘、报告与参数指纹之外的任何地方，只改这一页的曲线。
    */
   const [fmw, setFmw] = useState(false);
-  const [fmwRatio, setFmwRatio] = useState(0.25);
+  const [fmwRatio, setFmwRatio] = useState(0.1);
 
   /**
    * 跨度超过默认柱数能覆盖的范围时，**另建一份带足够大运柱的基础盘**。
@@ -372,6 +372,7 @@ export default function CurvesPage() {
             总量占流年
             <select value={fmwRatio} disabled={!fmw}
               onChange={(e) => setFmwRatio(Number(e.target.value))}>
+              <option value={0.05}>5%</option>
               <option value={0.1}>10%</option>
               <option value={0.25}>25%（≈ 1/4）</option>
               <option value={0.5}>50%</option>
@@ -381,7 +382,7 @@ export default function CurvesPage() {
           {fmw && (
             <span className="dim" style={{ fontSize: 12 }}>
               流月 {num(110 * fmwRatio, 1)}（流年 110 × {fmwRatio}），干支按 40:70 同比缩放；
-              距离系数借流年的
+              结构作用与通根、受方耦合同比缩放
             </span>
           )}
         </div>

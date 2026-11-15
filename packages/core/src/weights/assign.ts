@@ -135,11 +135,16 @@ export function layExternalCarriers(
   }
   // 🧪 流月：总量取流年的一个比例，干支内部同流年的 40:70 同比缩放。
   // 开关关着时这一支根本不走 —— 默认行为与主线逐字相同。
-  if (fleetingMonth != null && params.series.fleetingMonthInWeights) {
+  // 比例为 0 时一个载体都不铺 —— 零权重的载体照样触发结构事件，
+  // 「比例 0」才不是「关」。这样两者逐位相同，是连续性的端点。
+  if (fleetingMonth != null && params.series.fleetingMonthInWeights
+    && w.fleetingMonth.ratioToYear > 0) {
     const r = w.fleetingMonth.ratioToYear;
     carriers.push(...layPillar("fleetingMonth", fleetingMonth,
       w.year.stem * r, w.year.branch * r,
-      { total: w.year.total * r, ratioToYear: r }));
+      { total: w.year.total * r, ratioToYear: r })
+      // 受方耦合同比缩放 —— 见 Carrier.couplingScale
+      .map((c) => ({ ...c, couplingScale: r })));
   }
   return { carriers, luckStemShare };
 }

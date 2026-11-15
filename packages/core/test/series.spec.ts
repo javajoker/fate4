@@ -415,6 +415,68 @@ describe("🧪 流月入权重（实验）", () => {
     expect(dAnn / dMon).toBeCloseTo(P.external.annualToDayMasterBonus, 9);
   });
 
+  // ───────── 比例是真旋钮：向 0 连续，且单调 ─────────
+  //
+  // 第一版漏了这一组，是后来用比例扫描才发现的：比例设成 0.0001 时效应与 0.05 几乎一样。
+  // 原因是有三处不看质量、只看「有没有」的地方（结构事件、L3 的受方分摊、通根评分），
+  // 零权重的流月载体照样起作用。上面那些「总量 = 流年 × 比例」的断言一条都不会失败 ——
+  // 因为它们只量了流月自己的分量，没量它对别人的影响。
+
+  const withRatio = (r: number) => mk({
+    series: { fleetingMonthInWeights: true }, weights: { fleetingMonth: { ratioToYear: r } },
+  } as never);
+
+  it("**比例 0 ≡ 关** —— 一个载体都不铺，逐位相同", () => {
+    const zero = withRatio(0);
+    const a = at(off); const b = at(zero);
+    expect(b.carriers.some((c) => c.position.pillar === "fleetingMonth")).toBe(false);
+    expect(b.carriers.map((c) => c.weight)).toEqual(a.carriers.map((c) => c.weight));
+    expect(b.conclusions.rootScore).toBe(a.conclusions.rootScore);
+  });
+
+  it("**比例趋 0 时连续地回到「关」** —— 不是在 0 附近有个跳变", () => {
+    const tiny = withRatio(1e-6);
+    let worst = 0;
+    for (const idx of [5, 17, 30, 44, 61, 83, 100, 119]) {
+      const fr = sample.frames[idx]!;
+      const ev = (b: typeof off) => evaluateAt(b, {
+        luck: fr.luckPillar === null ? null : { pillar: fr.luckPillar, elapsedYears: fr.elapsedYears },
+        annual: fr.annual, fleetingMonth: fr.fleetingMonth,
+      });
+      const x = ev(off); const y = ev(tiny);
+      for (const g of Object.keys(x.conclusions.tenGods)) {
+        worst = Math.max(worst, Math.abs(
+          x.conclusions.tenGods[g as keyof typeof x.conclusions.tenGods]
+          - y.conclusions.tenGods[g as keyof typeof y.conclusions.tenGods]));
+      }
+      worst = Math.max(worst, Math.abs(x.conclusions.rootScore - y.conclusions.rootScore) * 100);
+    }
+    // 第一版在这里是 76 量级（0.001 的流月载体照样合绊、分流、记根）
+    expect(worst, "比例 1e-6 的流月不该让任何权重动超过 0.01").toBeLessThan(0.01);
+  });
+
+  it("**比例越大，年内月间变化越大 —— 单调** ", () => {
+    const med = (r: number | null) => {
+      const b = r === null ? off : withRatio(r);
+      const Sx = buildSeries(b, { years: 6, statsYears: 6 });
+      const ds: number[] = [];
+      for (const sr of Sx.series.filter((x) => x.kind === "tenGod")) {
+        for (let i = 1; i < Sx.frames.length; i++) {
+          const a = Sx.frames[i - 1]!; const c = Sx.frames[i]!;
+          if (c.luckIndex !== a.luckIndex || c.monthIndex === 0) continue;
+          ds.push(Math.abs(sr.values[i]! - sr.values[i - 1]!));
+        }
+      }
+      ds.sort((x, y) => x - y);
+      return ds[Math.floor(ds.length / 2)]!;
+    };
+    const m = [null, 0.01, 0.1, 0.25, 0.5, 1].map(med);
+    for (let i = 1; i < m.length; i++) {
+      expect(m[i]!, `第 ${i} 档应不小于前一档`).toBeGreaterThanOrEqual(m[i - 1]! - 1e-9);
+    }
+    expect(m[m.length - 1]!, "整个量程里应有可观的跨度").toBeGreaterThan(m[1]! * 3);
+  });
+
   it("参数指纹因此不同 —— 数不可与主线的报告相比", () => {
     expect(paramsHash(on.params)).not.toBe(paramsHash(off.params));
   });

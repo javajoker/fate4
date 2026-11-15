@@ -78,6 +78,21 @@ export function applyStructure(
   const params = paramsIn ?? DEFAULT_PARAMS;
   const p = params.structure;
   const events: StructureEvent[] = [];
+
+  // 🧪 流月入权重时，它**对别人的作用**也要按比例缩。
+  //
+  // 第一版只缩了流月自己的分量（总量 = 流年 × 比例），结果实测：比例设成 0、
+  // 流月载体权重为零，年内月间变化仍有 0.115σ（关时 0.004σ），23% 的月间跳变 ≥0.3σ。
+  // 原因是结构事件的威力不随参与者的权重缩放 —— 一个零权重的流月照样
+  // 合绊本命、刑破大运，把别人的载体削掉五六分。比例只是次要旋钮，主效应是
+  // 「流月在结构层里在场」。
+  //
+  // 这与「总权重约为流年的 1/4」的本意不符：本意是流月的**影响**弱，不是它的质量小。
+  // 故凡牵涉流月的事件，距离系数乘以比例；绑缚（damp）向「无操作」同比靠拢。
+  const fmRatio = params.series.fleetingMonthInWeights
+    ? params.weights.fleetingMonth.ratioToYear : 1;
+  const mf = (pillars: readonly PillarKind[]): number =>
+    pillars.includes("fleetingMonth") ? fmRatio : 1;
   const { branches, stems } = slotsOf(carriers);
 
   const heCands = detectHe(branches, stems);
@@ -165,7 +180,8 @@ export function applyStructure(
   for (const h of heCands) {
     const gd = gainDecayOf(h);
     if (gd === null) continue;
-    const coef = heDistanceCoef(h.slots.map((s) => s.pillar), p.heDistance, p.externalHeFactor);
+    const coef = heDistanceCoef(h.slots.map((s) => s.pillar), p.heDistance, p.externalHeFactor)
+      * mf(h.slots.map((s) => s.pillar));
     const delta: Record<string, number> = {};
     for (const s of h.slots) {
       for (const c of s.carriers) {
@@ -221,7 +237,7 @@ export function applyStructure(
       ...(h.stemSlots ?? []).map((s) => s.carrier),
     ];
     const pillars = [...h.slots.map((s) => s.pillar), ...(h.stemSlots ?? []).map((s) => s.pillar)];
-    const coef = heDistanceCoef(pillars, p.heDistance, p.externalHeFactor);
+    const coef = heDistanceCoef(pillars, p.heDistance, p.externalHeFactor) * mf(pillars);
     const wDelta: Record<string, number> = {};
     const aDelta: Record<string, number> = {};
 
@@ -235,7 +251,8 @@ export function applyStructure(
     } else {
       const f = contested ? p.transform.contentionFactor : p.transform.bindFactorOnFailure;
       for (const c of parts) {
-        damp(c, f, aDelta);
+        // 🧪 绑缚不经 coef，单独按比例向 1 靠拢
+        damp(c, 1 - (1 - f) * mf(pillars), aDelta);
         c.flags.push(contested ? "CONTESTED" : "BOUND");
       }
     }
@@ -280,7 +297,8 @@ export function applyStructure(
     const wb = b.carriers.reduce((s, c) => s + c.weight, 0);
     const ratio = Math.max(wa, wb) / Math.max(Math.min(wa, wb), 1e-9);
     const coefBase = chongDistanceCoef(a.pillar, b.pillar, p.chong.distance);
-    const coef = mutualChong.has(cl) ? coefBase * p.arbitration.mutualDamageFactor : coefBase;
+    const coef = (mutualChong.has(cl) ? coefBase * p.arbitration.mutualDamageFactor : coefBase)
+      * mf([a.pillar, b.pillar]);
 
     let lossStrong: number; let lossWeak: number;
     if (ratio >= p.chong.uprootThreshold) { lossStrong = p.chong.strongLoss; lossWeak = p.chong.weakLossUproot; }
@@ -307,7 +325,8 @@ export function applyStructure(
   for (const cl of clashes) {
     if (cl.kind !== "ganchong") continue;
     const a = cl.a as StemSlot; const b = cl.b as StemSlot;
-    const coef = chongDistanceCoef(a.pillar, b.pillar, p.chong.distance) * p.ganchong.factor;
+    const coef = chongDistanceCoef(a.pillar, b.pillar, p.chong.distance) * p.ganchong.factor
+      * mf([a.pillar, b.pillar]);
     if (p.ganchong.requireAdjacent && chongDistanceCoef(a.pillar, b.pillar, p.chong.distance) < p.chong.distance.adjacent) continue;
     const delta: Record<string, number> = {};
     for (const c of [a.carrier, b.carrier]) scale(c, 1 - p.chong.equalLoss * coef, "L2.ganchong", delta, { coef });
@@ -325,7 +344,8 @@ export function applyStructure(
       : x.punishment === "自刑" ? p.xing.selfFactor
       : x.punishment === "无礼之刑" ? p.xing.ziMaoFactor
       : p.xing.fullFactor;
-    const coef = heDistanceCoef(x.slots.map((s) => s.pillar), p.chong.distance, 1);
+    const coef = heDistanceCoef(x.slots.map((s) => s.pillar), p.chong.distance, 1)
+      * mf(x.slots.map((s) => s.pillar));
     const delta: Record<string, number> = {};
     for (const s of x.slots) for (const c of s.carriers) {
       scale(c, attenuate(factor, coef), "L2.xing", delta, { factor, coef });
@@ -346,7 +366,7 @@ export function applyStructure(
     if (cl.kind === "po" && !p.po.enabled) continue;
     const a = cl.a as BranchSlot; const b = cl.b as BranchSlot;
     const factor = cl.kind === "hai" ? p.hai.factor : p.po.factor;
-    const coef = chongDistanceCoef(a.pillar, b.pillar, p.chong.distance);
+    const coef = chongDistanceCoef(a.pillar, b.pillar, p.chong.distance) * mf([a.pillar, b.pillar]);
     const delta: Record<string, number> = {};
     for (const c of [...a.carriers, ...b.carriers]) {
       scale(c, attenuate(factor, coef), `L2.${cl.kind}`, delta, { factor, coef });

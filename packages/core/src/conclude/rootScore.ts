@@ -68,8 +68,11 @@ export function rootScoreOf(
     if (!hasSame) continue;
     const kind = rootKindOf(dayMaster.stem, branch, opts);
     if (kind === "none") continue;
-    // 距离取该支任一藏干到日主的最近者
-    const distance = Math.max(...hidden.map((h) => propagationDistance(h, dayMaster, pp)));
+    // 距离取该支任一藏干到日主的最近者。
+    // 🧪 流月载体带一个与比例同步的缩放（Carrier.couplingScale）：通根是个离散的
+    // 「有无」评分，不看权重 —— 不缩的话，零权重的流月支照样给日主记满一份根。
+    const distance = Math.max(...hidden.map(
+      (h) => propagationDistance(h, dayMaster, pp) * (h.couplingScale ?? 1)));
     const coef = coefOf[kind];
     detail.push({ branch, kind, coef, distance, contribution: coef * distance });
   }
