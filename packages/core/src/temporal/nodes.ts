@@ -330,6 +330,25 @@ function reasonsAt(base: BaseChart, frames: readonly SeriesFrame[], enterIndex: 
 
 // ─────────────────────────────────────────────────────────
 
+/**
+ * 一个检出单元：扫哪些点，以及拿**哪些值**当基准。
+ *
+ * ## 为什么基准与扫描要分开
+ *
+ * 基准窗固定为起运后 60 年（`series.spanYears`），而报告的时间跨度可以是
+ * 60 / 120 / 180 年。要让跨度更长时窗外的年份**也被扫描**、却**用同一把尺子**量，
+ * 就不能再让「算 μ、σ 的值」和「被扫描的值」是同一批 ——
+ * 否则要么窗外的年份扫不到，要么 σ 随跨度变。
+ *
+ * 60 年时 `scan` 与基准是同一批点，两条路径逐位相同（有金标准快照守着）。
+ */
+interface ScanGroup {
+  /** 被扫描的点，下标指向 `Scaled.values`。覆盖整个跨度。 */
+  readonly scan: readonly number[];
+  /** 算 μ、σ 与同比差分散布用的值。小尺度取自己所在的那一步，大 / 中尺度取基准窗内的。 */
+  readonly baseVals: readonly number[];
+}
+
 interface Scaled {
   readonly values: readonly number[];
   /** 差分步长。月度序列取 12（同比），每步一值的中尺度取 1。 */
@@ -345,70 +364,84 @@ interface Scaled {
   readonly frameOf: (i: number) => SeriesFrame;
   readonly lastFrameOf: (i: number) => SeriesFrame;
   readonly robust: boolean;
-  readonly groups: readonly (readonly number[])[];
+  readonly groups: readonly ScanGroup[];
 }
 
 /** 把一条序列按尺度整理成「取值 + 分组 + 索引到时点的映射」。 */
 function scaleView(s: Series, S: SeriesSet, scale: NodeScale): Scaled {
-  const inWin = S.frames.map((f, i) => ({ f, i })).filter((x) => x.f.inStatsWindow);
-  const idx = inWin.map((x) => x.i);
+  const allIdx = S.frames.map((_, i) => i);
+  const winIdx = allIdx.filter((i) => S.frames[i]!.inStatsWindow);
 
   if (scale === "medium") {
     // 每步大运一个均值。六十年六步 —— 故必须用稳健估计。
-    const byStep = new Map<number | null, number[]>();
-    const order: (number | null)[] = [];
-    const first = new Map<number | null, number>();
-    const last = new Map<number | null, number>();
-    for (const i of idx) {
-      const k = S.frames[i]!.luckIndex;
-      if (!byStep.has(k)) { byStep.set(k, []); order.push(k); first.set(k, i); }
-      byStep.get(k)!.push(s.values[i]!);
-      last.set(k, i);
-    }
-    // 采样不足的那一「步」要丢掉 —— 它的均值与整步的均值不可比。
-    //
-    // 窗口起点通常落在起运之前，于是 `luckIndex` 为 null 的那一段只有几个月，
-    // 均值却与整整十年的均值并列参与统计。实测：对一条纯线性上升的序列，
-    // 这个残段自己就撑出一个 −2.23σ 的假中节点 —— 一条直线报出了「节点」。
-    // 门槛取最长一步的一半，随采样密度自适应，不另设参数。
-    const full = Math.max(...order.map((k) => byStep.get(k)!.length));
-    const kept = order.filter((k) => byStep.get(k)!.length * 2 >= full);
-    const values = kept.map((k) => mean(byStep.get(k)!));
+    const stepsOf = (idx: readonly number[]) => {
+      const byStep = new Map<number | null, number[]>();
+      const order: (number | null)[] = [];
+      const first = new Map<number | null, number>();
+      const last = new Map<number | null, number>();
+      for (const i of idx) {
+        const k = S.frames[i]!.luckIndex;
+        if (!byStep.has(k)) { byStep.set(k, []); order.push(k); first.set(k, i); }
+        byStep.get(k)!.push(s.values[i]!);
+        last.set(k, i);
+      }
+      // 采样不足的那一「步」要丢掉 —— 它的均值与整步的均值不可比。
+      //
+      // 窗口起点通常落在起运之前，于是 `luckIndex` 为 null 的那一段只有几个月，
+      // 均值却与整整十年的均值并列参与统计。实测：对一条纯线性上升的序列，
+      // 这个残段自己就撑出一个 −2.23σ 的假中节点 —— 一条直线报出了「节点」。
+      // 门槛取最长一步的一半，随采样密度自适应，不另设参数。
+      const full = Math.max(...order.map((k) => byStep.get(k)!.length));
+      const kept = order.filter((k) => byStep.get(k)!.length * 2 >= full);
+      return { byStep, first, last, kept };
+    };
+    // 基准：**基准窗内**的那几步（原算法）。扫描：整个跨度里的每一步。
+    // 窗口边缘那一步在基准里只有残段，在扫描里是完整的一步 ——
+    // 两者各取各的，基准因此不随跨度变。
+    const win = stepsOf(winIdx);
+    const all = stepsOf(allIdx);
+    const baseVals = win.kept.map((k) => mean(win.byStep.get(k)!));
+    const values = all.kept.map((k) => mean(all.byStep.get(k)!));
     return {
       values,
-      frameOf: (i) => S.frames[first.get(kept[i]!)!]!,
-      lastFrameOf: (i) => S.frames[last.get(kept[i]!)!]!,
+      frameOf: (i) => S.frames[all.first.get(all.kept[i]!)!]!,
+      lastFrameOf: (i) => S.frames[all.last.get(all.kept[i]!)!]!,
       robust: true, diffLag: 1, monthsPerSample: 120,
-      groups: [values.map((_, i) => i)],
+      groups: [{ scan: values.map((_, i) => i), baseVals }],
     };
   }
 
-  const values = idx.map((i) => s.values[i]!);
+  const values = allIdx.map((i) => s.values[i]!);
   if (scale === "large") {
     return {
       values,
-      frameOf: (i) => S.frames[idx[i]!]!,
-      lastFrameOf: (i) => S.frames[idx[i]!]!,
+      frameOf: (i) => S.frames[allIdx[i]!]!,
+      lastFrameOf: (i) => S.frames[allIdx[i]!]!,
       robust: false, diffLag: S.samplesPerYear, monthsPerSample: 12 / S.samplesPerYear,
-      groups: [values.map((_, i) => i)],
+      // 基准 = 基准窗内的月值（起运后 60 年）；扫描 = 整个跨度
+      groups: [{
+        scan: values.map((_, i) => i),
+        baseVals: winIdx.map((i) => s.values[i]!),
+      }],
     };
   }
   // small：基准窗是所在的那一步大运 —— 问的是「这个月在本运中有多异常」。
   // 区间不跨步：跨步的两点参照的是不同的基准，接成一段没有意义。
-  const groups: number[][] = [];
+  // 基准就是这一步自己，与那 60 年的基准窗无关，故窗外的步照样各用各的。
+  const scans: number[][] = [];
   let cur: number[] = []; let prev: number | null | undefined;
-  for (const [j, i] of idx.entries()) {
+  for (const [j, i] of allIdx.entries()) {
     const k = S.frames[i]!.luckIndex;
-    if (prev !== undefined && k !== prev) { groups.push(cur); cur = []; }
+    if (prev !== undefined && k !== prev) { scans.push(cur); cur = []; }
     cur.push(j); prev = k;
   }
-  if (cur.length > 0) groups.push(cur);
+  if (cur.length > 0) scans.push(cur);
   return {
     values,
-    frameOf: (i) => S.frames[idx[i]!]!,
-    lastFrameOf: (i) => S.frames[idx[i]!]!,
+    frameOf: (i) => S.frames[allIdx[i]!]!,
+    lastFrameOf: (i) => S.frames[allIdx[i]!]!,
     robust: false, diffLag: S.samplesPerYear, monthsPerSample: 12 / S.samplesPerYear,
-    groups,
+    groups: scans.map((g) => ({ scan: g, baseVals: g.map((i) => values[i]!) })),
   };
 }
 
@@ -439,21 +472,27 @@ export function findNodes(
     if (view.values.length < 3) { excluded.push({ seriesId: s.id, why: "采样点不足" }); continue; }
 
     let anyGroup = false;
-    for (const g of view.groups) {
-      if (g.length < 3) continue;
+    for (const grp of view.groups) {
+      if (grp.baseVals.length < 3) continue;
+      const g = grp.scan;
       const vs = g.map((i) => view.values[i]!);
+      // μ、σ 取自**基准**，不取自被扫描的值 —— 基准窗固定为起运后 60 年，
+      // 报告的跨度更长时窗外的年份用同一把尺子量
       const { center, sigma } = view.robust
-        ? robustSigma(vs)
-        : { center: mean(vs), sigma: stdev(vs) };
+        ? robustSigma(grp.baseVals)
+        : { center: mean(grp.baseVals), sigma: stdev(grp.baseVals) };
       if (sigma <= 0) continue;
       anyGroup = true;
 
       // 同比差分。步长取一整年，以消掉立春换柱那个确定性的年周期阶跃。
+      // 差分的散布同样只取基准，与 μ、σ 同一口径。
       const P = view.diffLag;
-      const d = vs.map((v, i) => (i < P ? Number.NaN : v - vs[i - P]!));
-      const dReal = d.filter((x) => Number.isFinite(x));
+      const diffOf = (a: readonly number[]) =>
+        a.map((v, i) => (i < P ? Number.NaN : v - a[i - P]!));
+      const dReal = diffOf(grp.baseVals).filter((x) => Number.isFinite(x));
       const dSigma = stdev(dReal);
       const dCenter = mean(dReal);
+      const d = diffOf(vs);
 
       const z = vs.map((v) => (v - center) / sigma);
       const rz = d.map((v) => (!Number.isFinite(v) || dSigma <= 0 ? 0 : (v - dCenter) / dSigma));
@@ -490,8 +529,9 @@ export function findNodes(
           durationMonths: (r.to - r.from + 1) * view.monthsPerSample,
           peakZ: z[peakLocal]!, peakRateZ: rz[peakLocal]!,
           area, peakValue, mean: center, sigma,
-          groupSize: g.length,
-          nearBaseline: z.reduce((a, v) => a + (Math.abs(v) < 1 ? 1 : 0), 0),
+          groupSize: grp.baseVals.length,
+          nearBaseline: grp.baseVals.reduce(
+            (a, v) => a + (Math.abs((v - center) / sigma) < 1 ? 1 : 0), 0),
           // 理由**在截断之后**才填 —— 见下方 fillReasons
           reasons: EMPTY,
           resolve: scale === "medium"

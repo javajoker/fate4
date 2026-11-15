@@ -7,6 +7,8 @@ import {
 } from "@fate/core";
 import { Card } from "../Card";
 import { loadAudience, loadBirth } from "../store";
+import { SpanPicker } from "../Span";
+import { useSpan } from "../useSpan";
 import { Disclaimer } from "../page";
 
 /**
@@ -21,6 +23,8 @@ export default function TimePage() {
   const [birth, setBirth] = useState<BirthInput | null>(null);
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<"今年" | "本月" | "今天" | "按年">("今天");
+  // 时间跨度：选中的与已用于计算的分开，见 useSpan
+  const { span, applied: spanApplied, set: setSpan, pending: spanPending } = useSpan();
 
   useEffect(() => { setBirth(loadBirth()); setReady(true); }, []);
 
@@ -31,10 +35,10 @@ export default function TimePage() {
     try {
       const chart = buildChart(birth);
       const params = loadParams({ report: { audience: loadAudience() } });
-      const r = buildReport(chart, { includeNodes: true, now, params });
+      const r = buildReport(chart, { includeNodes: true, now, params, span: spanApplied });
       return { plain: plainCards(r), report: r, daily: dailyOutlook(chart, now, params) };
     } catch { return null; }
-  }, [birth]);
+  }, [birth, spanApplied]);
 
   if (!ready) return <p className="m-lede">载入中…</p>;
   if (birth === null) {
@@ -62,6 +66,8 @@ export default function TimePage() {
         ))}
       </div>
 
+      {tab === "按年" && <SpanPicker value={span} onChange={setSpan} pending={spanPending} />}
+
       {tab === "按年" ? <ByYear report={data.report} /> : (
         <>
           {cards.map((c) => <Card key={c.id} card={c} />)}
@@ -78,7 +84,11 @@ export default function TimePage() {
 /** 按年的提示 —— 说的是哪一年张力大，不是那一年会发生什么。 */
 function ByYear({ report }: { report: ReturnType<typeof buildReport> }) {
   const [open, setOpen] = useState<number | null>(null);
-  const rows = report.years.curve.slice(0, 16);
+  // 默认只列前 16 年；跨度更长时其余的点「展开」才出 —— 一次摆出 180 张卡，
+  // 手机上是一条几万像素高的长列表，而用户多半只想看一段。
+  const [all, setAll] = useState(false);
+  const total = report.years.curve.length;
+  const rows = all ? report.years.curve : report.years.curve.slice(0, 16);
   return (
     <>
       <p className="m-note">
@@ -107,6 +117,11 @@ function ByYear({ report }: { report: ReturnType<typeof buildReport> }) {
           </div>
         </div>
       ))}
+      {total > 16 && (
+        <button className="m-btn ghost" onClick={() => setAll(!all)}>
+          {all ? "只看前 16 年" : `展开全部 ${total} 年`}
+        </button>
+      )}
     </>
   );
 }

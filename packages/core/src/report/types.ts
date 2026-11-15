@@ -157,6 +157,11 @@ export interface NodesSection {
   /** 曲线的统计基准窗，供读者知道「常态」是相对哪一段而言。 */
   readonly statsFrom: number;
   readonly statsTo: number;
+  /**
+   * 节点实际扫到的最后一年。跨度比基准窗长时它大于 `statsTo` ——
+   * 窗外的年份也被扫描，用的是同一把尺子。精度地平线据此覆盖到节点扫到的年份。
+   */
+  readonly scanTo: number;
   /** 判据门槛，单位为标准差。默认 2，可由 `nodes.threshold` 改。 */
   readonly threshold: number;
   readonly narrative: readonly NarrativeLine[];
@@ -199,9 +204,9 @@ export interface ReportMeta {
   /**
    * 报告的时间跨度（自起运起算的年数）。
    *
-   * ⚠️ 与指纹分开记，因为**节点的 z 分数随它变**：统计节点的基准窗就是这一整段，
-   * 换跨度，μ 与 σ 重算。指纹相同、跨度不同的两份报告，逐年的数相同，
-   * 节点的 z 分数不同。
+   * 决定大运列几柱、流年曲线画多远、节点扫多远。**σ 的基准窗不随它变**，
+   * 固定为起运后 60 年 —— 指纹相同、跨度不同的两份报告，同一年的数与 z 分数都相同，
+   * 只是后者看得更远。与指纹分开记，是因为大运列几柱、曲线多长确实不同。
    */
   readonly span: SpanYears;
   readonly locale: Locale;

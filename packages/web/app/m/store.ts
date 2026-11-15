@@ -1,6 +1,6 @@
 "use client";
 
-import type { Audience, BirthInput } from "@fate/core";
+import { DEFAULT_SPAN, isSpanYears, type Audience, type BirthInput, type SpanYears } from "@fate/core";
 
 /**
  * 移动版只记一份出生信息，存在本机。
@@ -90,6 +90,26 @@ export function loadAudience(): Audience {
 
 export function saveAudience(v: Audience): void {
   try { localStorage.setItem(AUD_KEY, v); } catch { /* 同上 */ }
+}
+
+/**
+ * 时间跨度：60 / 120 / 180 年（自起运起算）。
+ *
+ * **与桌面版同一个键。**同一台设备上它是同一个偏好 —— 在手机上切了 120 年，
+ * 打开桌面版也该是 120 年，而不是两边各记各的。与读者档同理，它是
+ * 「看的人」的偏好，不是这张盘的参数，不随盘走。
+ */
+const SPAN_KEY = "fate.span.v1";
+
+export function loadSpan(): SpanYears {
+  try {
+    const v = Number(localStorage.getItem(SPAN_KEY));
+    return isSpanYears(v) ? v : DEFAULT_SPAN;
+  } catch { return DEFAULT_SPAN; }
+}
+
+export function saveSpan(v: SpanYears): void {
+  try { localStorage.setItem(SPAN_KEY, String(v)); } catch { /* 同上 */ }
 }
 
 // ─────────────────────────────────────────────────────────

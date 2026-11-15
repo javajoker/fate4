@@ -409,8 +409,8 @@ const methodTemplates: NarrativeTemplate[] = [
   }),
   // 跨度要说清楚，因为它改变一件事：统计节点的基准窗就是这一整段，换跨度 σ 重算。
   T("method.span", "data", "method", ["span"], {
-    zhHans: "时间跨度 {span} 年，自起运起算。统计节点与曲线界线的 σ 取这一整段：换一个跨度，同一年的 z 分数会随之改变，节点也会出现或消失；逐年的数值则不受影响。",
-    en: "Time span {span} years, counted from the start of the first luck pillar. The sigma behind statistical nodes and curve bands is taken over this whole span: change the span and the z-score of the same year changes with it, and nodes appear or disappear; the year-by-year values themselves do not change.",
+    zhHans: "时间跨度 {span} 年，自起运起算：它决定大运列几柱、流年曲线画多远、统计节点扫多远。σ 的基准窗不随跨度变，固定为起运后 60 年，跨度更长时窗外的年份用同一把尺子量，所以同一年的 z 分数在不同跨度下相同。",
+    en: "Time span {span} years, counted from the start of the first luck pillar: it decides how many luck pillars are listed, how far the year curve runs and how far the statistical nodes are scanned. The baseline window for sigma does not change with the span; it stays fixed at the first 60 years after the start of luck, and years beyond it are measured against the same yardstick, so the z-score of a given year is the same under every span.",
   }),
   T("method.provenance", "data", "method", ["engineVersion", "paramsHash", "solarProvider"], {
     zhHans: "引擎版本 {engineVersion}，参数快照 {paramsHash}，太阳黄经算法 {solarProvider}。半年后若同一生辰算出不同结果，这三项是唯一能回答「为什么」的依据。",
@@ -602,13 +602,16 @@ const bodyTemplates: NarrativeTemplate[] = [
 
 const nodeTemplates: readonly NarrativeTemplate[] = [
   T("node.section", "data", "node", ["count", "threshold", "from", "to", "maxShown"], {
-    zhHans: "以下 {count} 条为 {from}–{to} 年这条基准窗内，各条曲线越过 ±{threshold} 个标准差的时段。"
+    zhHans: "以下 {count} 条为各条曲线越过 ±{threshold} 个标准差的时段，「常态」取自 {from}–{to} 年这段基准窗（起运后 60 年）。"
+      + "报告的时间跨度比基准窗长时，窗外的年份也被扫描，用的是同一把尺子。"
       + "门槛决定哪些时段入选，每个尺度按偏离程度取前 {maxShown} 条 —— "
       + "它是一个取舍旋钮，不是显著性水平：序列由出生时刻完全决定，"
       + "越阈的采样点在任何一张盘上都是那么多。"
       + "每条默认只给一句，展开才有依据；摘要里出现的每个数字都能在展开层找到出处。",
     en: "The {count} entries below are the stretches in which each curve crosses ±{threshold} "
-      + "standard deviations, measured against the {from}–{to} baseline window. "
+      + "standard deviations, measured against the {from}–{to} baseline window (the first 60 years "
+      + "after the start of luck). When the report's time span is longer than the baseline window, "
+      + "the years beyond it are scanned too, with the same yardstick. "
       + "The threshold decides which stretches qualify, and each scale lists its top {maxShown} "
       + "by deviation. It is a dial for selection, not a significance level: the series is fully "
       + "determined by the moment of birth, and about as many samples cross the threshold in any "
@@ -632,7 +635,7 @@ const nodeTemplates: readonly NarrativeTemplate[] = [
 
   T("node.level.medium", "data", "node", ["peakValue", "mean", "flatSteps"], {
     zhHans: "该步 {peakValue}，各步中位 {mean}，另有 {flatSteps} 步都落在中位附近。"
-      + "此处不引「几个标准差」—— 六十年只有六步运，散布由中位数与绝对中位差估出，"
+      + "此处不引「几个标准差」—— 基准的六十年只有六步运，散布由中位数与绝对中位差估出，"
       + "落在四五个取值相近的步上时，那个比值可以大到几十，"
       + "与大节点的三、四完全不在一个量纲上，并列去读只会误导。"
       + "比值仍用来给中节点排序，但不作为陈述。",
@@ -657,10 +660,10 @@ const nodeTemplates: readonly NarrativeTemplate[] = [
 
   T("node.scaleNote", "data", "node", ["scale", "from", "to"], {
     zhHans: "此为{scale}，基准取 {from}–{to} 年这一段本身的散布。"
-      + "所谓「偏离」是在这条序列自己的六十年里排序，不是概率陈述 —— "
+      + "所谓「偏离」是相对这条序列自己头六十年的常态来排序，不是概率陈述 —— "
       + "命盘的时间序列由出生时刻完全决定，越阈的采样点总在二十分之一上下，与哪张盘无关。",
     en: "This is a {scale}; the baseline is the spread of the {from}–{to} window itself. "
-      + "「Deviation」 here ranks moments within this one series' own sixty years and is not a "
+      + "「Deviation」 here ranks moments against this one series' own first sixty years and is not a "
       + "probability claim: the chart's time series is fully determined by the moment of birth, "
       + "so about one sample in twenty crosses the threshold no matter whose chart it is.",
   }),
@@ -765,10 +768,10 @@ const nodeTemplates: readonly NarrativeTemplate[] = [
   }),
 
   T("guidance.none", "data", "guidance", [], {
-    zhHans: "本命六十年中没有张力显著偏高的时段可供列举。"
+    zhHans: "本命所看的这一段里没有张力显著偏高的时段可供列举。"
       + "这说的是这条序列自身的散布较平，不是「一生平顺」——"
       + "同一套判据在任何一张盘上都只挑出最偏的那几段。",
-    en: "No stretch of the sixty years stands out as markedly elevated in tension. "
+    en: "No stretch of the span examined stands out as markedly elevated in tension. "
       + "That says the series' own spread is flat, not that a life will be smooth: "
       + "the same criterion picks only the most deviant stretches of whatever chart it is given.",
   }),

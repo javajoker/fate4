@@ -76,9 +76,9 @@ export default function CurvesPage() {
     } catch { return ctxSpanBase; }
   }, [base, ctxSpanBase, span, ctxParams, fmw, fmwRatio]);
 
-  // 基准窗 = 整个跨度：换跨度，μ 与 σ 重算，±θσ 界线随之移动
+  // 扫描覆盖整个跨度，基准窗仍是起运后 60 年：μ 与 σ 不随跨度变，±θσ 界线不动
   const S = useMemo(
-    () => (spanBase === null ? null : buildSeries(spanBase, { years: span, statsYears: span })),
+    () => (spanBase === null ? null : buildSeries(spanBase, { years: span })),
     [spanBase, span]);
 
   // 跨度一变，抽稀之后的下标空间就变了 —— 旧窗口的下标指向的是另一段时间，
@@ -220,12 +220,11 @@ export default function CurvesPage() {
             而 60 年只够看见其中一轮。
           </p>
           <p className="sub">
-            <strong>σ 的基准窗 = 这一整段（{span} 年），随跨度重算。</strong>
-            所以 ±θσ 界线会随跨度移动，同一年的 z 分数、哪些年越线也随之改变 ——
-            <b>这是尺子换了，不是那一年变了</b>：逐年的数值本身一位不差。
-            切到 120 / 180 年时，基准里纳入了第 60 年之后那些已超出寿数的年份，
-            它们拉大或压低 σ，前 60 年里越线的集合因此会变。
-            想知道一个节点是不是「盘的性质」，换几个跨度看它在不在。
+            <strong>σ 的基准窗仍是头 60 年，不随跨度变。</strong>
+            若基准跟着跨度走，同一年的 z 分数就会随你把跨度拖到哪里而变 ——
+            一个节点会因为显示选择而出现或消失。那不该发生：
+            统计节点是盘的性质，不是界面状态的函数。
+            所以 ±θσ 界线在 60 / 120 / 180 年下是同一条，窗外的年份用同一把尺子量。
           </p>
           <p className="sub">
             大运柱数也跟着加到 {span / 10} 柱。

@@ -104,8 +104,9 @@ function Shell({ children }: { children: ReactNode }) {
               </button>
             ))}
             <span className="dim">
-              大运 {span / 10} 柱。统计节点与曲线界线的 σ 取<b>这一整段</b>：
-              换跨度会重算，同一年的 z 分数随之改变；逐年的数值不变。
+              大运 {span / 10} 柱。跨度只决定<b>看多远</b>；
+              σ 的基准窗不随它变，固定为起运后 60 年 —— 窗外的年份用同一把尺子量，
+              同一年的 z 分数在任何跨度下相同。
             </span>
           </div>
         )}

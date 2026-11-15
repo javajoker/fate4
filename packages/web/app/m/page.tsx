@@ -9,6 +9,8 @@ import { Card } from "./Card";
 import { CITIES, clearBirth, loadBirth, loadPlainSource, savePlainSource, saveBirth,
   loadAudience, saveAudience, type PlainSource } from "./store";
 import { AudiencePicker, ProvenanceWarnings } from "./Audience";
+import { SpanPicker } from "./Span";
+import { useSpan } from "./useSpan";
 import { AiHandoff } from "./AiHandoff";
 import { Profile } from "./Profile";
 import { Share } from "./Share";
@@ -28,6 +30,8 @@ export default function MePage() {
   const [sec, setSec] = useState<PlainSection>("性格");
   const [src, setSrc] = useState<PlainSource>("code");
   const [aud, setAud] = useState<Audience>("lay");
+  // 时间跨度：选中的与已用于计算的分开，见 useSpan
+  const { span, applied: spanApplied, set: setSpan, pending: spanPending } = useSpan();
 
   useEffect(() => {
     setBirth(loadBirth()); setSrc(loadPlainSource()); setAud(loadAudience()); setReady(true);
@@ -39,13 +43,13 @@ export default function MePage() {
     if (birth === null) return null;
     try {
       return buildReport(buildChart(birth), {
-        includeNodes: true,
+        includeNodes: true, span: spanApplied,
         params: loadParams({ report: { audience: aud } }),
         now: (() => { const d = new Date();
           return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() }; })(),
       });
     } catch { return null; }
-  }, [birth, aud]);
+  }, [birth, aud, spanApplied]);
 
   const plain = useMemo(() => (report === null ? null : plainCards(report)), [report]);
 
@@ -79,6 +83,7 @@ export default function MePage() {
       <ProvenanceWarnings warnings={plain.provenanceWarnings} />
 
       <AudiencePicker value={aud} onChange={(a) => { setAud(a); saveAudience(a); }} />
+      <SpanPicker value={span} onChange={setSpan} pending={spanPending} />
 
       <div className="m-chips" style={{ display: src === "code" ? undefined : "none" }}>
         {sections.map((s) => (

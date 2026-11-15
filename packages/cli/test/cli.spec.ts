@@ -205,14 +205,15 @@ describe("--span：60 / 120 / 180 年", () => {
     expect(cli(["report", "--chart", "c.json", "--span", "100"], files).code).toBe(2);
   });
 
-  it("report：曲线年数、大运柱数、节点基准窗都随跨度走", () => {
+  it("report：曲线年数、大运柱数、节点扫描随跨度走；节点基准窗恒为 60 年", () => {
     for (const span of [60, 120, 180]) {
       const r = JSON.parse(cli(["report", "--chart", "c.json", "--format", "json",
         "--now", "2026-09-01", "--nodes", "--span", String(span)], files).out);
       expect(r.meta.span).toBe(span);
       expect(r.years.curve).toHaveLength(span);
       expect(r.luck.steps).toHaveLength(span / 10);
-      expect(r.nodes.statsTo - r.nodes.statsFrom + 1, `${span} 年`).toBe(span);
+      expect(r.nodes.statsTo - r.nodes.statsFrom + 1, `${span} 年：基准窗不随跨度变`).toBe(60);
+      expect(r.nodes.scanTo - r.nodes.statsFrom + 1, `${span} 年：扫描覆盖整个跨度`).toBe(span);
     }
   });
 

@@ -85,8 +85,8 @@ export interface ReportOptions {
   /**
    * 报告的时间跨度：60 / 120 / 180 年（自起运起算）。默认 60。
    *
-   * 决定大运列几柱（跨度 / 10）、§6.1 三线曲线多少年、§6.5 节点的基准窗多长。
-   * **σ 随它重算** —— 同一年的 z 分数在不同跨度下不同，见 `temporal/span.ts`。
+   * 决定大运列几柱（跨度 / 10）、§6.1 三线曲线多少年、§6.5 节点扫多少年。
+   * **σ 的基准窗不随它变**，固定为起运后 60 年 —— 见 `temporal/span.ts`。
    *
    * 默认值放在这里而不是调用方 —— Web 与 CLI 才同源。
    */
@@ -670,8 +670,9 @@ export function buildReport(
   // 节点要按月跑满六十年，代价高一个量级，故按需开启。
   let nodesSection: NodesSection | null = null;
   if (options.includeNodes === true && subject === "self") {
-    // 基准窗 = 整个跨度：换跨度，μ 与 σ 重算，同一年的 z 分数随之改变
-    const S = buildSeries(base, { years: spanYears, statsYears: spanYears });
+    // 扫描覆盖整个跨度，基准窗仍是起运后 60 年（`series.spanYears`）：
+    // 跨度更长时窗外的年份用同一把尺子量，σ 不随跨度变
+    const S = buildSeries(base, { years: spanYears });
     const override = options.nodeThreshold === undefined
       ? undefined : { threshold: options.nodeThreshold };
     const sets = allNodes(S, override);
@@ -687,6 +688,7 @@ export function buildReport(
       findings: F.findings,
       guidanceEmptyNote: F.guidanceEmptyNote,
       statsFrom: S.statsFrom, statsTo: S.statsTo,
+      scanTo: S.frames[S.frames.length - 1]!.year,
       threshold: sets.large.threshold,
       narrative: L65.items,
     };
@@ -752,7 +754,7 @@ export function buildReport(
     ...luckSection.steps.map((st) => fromJulianDay(st.endJd).year),
     ...yearsSection.curve.map((p) => p.year),
     ...yearsSection.cards.map((c) => c.view.year),
-    ...(nodesSection === null ? [] : [nodesSection.statsTo]),
+    ...(nodesSection === null ? [] : [nodesSection.scanTo]),
     current === null ? chart.input.year : current.year.year,
   ];
   const horizon = horizonOf(coveredYears);
