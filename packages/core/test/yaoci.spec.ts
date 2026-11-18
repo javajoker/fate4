@@ -16,7 +16,7 @@ import {
 } from "../src/liuyao/yaoci.js";
 import { buildQuestionReport } from "../src/liuyao/report.js";
 import { renderQuestionMarkdown } from "../src/liuyao/markdown.js";
-import { plainYaoci } from "../src/plain/question.js";
+import { plainYaoci, ZHISHI_RULE_PLAIN } from "../src/plain/question.js";
 import { zhishiProse } from "../src/plain/zhishi.js";
 import { scanText } from "../src/report/guard.js";
 import { scanPlain } from "../src/plain/guard.js";
@@ -623,3 +623,62 @@ describe("**指事接成段落**（独立页面用）", () => {
   });
 });
 
+describe("**指事接成段落：繁体与英文**", () => {
+  const LOCS = ["zh-Hant", "en"] as const;
+
+  it("引文取各自语言的语料原文，出现在段落里（英文句首可能被改成小写）", () => {
+    for (const loc of LOCS) {
+      for (const g of allGua(37)) {
+        const r = reading(g, loc, "plain");
+        const z = zhishiProse(r);
+        expect(z.locale).toBe(loc);
+        const all = z.paragraphs.map((p) => p.text).join("\n");
+        for (const pk of r.picks) {
+          for (const q of [pk.quotes.gist, pk.quotes.expand]) {
+            if (q.text === null) continue;
+            // 去掉首字（英文可能改了大小写）与句末标点（可能被补）再比
+            const core = q.text.slice(1).replace(/[.。？！?!]$/, "");
+            expect(all, `${loc}：${q.text}`).toContain(core);
+          }
+        }
+      }
+    }
+  });
+
+  it("繁体：本模块自己的话由简体机械转出，每个字都已归类，转出来没有残留简体", () => {
+    const own = [
+      ...ZHISHI_RULE_PLAIN, "其次，", "就这件事本身来说，", "再看它往哪里去，", "整体来看，",
+      "这一步的要点是：", "具体来说，", "细说起来，", "本卦变卦卦辞第爻",
+    ].join("");
+    expect(unclassifiedOf(own)).toEqual([]);
+    const S = new Set(SIMPLIFIED_ONLY);
+    for (const g of allGua(37)) {
+      const z = zhishiProse(reading(g, "zh-Hant", "plain"));
+      const text = [z.rule, ...z.paragraphs.flatMap((p) => [p.text, p.source])].join("");
+      const left = [...text].filter((ch) => S.has(ch));
+      expect(left, `繁体残留简体：${left.join("")}`).toEqual([]);
+    }
+  });
+
+  it("英文：逗号后的句首改小写，不出现「Secondly, When」", () => {
+    for (const g of allGua(37)) {
+      const z = zhishiProse(reading(g, "en", "plain"));
+      expect(z.rule).toMatch(/^[A-Z].*\.$/);
+      for (const p of z.paragraphs) {
+        expect(p.text).not.toMatch(/(?:Secondly|concretely|detail|Overall|itself|heading), [A-Z][a-z]/);
+        expect(p.source).toMatch(/^(?:Original|Changed) hexagram, No\. \d+ /);
+        if (p.title !== null) expect(p.title).toMatch(/^(?:First|Second|Third|Fourth|Fifth|Top) (?:Nine|Six)$/);
+      }
+    }
+  });
+
+  it("接好的繁体、英文段落过人话守卫", () => {
+    for (const loc of LOCS) {
+      for (const g of allGua(37)) {
+        for (const p of zhishiProse(reading(g, loc, "plain")).paragraphs) {
+          expect(scanPlain(p.text, `zhishi.${loc}`), p.text).toEqual([]);
+        }
+      }
+    }
+  });
+});

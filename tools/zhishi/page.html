@@ -1,175 +1,341 @@
 <!doctype html>
-<html lang="zh-Hans">
+<html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>六爻指事</title>
-<meta name="description" content="起一卦，按传统取法取出卦辞、爻辞的转述，接成一段话。">
+<title>六爻指事 · Six Lines</title>
+<meta name="description" content="起一卦，按传统取法读《周易》里「这一卦说的是什么事」。简体、繁體、English。">
 <!--
-  由 scripts/build-zhishi.mjs 生成，勿手改 liuyao-zhishi.html —— 改 tools/zhishi/page.html 与 main.ts。
+  由 scripts/build-zhishi.mjs 生成，勿手改 liuyao-zhishi.html —— 改 tools/zhishi/ 下的 page.html、main.ts、i18n.ts。
   单文件、无外部资源：断网、直接双击打开都能用。起卦、取辞、措辞检查都是内核的同一份代码。
 -->
 <style>
-  /* 色板沿用站点（packages/web/app/globals.css）：中性色，无红绿吉凶色 */
+  /*
+   * 色板沿用站点（packages/web/app/globals.css）：中性色，无红绿吉凶色。
+   * 唯一的强调色（石板蓝）只用在两处：在动的格，和这次读的那一格 —— 卦画上看得见读的是哪里。
+   */
   :root {
-    --bg: #f7f7f5; --surface: #ffffff; --surface-2: #f1f1ee;
+    --bg: #f5f5f2; --surface: #ffffff; --surface-2: #efefeb;
     --line: #dcdcd6; --line-strong: #b9b9b1;
-    --ink: #23262a; --ink-2: #5b6068; --ink-3: #878d95;
-    --accent: #2f4858; --accent-soft: #e3e9ed;
-    --serif: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", serif;
-    --sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    --ink: #22252a; --ink-2: #565b63; --ink-3: #868c94;
+    --accent: #2f4858; --accent-2: #4a6a7e; --accent-soft: #e2e8ec;
+    --read: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia,
+      "Songti TC", "Songti SC", "Noto Serif CJK TC", "Noto Serif CJK SC", "Source Han Serif TC", "Source Han Serif SC", serif;
+    --sans: -apple-system, "SF Pro Text", "PingFang TC", "PingFang SC", "Hiragino Sans", "Noto Sans CJK TC",
+      "Noto Sans CJK SC", "Microsoft JhengHei", "Microsoft YaHei", sans-serif;
+    --r: 12px;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #16181a; --surface: #1d2023; --surface-2: #24282c;
-      --line: #32373c; --line-strong: #4a5158;
-      --ink: #e6e8ea; --ink-2: #a6adb5; --ink-3: #7b838c;
-      --accent: #9fbdd0; --accent-soft: #24313a;
+      --bg: #141618; --surface: #1c1f22; --surface-2: #23272b;
+      --line: #30353a; --line-strong: #4a5158;
+      --ink: #e7e9eb; --ink-2: #a9b0b7; --ink-3: #7c848c;
+      --accent: #a3c2d4; --accent-2: #8aaabd; --accent-soft: #233039;
       color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
-    --bg: #16181a; --surface: #1d2023; --surface-2: #24282c;
-    --line: #32373c; --line-strong: #4a5158;
-    --ink: #e6e8ea; --ink-2: #a6adb5; --ink-3: #7b838c;
-    --accent: #9fbdd0; --accent-soft: #24313a;
+    --bg: #141618; --surface: #1c1f22; --surface-2: #23272b;
+    --line: #30353a; --line-strong: #4a5158;
+    --ink: #e7e9eb; --ink-2: #a9b0b7; --ink-3: #7c848c;
+    --accent: #a3c2d4; --accent-2: #8aaabd; --accent-soft: #233039;
     color-scheme: dark;
   }
 
-  * { box-sizing: border-box; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
   html, body { background: var(--bg); color: var(--ink); }
   body { font-family: var(--sans); font-size: 15px; line-height: 1.7; -webkit-text-size-adjust: 100%; }
-  .wrap { max-width: 640px; margin: 0 auto; padding: 32px 16px 48px; display: flex; flex-direction: column; gap: 22px; }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  button { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 
-  h1 { font-family: var(--serif); font-size: 26px; font-weight: 600; letter-spacing: 0.06em; }
-  .lede { font-size: 13.5px; color: var(--ink-2); margin-top: 6px; }
+  /* ── 顶栏 ── */
+  .bar { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: saturate(1.2) blur(10px); -webkit-backdrop-filter: saturate(1.2) blur(10px);
+    border-bottom: 1px solid var(--line); }
+  .bar-in { max-width: 720px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 14px; }
+  .brand { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ink);
+    font-family: var(--read); font-weight: 600; font-size: 16px; letter-spacing: 0.04em; margin-right: auto; white-space: nowrap; }
+  .mark { display: inline-grid; gap: 2.5px; width: 16px; }
+  .mark i { display: block; height: 3px; background: var(--ink); border-radius: 1px; }
+  .mark i.half { background: linear-gradient(90deg, var(--ink) 42%, transparent 42% 58%, var(--ink) 58%); }
+  .nav { display: flex; gap: 16px; }
+  .nav a { font-size: 13.5px; color: var(--ink-2); text-decoration: none; white-space: nowrap; }
+  .nav a:hover { color: var(--ink); }
+  .lang select { font: inherit; font-size: 13px; color: var(--ink); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
 
-  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
-    padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  /* ── 版面 ── */
+  .wrap { max-width: 720px; margin: 0 auto; padding: 36px 16px 56px; display: flex; flex-direction: column; gap: 34px; }
+
+  .hero h1 { font-family: var(--read); font-weight: 600; font-size: clamp(30px, 7vw, 40px); line-height: 1.2;
+    letter-spacing: 0.06em; text-wrap: balance; }
+  :lang(en) .hero h1 { letter-spacing: 0; }
+  .tagline { margin-top: 10px; font-size: 16px; color: var(--ink-2); text-wrap: pretty; }
+  .first { margin-top: 14px; font-size: 13.5px; color: var(--ink-3); display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* ── 起卦：三步 ── */
+  .steps { display: flex; flex-direction: column; gap: 14px; }
+  .step { display: grid; grid-template-columns: 30px 1fr; gap: 14px; align-items: start;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 18px 18px 14px; }
+  .step-n { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+    font-family: var(--read); font-size: 15px; color: var(--accent); border: 1px solid var(--line-strong); }
+  .step-body { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .step h2 { font-size: 15.5px; font-weight: 600; line-height: 30px; }
+
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .choice { text-align: left; cursor: pointer; padding: 12px 14px; border-radius: 10px; background: var(--surface);
+    border: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; transition: border-color .15s, background .15s; }
+  .choice:hover { border-color: var(--line-strong); }
+  .choice.on { border-color: var(--accent); background: var(--accent-soft); }
+  .choice-t { font-weight: 600; font-size: 14.5px; }
+  .choice-d { font-size: 12.5px; color: var(--ink-2); line-height: 1.6; }
+
   .field { display: flex; flex-direction: column; gap: 6px; }
-  .label, label { font-size: 12.5px; color: var(--ink-2); }
-  select { font: inherit; font-size: 15px; padding: 9px 10px; color: var(--ink); background: var(--surface);
-    border: 1px solid var(--line); border-radius: 8px; }
+  .field label { font-size: 13px; color: var(--ink-2); }
+  .field-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  select#place { font: inherit; font-size: 15px; padding: 8px 10px; color: var(--ink); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 8px; min-width: 9em; }
+  .hint { font-size: 12.5px; color: var(--ink-3); line-height: 1.65; }
 
-  .seg { display: flex; gap: 6px; }
-  .seg button { flex: 1; font: inherit; font-size: 14px; padding: 9px 6px; cursor: pointer;
-    background: var(--surface); color: var(--ink-2); border: 1px solid var(--line); border-radius: 8px; }
-  .seg button.on { background: var(--accent-soft); color: var(--ink); border-color: var(--line-strong); }
+  .seg { display: inline-flex; background: var(--surface-2); border-radius: 9px; padding: 3px; gap: 3px; align-self: flex-start; }
+  .seg button { cursor: pointer; border: none; background: none; padding: 6px 14px; border-radius: 7px; font-size: 13.5px; color: var(--ink-2); }
+  .seg button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
 
-  .help { font-size: 12.5px; color: var(--ink-2); }
-  .coin-grid { display: flex; flex-direction: column; gap: 4px; }
-  .coin-row { display: grid; grid-template-columns: 4.4em auto 52px 1fr; align-items: center;
-    gap: 10px; padding: 6px 8px; border-radius: 8px; }
+  /* 铜钱：圆钱方孔。实心为正，空心为反，虚线为未记 */
+  .coin-grid { display: flex; flex-direction: column; gap: 2px; }
+  .coin-row { display: grid; grid-template-columns: 5.2em auto 60px 1fr; align-items: center; gap: 12px;
+    padding: 7px 8px; border-radius: 9px; }
   .coin-row.next { background: var(--surface-2); }
-  .ord { font-size: 12.5px; color: var(--ink-2); line-height: 1.3; }
-  .ord small { display: block; font-size: 10.5px; color: var(--ink-3); }
-  .coins { display: inline-flex; gap: 6px; }
-  .coin { width: 30px; height: 30px; padding: 0; border-radius: 50%; font: inherit; font-size: 12px; cursor: pointer;
-    background: var(--surface); color: var(--ink-2); border: 1px solid var(--line-strong); }
-  .coin.head { background: var(--accent); color: var(--surface); border-color: var(--accent); }
-  .coin.tail { background: var(--surface-2); color: var(--ink-2); }
+  .ord { font-size: 13px; color: var(--ink-2); line-height: 1.25; }
+  .ord small { display: block; font-size: 11px; color: var(--ink-3); }
+  .coins { display: inline-flex; gap: 7px; }
+  .coin { position: relative; width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+    border: 1.5px solid var(--line-strong); background: var(--surface); font-size: 11px; font-weight: 600; color: var(--ink-2);
+    display: grid; place-items: center; }
+  .coin::after { content: ""; position: absolute; width: 9px; height: 9px; border: 1.5px solid currentColor; opacity: .55; }
+  .coin span { position: absolute; bottom: -1px; right: -3px; font-size: 10px; line-height: 1; padding: 1px 2px;
+    border-radius: 3px; background: var(--surface); color: var(--ink-2); }
+  .coin.head { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+  .coin.head::after { opacity: .9; }
+  .coin.tail { background: var(--surface); color: var(--ink-2); }
   .coin.blank { border-style: dashed; color: var(--ink-3); }
+  .coin.blank::after { opacity: .25; }
   .coin:disabled { cursor: default; }
-  .line { display: inline-flex; gap: 6px; align-items: center; }
-  .line .seg { display: block; height: 6px; width: 52px; border-radius: 1px; background: var(--ink-2); }
-  .line .seg.half { width: 23px; }
-  .line .seg.pending { background: none; border-top: 1px dashed var(--line-strong); height: 0; }
-  .mv { font-size: 12px; color: var(--ink-3); white-space: nowrap; }
-  .mv.on { color: var(--accent); }
+  .rowline { display: inline-flex; gap: 8px; align-items: center; }
+  .rowline i { display: block; height: 7px; width: 60px; border-radius: 1.5px; background: var(--ink-2); }
+  .rowline i.half { width: 26px; }
+  .rowline i.pending { background: none; border-top: 1.5px dashed var(--line-strong); height: 0; }
+  .mv { font-size: 12.5px; color: var(--ink-3); white-space: nowrap; }
+  .mv.on { color: var(--accent); font-weight: 600; }
 
   .tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .chip { font: inherit; font-size: 12.5px; padding: 6px 12px; border-radius: 999px; cursor: pointer;
-    background: var(--surface); color: var(--ink-2); border: 1px solid var(--line); }
+  .chip { cursor: pointer; font-size: 13px; padding: 6px 13px; border-radius: 999px; background: var(--surface);
+    color: var(--ink-2); border: 1px solid var(--line); }
+  .chip:hover:not(:disabled) { border-color: var(--line-strong); color: var(--ink); }
   .chip:disabled { opacity: 0.45; cursor: default; }
-  .count { font-size: 12px; color: var(--ink-3); }
+  .count { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; margin-left: auto; }
 
-  .primary { font: inherit; font-size: 15px; font-weight: 600; padding: 12px; width: 100%; cursor: pointer;
-    background: var(--accent); color: var(--bg); border: none; border-radius: 9px; }
-  .primary:disabled { opacity: 0.45; cursor: default; }
-  button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .primary { cursor: pointer; width: 100%; padding: 13px; font-size: 16px; font-weight: 600; letter-spacing: 0.04em;
+    background: var(--accent); color: var(--bg); border: none; border-radius: 10px; transition: opacity .15s; }
+  .primary:hover:not(:disabled) { opacity: .92; }
+  .primary:disabled { opacity: 0.4; cursor: default; }
 
-  #out { display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 16px; }
-  #out[hidden] { display: none; }
-  .gua { font-family: var(--serif); font-size: 21px; font-weight: 600; letter-spacing: 0.04em; }
-  .meta { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; margin-top: 2px; }
-  .rule { font-size: 13px; color: var(--ink-2); padding: 10px 12px; background: var(--surface-2); border-radius: 8px; }
-  .para { display: flex; flex-direction: column; gap: 6px; }
-  .para + .para { border-top: 1px solid var(--line); padding-top: 14px; }
-  .para .text { font-size: 16px; line-height: 1.95; }
-  .para .src { font-size: 12px; color: var(--ink-3); }
-  .note { font-size: 12px; color: var(--ink-3); }
+  /* ── 结果 ── */
+  #result { display: flex; flex-direction: column; gap: 20px; }
+  .sec { font-family: var(--read); font-size: 22px; font-weight: 600; letter-spacing: 0.04em;
+    display: flex; align-items: baseline; gap: 12px; }
+  .sec::after { content: ""; flex: 1; height: 1px; background: var(--line); transform: translateY(-6px); }
+  .meta { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; margin-top: -10px; }
 
-  footer { font-size: 11.5px; line-height: 1.7; color: var(--ink-3); border-top: 1px solid var(--line); padding-top: 14px; }
-  [hidden] { display: none !important; }
+  /* 卦画：自上而下排（上爻在上），动画自下而上 —— 与起卦的次序一致 */
+  .figure { display: flex; align-items: center; justify-content: center; gap: clamp(10px, 4vw, 28px);
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 22px 12px 18px; }
+  .hex { position: relative; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px 10px 4px; border-radius: 10px; }
+  .hex.whole { background: var(--accent-soft); outline: 1.5px solid var(--accent); }
+  .hex-lines { display: flex; flex-direction: column; gap: 9px; }
+  .hl { display: grid; grid-template-columns: 18px clamp(84px, 24vw, 124px) 3.6em; align-items: center; gap: 8px; }
+  .hl .mk { font-size: 14px; line-height: 1; color: var(--accent); text-align: center; font-family: var(--read); }
+  .hl .bar { display: flex; gap: 14%; height: 11px; }
+  .hl .bar i { flex: 1; background: var(--ink); border-radius: 2px; }
+  .hl.picked .bar i { background: var(--accent); }
+  .hl .tag { font-size: 11.5px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+  :lang(en) .hl .tag { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; }
+  .hex figcaption { text-align: center; line-height: 1.35; }
+  .hex-role { display: block; font-size: 11.5px; color: var(--ink-3); letter-spacing: .1em; }
+  :lang(en) .hex-role { text-transform: uppercase; letter-spacing: .08em; font-size: 10.5px; }
+  .hex-name { font-family: var(--read); font-size: 17px; font-weight: 600; }
+  .hex-badge { position: absolute; top: -11px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+    font-size: 11px; font-weight: 600; color: var(--surface); background: var(--accent); padding: 2px 9px; border-radius: 999px; }
+  .arrow { font-family: var(--read); font-size: 22px; color: var(--ink-3); }
+  .nobian { font-size: 13px; color: var(--ink-3); max-width: 9em; }
 
-  @media (max-width: 400px) {
-    .coin-row { grid-template-columns: 4em auto 40px 1fr; gap: 7px; padding: 6px 4px; }
-    .line .seg { width: 40px; } .line .seg.half { width: 17px; }
-    .coin { width: 28px; height: 28px; }
+  .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; font-size: 12px; color: var(--ink-3); margin-top: -8px; }
+  .legend b { color: var(--accent); font-weight: 600; margin-right: 4px; }
+
+  .rule { font-size: 14px; color: var(--ink-2); padding: 12px 14px; border-left: 3px solid var(--line-strong);
+    background: var(--surface-2); border-radius: 0 8px 8px 0; }
+  .rule .en { display: block; margin-top: 4px; font-size: 13px; color: var(--ink-3); }
+
+  .reading { display: flex; flex-direction: column; gap: 26px; }
+  .para { display: flex; flex-direction: column; gap: 10px; }
+  .para-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .role { font-size: 12px; font-weight: 600; color: var(--accent); border: 1px solid var(--accent);
+    border-radius: 999px; padding: 1px 9px; }
+  :lang(en) .role { text-transform: uppercase; letter-spacing: .06em; font-size: 10.5px; padding: 2px 9px; }
+  .src { font-size: 12.5px; color: var(--ink-3); }
+  .text { font-family: var(--read); font-size: 17.5px; line-height: 2; text-wrap: pretty; }
+  :lang(en) .text { font-size: 17px; line-height: 1.75; }
+  .text-en { font-family: var(--read); font-size: 15.5px; line-height: 1.75; color: var(--ink-2);
+    padding-left: 14px; border-left: 2px solid var(--line); }
+  .src-en { font-size: 12px; color: var(--ink-3); padding-left: 16px; }
+  .note { font-size: 12.5px; color: var(--ink-3); }
+  .again { align-self: flex-start; font-size: 14px; text-decoration: none; border-bottom: 1px solid currentColor; padding-bottom: 1px; }
+
+  @keyframes draw { from { opacity: 0; transform: scaleX(0.4); } to { opacity: 1; transform: none; } }
+  .animate .hl .bar, .animate .hl .mk, .animate .hl .tag { animation: draw .38s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(var(--i) * 70ms); }
+  @media (prefers-reduced-motion: reduce) { .animate .hl .bar, .animate .hl .mk, .animate .hl .tag { animation: none; } }
+
+  /* ── 说明 ── */
+  .guide { display: flex; flex-direction: column; gap: 22px; }
+  .guide h3 { font-size: 15.5px; font-weight: 600; margin-bottom: 6px; }
+  .guide p { color: var(--ink-2); max-width: 64ch; text-wrap: pretty; }
+  .guide p + p { margin-top: 8px; }
+  .table-wrap { overflow-x: auto; margin-top: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  th { font-size: 12px; font-weight: 600; color: var(--ink-3); background: var(--surface-2); }
+  td:first-child { font-family: var(--read); font-size: 16px; color: var(--accent); width: 5.5em; font-variant-numeric: tabular-nums; }
+  .guide .small { font-size: 12.5px; color: var(--ink-3); margin-top: 10px; }
+
+  footer { font-size: 12px; line-height: 1.75; color: var(--ink-3); border-top: 1px solid var(--line); padding-top: 16px; }
+
+  @media (max-width: 520px) {
+    .wrap { padding-top: 26px; gap: 28px; }
+    .choices { grid-template-columns: 1fr; }
+    .step { grid-template-columns: 26px 1fr; gap: 11px; padding: 15px 14px 15px 12px; }
+    .step-n { width: 26px; height: 26px; font-size: 14px; }
+    .step h2 { line-height: 26px; }
+    .coin-row { grid-template-columns: 4.6em auto 46px 1fr; gap: 9px; padding: 6px 4px; }
+    .coin { width: 29px; height: 29px; }
+    .rowline i { width: 46px; } .rowline i.half { width: 19px; }
+    .nav { gap: 12px; }
+    .hl { grid-template-columns: 14px clamp(64px, 20vw, 96px) 3em; gap: 5px; }
+    .figure { padding: 20px 6px 16px; }
+    .text { font-size: 17px; }
+  }
+  @media (max-width: 420px) {
+    .brand-t { display: none; }
   }
 </style>
 </head>
 <body>
-<main class="wrap">
-  <header>
-    <h1>六爻指事</h1>
-    <p class="lede" id="ledeTime">起一卦，按传统的取法从卦里取出卦辞、爻辞的转述，接成一段话。不需要出生信息 ——
-      按时刻起时，同一个时段里所有人得到的是同一卦。</p>
-    <p class="lede" id="ledeCoin" hidden>起一卦，按传统的取法从卦里取出卦辞、爻辞的转述，接成一段话。不需要出生信息 ——
-      掷铜钱时，卦由你掷出来的六次决定。</p>
-  </header>
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="#top">
+      <span class="mark" aria-hidden="true"><i></i><i class="half"></i><i></i></span>
+      <span class="brand-t" data-t="brand"></span>
+    </a>
+    <nav class="nav">
+      <a href="#cast" data-t="navCast"></a>
+      <a href="#result" id="navResult" data-t="navResult" hidden></a>
+      <a href="#guide" data-t="navGuide"></a>
+    </nav>
+    <label class="lang">
+      <span class="sr" data-t="langLabel"></span>
+      <select id="lang">
+        <option value="zh-Hans">简体</option>
+        <option value="zh-Hant">繁體</option>
+        <option value="en">English</option>
+        <option value="bi">繁體＋EN</option>
+      </select>
+    </label>
+  </div>
+</header>
 
-  <section class="panel" aria-label="起卦">
-    <div class="field">
-      <span class="label">怎么起</span>
-      <div class="seg" id="how">
-        <button type="button" data-how="time">按现在的时刻</button>
-        <button type="button" data-how="coin">掷铜钱</button>
-      </div>
-    </div>
-
-    <div class="field">
-      <label for="place">你在哪（定当地的时刻）</label>
-      <select id="place"></select>
-    </div>
-
-    <div class="field" id="coins" hidden>
-      <div class="seg" id="hand">
-        <button type="button" data-hand="1">我自己掷</button>
-        <button type="button" data-hand="0">让程序替我掷</button>
-      </div>
-      <p class="help" id="coinHelpHand">准备三枚一样的硬币（有铜钱最好），两面里先定一面叫「正」——
-        有人以有字的一面为正，也有人以背面为正，定了就一直这么算。然后掷六次，每次把三枚的正反点下来：
-        点一下是正，再点一下是反，第三下清空。从最下面一行记起，一次一行往上。</p>
-      <p class="help" id="coinHelpMachine" hidden>程序替你掷，用的是浏览器生成的随机数，不是你自己掷出来的 ——
-        这一点说在明处。手边有硬币，还是自己掷。</p>
-      <div class="coin-grid" id="coinGrid"></div>
-      <div class="tools">
-        <button type="button" class="chip" id="tossNext">掷第一次</button>
-        <button type="button" class="chip" id="tossAll">六次一起掷</button>
-        <button type="button" class="chip" id="reset">重来</button>
-        <span class="count" id="coinCount">已记 0 / 6</span>
-      </div>
-    </div>
-
-    <button type="button" class="primary" id="go">起卦</button>
+<main class="wrap" id="top">
+  <section class="hero">
+    <h1 data-t="title"></h1>
+    <p class="tagline" data-t="tagline"></p>
+    <p class="first"><span data-t="firstTime"></span><a href="#guide" data-t="firstTimeLink"></a></p>
   </section>
 
-  <section id="out" hidden aria-live="polite">
-    <div>
-      <p class="gua" id="gua"></p>
-      <p class="meta" id="meta"></p>
+  <section class="steps" id="cast">
+    <div class="step">
+      <div class="step-n">1</div>
+      <div class="step-body">
+        <h2 data-t="step1"></h2>
+        <div class="choices" id="how">
+          <button type="button" class="choice" data-how="time" aria-pressed="true">
+            <span class="choice-t" data-t="howTime"></span>
+            <span class="choice-d" data-t="howTimeHint"></span>
+          </button>
+          <button type="button" class="choice" data-how="coin" aria-pressed="false">
+            <span class="choice-t" data-t="howCoin"></span>
+            <span class="choice-d" data-t="howCoinHint"></span>
+          </button>
+        </div>
+        <div class="field">
+          <label for="place" data-t="placeLabel"></label>
+          <div class="field-row">
+            <select id="place"></select>
+            <span class="hint" data-t="placeHint"></span>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <div class="step" id="coins" hidden>
+      <div class="step-n">2</div>
+      <div class="step-body">
+        <h2 data-t="step2"></h2>
+        <div class="seg" id="hand">
+          <button type="button" data-hand="1" data-t="handSelf"></button>
+          <button type="button" data-hand="0" data-t="handMachine"></button>
+        </div>
+        <p class="hint" id="helpSelf" data-t="helpSelf"></p>
+        <p class="hint" id="helpMachine" data-t="helpMachine" hidden></p>
+        <div class="coin-grid" id="coinGrid"></div>
+        <div class="tools">
+          <button type="button" class="chip" id="tossNext"></button>
+          <button type="button" class="chip" id="tossAll" data-t="tossAll"></button>
+          <button type="button" class="chip" id="reset" data-t="reset"></button>
+          <span class="count" id="coinCount"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-n" id="goN">2</div>
+      <div class="step-body">
+        <button type="button" class="primary" id="go"></button>
+      </div>
+    </div>
+  </section>
+
+  <section id="result" hidden aria-live="polite">
+    <h2 class="sec" data-t="resultTitle"></h2>
+    <p class="meta" id="meta"></p>
+    <div class="figure" id="figure"></div>
+    <p class="legend" id="legend"></p>
     <p class="rule" id="rule"></p>
-    <div id="paras"></div>
+    <div class="reading" id="paras"></div>
     <p class="note" id="withheld" hidden></p>
+    <a class="again" href="#cast" data-t="again"></a>
   </section>
 
-  <footer>
-    以上是《周易》卦辞、爻辞的传统转述，原话照录，只在段与段之间添了连接词；转述里的「你」是转述者的口吻。
-    它说的是「这一卦说的是什么事」，不是对你的判断，也不预言结果，更不构成医疗、法律、财务或任何专业建议。
-  </footer>
+  <section class="guide" id="guide">
+    <h2 class="sec" data-t="guideTitle"></h2>
+    <div id="guideBody" class="guide"></div>
+  </section>
+
+  <footer data-t="footer"></footer>
 </main>
 <script>/*__BUNDLE__*/</script>
 </body>

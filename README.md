@@ -10,7 +10,7 @@
 | `packages/skill` | Claude Agent Skill（术语版）。通过 CLI 调用 `core`，拿到结构化 JSON 后由模型组织叙述。 |
 | `packages/skill-plain` | Claude Agent Skill（平常话版）。同一台引擎，转述而非翻译 —— 人话由引擎的定值映射产出并过人话专用守卫。 |
 | `packages/data` | 体量较大的生成数据：VSOP87 截断级数、节气静态表、六十四卦爻辞语料。**一律由 `scripts/` 下的生成器程序化搬运并记 SHA256**，不经任何人工或模型转录。 |
-| `tools/zhishi` | 独立页面「六爻指事」：单个 HTML 文件（`liuyao-zhishi.html`），起一卦、按七例取卦爻辞，把阶段、指事、白话转述接成一段话。内核打包在内，断网可用。`pnpm gen:zhishi` 重新生成。 |
+| `tools/zhishi` | 独立页面「六爻指事」：单个 HTML 文件（`liuyao-zhishi.html`），起一卦、按七例取卦爻辞，把阶段、指事、白话转述接成一段话；卦画上标出读的是哪一格；简体／繁體／English／繁英对照，附新手说明。内核打包在内，断网可用。`pnpm gen:zhishi` 重新生成。 |
 
 Web 应用全部计算在浏览器内完成，**生辰数据不出本机**：记录存 IndexedDB，命盘标识与分享链接走 URL 片段（`#` 之后）—— 片段不随请求发往服务器，也不进任何访问日志。故整站可静态导出，无服务端路由。
 

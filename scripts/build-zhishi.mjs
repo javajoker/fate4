@@ -47,22 +47,46 @@ const fateData = {
 };
 
 /**
- * 页面只出简体：繁体、英文两份语料换成空包，省下三百多 KB。
+ * 构建前先查界面文案（`tools/zhishi/i18n.ts`）：
  *
- * 只在这一次打包里换，语料文件本身不动。空包而不是简体顶替 ——
- * 万一哪天页面误取了别的语言，看到的是空白，而不是一段语言不对却读得通的话。
+ * 1. 简体里每个字都已在 hant.ts 归类 —— 否则繁体界面里会静悄悄地留着简体字；
+ * 2. 每一条都能转成繁体而不抛错（「无单一读法」的字单独出现会抛）；
+ * 3. 三种文字的每一条都过人话守卫。
+ *
+ * 文案与内核的转换、守卫一起打成一个临时模块来查，不依赖 dist —— 查的就是源码本身。
  */
-const SIMPLIFIED_ONLY = {
-  name: "yaoci-zh-hans-only",
-  setup(b) {
-    b.onResolve({ filter: /^\.\/(en|zh-hant)\.js$/ }, (a) =>
-      a.importer.endsWith(`yaoci${"/"}index.ts`) ? { path: a.path, namespace: "empty-pack" } : undefined);
-    b.onLoad({ filter: /.*/, namespace: "empty-pack" }, () => ({
-      contents: "export const CLASSIC = []; export const GIST = []; export const EXPAND = []; export const STAGE = [];",
-      loader: "js",
-    }));
-  },
-};
+async function checkCopy() {
+  const r = await build({
+    stdin: {
+      contents: [
+        'export { UI_SOURCE, allStrings, mapUi } from "./tools/zhishi/i18n.ts";',
+        'export { toHant, unclassifiedOf } from "./packages/core/src/report/hant.ts";',
+        'export { scanPlain } from "./packages/core/src/plain/guard.ts";',
+      ].join("\n"),
+      resolveDir: ROOT, loader: "ts",
+    },
+    bundle: true, format: "esm", platform: "neutral", write: false, plugins: [fateData], logLevel: "warning",
+  });
+  const m = await import(`data:text/javascript;base64,${Buffer.from(r.outputFiles[0].text).toString("base64")}`);
+  const problems = [];
+  const hans = m.allStrings(m.UI_SOURCE["zh-Hans"]);
+  const un = m.unclassifiedOf(hans.join(""));
+  if (un.length > 0) problems.push(`hant.ts 未归类的字：${un.join("")}`);
+  let hant = [];
+  try { hant = m.allStrings(m.mapUi(m.UI_SOURCE["zh-Hans"], m.toHant)); }
+  catch (e) { problems.push(`繁体转换抛错：${String(e.message).split("\n")[0]}`); }
+  for (const [name, list] of [["简体", hans], ["繁体", hant], ["英文", m.allStrings(m.UI_SOURCE.en)]]) {
+    for (const s of list) {
+      for (const v of m.scanPlain(s, "zhishi.ui")) problems.push(`${name}文案被守卫拦下（${v.ruleId}）：${s.slice(0, 40)}`);
+    }
+  }
+  if (problems.length > 0) {
+    console.error(`六爻指事：界面文案检查未通过，${problems.length} 处：\n  ${problems.join("\n  ")}`);
+    process.exit(1);
+  }
+}
+
+await checkCopy();
 
 const r = await build({
   entryPoints: [resolve(DIR, "main.ts")],
@@ -74,7 +98,7 @@ const r = await build({
   charset: "utf8",
   legalComments: "none",
   write: false,
-  plugins: [fateData, SIMPLIFIED_ONLY],
+  plugins: [fateData],
   logLevel: "warning",
 });
 

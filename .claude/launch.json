@@ -4,8 +4,26 @@
     {
       "name": "fate-web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@fate/web", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@fate/web",
+        "dev"
+      ],
       "port": 3000
+    },
+    {
+      "name": "zhishi-static",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4173",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "tools/zhishi"
+      ],
+      "port": 4173
     }
   ]
 }
