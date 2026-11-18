@@ -867,13 +867,38 @@ const liuyaoTemplates: NarrativeTemplate[] = [
     zhHans: "未产出候选时段：{why}",
     en: "No candidate window is produced: {why}",
   }),
-  T("liuyao.yaoci.moving", "data", "liuyaoYaoci", ["positions"], {
-    zhHans: "指事取法：动爻。传统于此取动爻的爻辞，本卦第 {positions} 爻至变卦同位 —— 由此及彼。爻辞属象辞一路，与上面的纳甲断法是两套系统；此处只作所指，不改动任何一条断论。",
-    en: "Indication method: moving lines. The tradition reads the line statements of the moving lines here, from line {positions} of the primary hexagram to the same position in the derived one. Line statements belong to the image-and-word tradition, a system separate from the stem-branch reading above; they supply reference, not judgement, and change none of the findings.",
+  // 指事取法：按动爻多寡分七例（liuyao/yaoci.ts `zhishiSlots`）。
+  T("liuyao.yaoci.rule0", "data", "liuyaoYaoci", ["ben"], {
+    zhHans: "指事取法：六爻皆静，取本卦{ben}的卦辞。",
+    en: "Indication rule: all six lines still, so the judgement of the primary hexagram {ben} is read.",
   }),
-  T("liuyao.yaoci.shiying", "data", "liuyaoYaoci", ["shi", "ying"], {
-    zhHans: "指事取法：六爻皆静，传统改看世应 —— 世爻在第 {shi} 位，应爻在第 {ying} 位。世为我方、应为他方，这是一组位置关系，不是先后关系。爻辞只作所指，不改动任何一条断论。",
-    en: "Indication method: all six lines still, so the tradition turns to the self and other lines — self at position {shi}, other at position {ying}. These are two places, not two moments. The line statements supply reference, not judgement.",
+  T("liuyao.yaoci.rule1", "data", "liuyaoYaoci", ["ben", "pos"], {
+    zhHans: "指事取法：一爻动，取本卦{ben}这一动爻（第 {pos} 爻）的爻辞。",
+    en: "Indication rule: one moving line, so the line statement of that line (line {pos}) in the primary hexagram {ben} is read.",
+  }),
+  T("liuyao.yaoci.rule2", "data", "liuyaoYaoci", ["ben", "moving", "main"], {
+    zhHans: "指事取法：二爻动（第 {moving} 爻），取本卦{ben}这两爻的爻辞，以上者第 {main} 爻为主。",
+    en: "Indication rule: two moving lines (lines {moving}), so both line statements in the primary hexagram {ben} are read, the upper one, line {main}, taking the lead.",
+  }),
+  T("liuyao.yaoci.rule3", "data", "liuyaoYaoci", ["ben", "bian", "moving"], {
+    zhHans: "指事取法：三爻动（第 {moving} 爻），取本卦{ben}与变卦{bian}的卦辞，本卦为体，变卦为用。",
+    en: "Indication rule: three moving lines (lines {moving}), so the judgements of both the primary hexagram {ben} and the derived hexagram {bian} are read, the primary as substance and the derived as function.",
+  }),
+  T("liuyao.yaoci.rule4", "data", "liuyaoYaoci", ["bian", "moving", "still", "main"], {
+    zhHans: "指事取法：四爻动（第 {moving} 爻），取变卦{bian}两个不变爻（第 {still} 爻）的爻辞，以下者第 {main} 爻为主。",
+    en: "Indication rule: four moving lines (lines {moving}), so the line statements of the two unchanged lines (lines {still}) in the derived hexagram {bian} are read, the lower one, line {main}, taking the lead.",
+  }),
+  T("liuyao.yaoci.rule5", "data", "liuyaoYaoci", ["bian", "still"], {
+    zhHans: "指事取法：五爻动，取变卦{bian}唯一不变爻（第 {still} 爻）的爻辞。",
+    en: "Indication rule: five moving lines, so the line statement of the one unchanged line (line {still}) in the derived hexagram {bian} is read.",
+  }),
+  T("liuyao.yaoci.rule6", "data", "liuyaoYaoci", ["bian"], {
+    zhHans: "指事取法：六爻皆动，取变卦{bian}的卦辞。",
+    en: "Indication rule: all six lines moving, so the judgement of the derived hexagram {bian} is read.",
+  }),
+  T("liuyao.yaoci.frame", "data", "liuyaoYaoci", [], {
+    zhHans: "卦爻辞属象辞一路，与上面的纳甲断法是两套系统；此处只作所指，不改动任何一条断论。",
+    en: "Hexagram and line statements belong to the image-and-word tradition, a system separate from the stem-branch reading above; they supply reference, not judgement, and change none of the findings.",
   }),
   T("liuyao.yaoci.yongshen", "data", "liuyaoYaoci", ["state"], {
     zhHans: "取到的爻位{state}用神位。两套取法各自成立，此处只作记录 —— 相符不算互证，故不因此加重任何一条。",

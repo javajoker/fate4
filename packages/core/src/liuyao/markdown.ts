@@ -10,7 +10,7 @@ import { toHant } from "../report/hant.js";
 import type { QuestionReport } from "./report.js";
 import type { DailyOutlook } from "./daily.js";
 import { dailyNarrative } from "./daily.js";
-import { relayerYaoci } from "./yaoci.js";
+import { EXPAND_NOTE, pickSource, relayerYaoci, type YaociReading } from "./yaoci.js";
 import type { NarrativeLine } from "../report/render.js";
 import type { Locale } from "../report/templates.js";
 import { monthLabel } from "./yingqi.js";
@@ -100,18 +100,16 @@ export function renderQuestionMarkdown(r: QuestionReport): string {
       x === null ? "" : x.text === null
         ? `_（未通过措辞检查：${x.withheld.join("、")}）_`
         : keep(x.text);
-    p(`本卦 **${y.gua.ben.name}**：${q(y.gua.ben.classic)}`
-      + (y.gua.bian === null ? "" : `　→　变卦 **${y.gua.bian.name}**：${q(y.gua.bian.classic)}`));
-    row("| 爻 | 位 | 爻辞 | 指事 |");
+    p(`本卦 **${y.gua.ben.name}**`
+      + (y.gua.bian === null ? "，六爻皆静" : `　→　变卦 **${y.gua.bian.name}**`));
+    row("| 取 | 出处 | 原文 | 指事 |");
     row("| --- | --- | --- | --- |");
     for (const pk of y.picks) {
-      const tag = pk.role + (pk.isYongshen ? "・用神位" : "");
-      row(`| ${pk.pos} | ${tag} | ${q(pk.ben.classic)} | ${q(pk.ben.gist)} |`);
-      if (pk.bian !== null) {
-        row(`| ${pk.pos} | 变出 | ${q(pk.bian.classic)} | ${q(pk.bian.gist)} |`);
-      }
+      const src = pickSource(y, pk) + (pk.isYongshen ? "・用神位" : "");
+      row(`| ${pk.role} | ${src} | ${q(pk.quotes.classic)} | ${q(pk.quotes.gist)} |`);
     }
     out.push("");
+    out.push(...expandLines(y, q));
   }
 
   h(2, "§7 方法");
@@ -129,6 +127,27 @@ export function renderQuestionMarkdown(r: QuestionReport): string {
   const md = out.join("\n");
   const conv = r.meta.locale === "zh-Hant" ? toHant(md) : md;
   return conv.replace(QUOTE_SLOT_RE, (_m, i: string) => quotes[Number(i)] ?? "");
+}
+
+/** 白话转述逐条列在表格下面 —— 一整段话塞进表格单元格，终端里没法读。问事与当日运程共用。 */
+function expandLines(
+  y: YaociReading,
+  q: (x: { text: string | null; withheld: readonly string[] } | null) => string,
+): string[] {
+  const lines = [EXPAND_NOTE, ""];
+  for (const pk of y.picks) lines.push(`- **${pk.role}・${pickSource(y, pk)}**：${q(pk.quotes.expand)}`);
+  lines.push("");
+  return lines;
+}
+
+/**
+ * 当日运程按**渲染语言**取的那份指事。`renderDailyMarkdown` 与 CLI 的出口扫描共用 ——
+ * 两处若各取各的，出口要遮的那几段与实际印出来的就可能不是同一种字形。
+ */
+export function dailyYaoci(o: DailyOutlook, locale: Locale): YaociReading {
+  return o.liuyao.yaoci.locale === locale
+    ? o.liuyao.yaoci
+    : relayerYaoci(o.liuyao.yaoci, o.liuyao.yaoci.layer, locale);
 }
 
 export function renderDailyMarkdown(o: DailyOutlook, locale: Locale = "zh-Hans"): string {
@@ -179,25 +198,20 @@ export function renderDailyMarkdown(o: DailyOutlook, locale: Locale = "zh-Hans")
     // 而本函数的 `locale` 是调用方当场指定的（`fate daily --locale zh-Hant`）。
     // 两者不一致时，下面的占位符会忠实地保护住**简体**引文，让它原样穿过
     // 繁体转换 —— 于是繁体文档里嵌着简体爻辞。实测逮到，故在此对齐。
-    const y = o.liuyao.yaoci.locale === locale
-      ? o.liuyao.yaoci
-      : relayerYaoci(o.liuyao.yaoci, o.liuyao.yaoci.layer, locale);
+    const y = dailyYaoci(o, locale);
     const q = (x: { text: string | null; withheld: readonly string[] } | null): string =>
       x === null ? "" : x.text === null
         ? `_（未通过措辞检查：${x.withheld.join("、")}）_`
         : keep(x.text);
     p("以下是爻辞一路的说法 —— 引文，与上面的纳甲断法各说各的，不互相印证。");
-    p(`${y.gua.ben.name}：${q(y.gua.ben.classic)}`
-      + (y.gua.bian === null ? "" : `　→　${y.gua.bian.name}：${q(y.gua.bian.classic)}`));
-    row("| 爻 | 位 | 爻辞 | 指事 |");
+    p(`${y.gua.ben.name}` + (y.gua.bian === null ? "，六爻皆静" : `　→　${y.gua.bian.name}`));
+    row("| 取 | 出处 | 原文 | 指事 |");
     row("| --- | --- | --- | --- |");
     for (const pk of y.picks) {
-      row(`| ${pk.pos} | ${pk.role} | ${q(pk.ben.classic)} | ${q(pk.ben.gist)} |`);
-      if (pk.bian !== null) {
-        row(`| ${pk.pos} | 变出 | ${q(pk.bian.classic)} | ${q(pk.bian.gist)} |`);
-      }
+      row(`| ${pk.role} | ${pickSource(y, pk)} | ${q(pk.quotes.classic)} | ${q(pk.quotes.gist)} |`);
     }
     out.push("");
+    out.push(...expandLines(y, q));
   }
 
   const md = out.join("\n");

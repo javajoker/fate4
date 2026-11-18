@@ -16,11 +16,12 @@
  *
  * | 类 | 是什么 | 谁写的 |
  * | `classic` | 卦辞、爻辞原文 | 《周易》，公有领域 |
- * | `gist`    | 一句话指事 | 语料作者的撰述 |
+ * | `gist`    | 一句话指事 | 爻辞：语料作者的撰述；卦辞：本项目撰述（`guaGist.ts`） |
  * | `expand`  | 白话转述 | 语料作者的撰述 |
  * | `stage`   | 六个爻位各自的阶段 | 语料作者的撰述 |
  *
- * 后三类都是**转述**，不是经文。本模块只负责取出来，不判断能不能发 ——
+ * 后三类都是**转述**，不是经文。语料的卦辞格没有一句话指事，那一格由
+ * {@link GUA_GIST} 补上 —— 语料本身不动，补的东西另放一处。本模块只负责取出来，不判断能不能发 ——
  * 那是 `report/screen.ts` 的事，而它的答案在技术层与人话层并不相同。
  *
  * ## 爻位下标：0 是卦辞，1–6 才是爻
@@ -33,6 +34,7 @@
 import { en, zhHans, zhHant, RECEIVED_BINARY, RECEIVED_NAMES } from "@fate/data/yaoci";
 import { hexagramOf, keyOf, type Hexagram, type HexagramInfo } from "./hexagrams.js";
 import type { Yao } from "./trigrams.js";
+import { GUA_GIST } from "./guaGist.js";
 
 /** 语料的每卦第 0 格：卦辞。 */
 export const GUA_SLOT = 0;
@@ -49,8 +51,8 @@ export interface YaociEntry {
   readonly slot: YaociSlot;
   /** 《周易》原文。 */
   readonly classic: string;
-  /** 一句话指事。卦辞格没有，为 null。 */
-  readonly gist: string | null;
+  /** 一句话指事。卦辞格取自 {@link GUA_GIST}（语料的卦辞格没有）。 */
+  readonly gist: string;
   /** 白话转述。 */
   readonly expand: string;
 }
@@ -99,11 +101,10 @@ export function yaociAt(
   }
   const k = received * 7 + slot;
   const p = PACKS[locale];
-  const gist = p.GIST[k] ?? "";
   return {
     received, slot,
     classic: p.CLASSIC[k] ?? "",
-    gist: slot === GUA_SLOT || gist === "" ? null : gist,
+    gist: (slot === GUA_SLOT ? GUA_GIST[locale][received] : p.GIST[k]) ?? "",
     expand: p.EXPAND[k] ?? "",
   };
 }
@@ -123,3 +124,4 @@ export const stageOf = (pos: YaoPos, locale: YaociLocale = "zh-Hans"): string =>
   PACKS[locale].STAGE[pos - 1] ?? "";
 
 export { YAOCI_PROVENANCE } from "@fate/data/yaoci";
+export { GUA_GIST } from "./guaGist.js";

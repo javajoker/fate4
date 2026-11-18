@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   buildQuestionReport, cast, castMomentOf, dress, judge, loadParams,
-  monthLabel, pickYongshen, TOPICS, TOPIC_CATEGORIES,
+  EXPAND_NOTE, monthLabel, pickSource, pickYongshen, TOPICS, TOPIC_CATEGORIES,
   type CastInput, type CoinThrow, type Liuqin, type TopicCategory,
 } from "@fate/core";
 import { CoinCast } from "../../components/CoinCast";
@@ -336,7 +336,7 @@ function QuestionView(
 }
 
 /**
- * 指事 —— 爻辞一路。
+ * 指事 —— 卦爻辞一路。按动爻多寡分七例取辞（core 的 `zhishiSlots`），此处只照表排出。
  *
  * 与上面几块**分开摆**，因为它不是本引擎写的话。引文用 blockquote 排，
  * 让「这是引来的」在视觉上也成立，而不只是在文案里声明一句。
@@ -355,33 +355,30 @@ function YaociView({ r }: { r: ReturnType<typeof buildQuestionReport> }) {
         {r.yaoci.narrative.map((l, i) => <li key={i}>{l.text}</li>)}
       </ul>
       <p>
-        本卦 <strong>{y.gua.ben.name}</strong>：{q(y.gua.ben.classic)}
-        {y.gua.bian !== null && (
-          <>　→　变卦 <strong>{y.gua.bian.name}</strong>：{q(y.gua.bian.classic)}</>
-        )}
+        本卦 <strong>{y.gua.ben.name}</strong>
+        {y.gua.bian === null ? "，六爻皆静" : <>　→　变卦 <strong>{y.gua.bian.name}</strong></>}
       </p>
       <div className="scroll">
         <table>
-          <thead><tr><th>爻</th><th>位</th><th>爻辞</th><th>指事</th></tr></thead>
+          <thead><tr><th>取</th><th>出处</th><th>原文</th><th>指事</th></tr></thead>
           <tbody>
             {y.picks.flatMap((pk) => [
-              <tr key={`${pk.pos}-ben`}>
-                <td>{pk.pos}</td>
-                <td>{pk.role}{pk.isYongshen && "・用神位"}</td>
-                <td>{q(pk.ben.classic)}</td>
-                <td>{q(pk.ben.gist)}</td>
+              <tr key={`${pk.source}-${pk.slot}`}>
+                <td>{pk.role}</td>
+                <td>{pickSource(y, pk)}{pk.isYongshen && "・用神位"}</td>
+                <td>{q(pk.quotes.classic)}</td>
+                <td>{q(pk.quotes.gist)}</td>
               </tr>,
-              ...(pk.bian === null ? [] : [
-                <tr key={`${pk.pos}-bian`}>
-                  <td>{pk.pos}</td><td className="dim">变出</td>
-                  <td>{q(pk.bian.classic)}</td>
-                  <td>{q(pk.bian.gist)}</td>
-                </tr>,
-              ]),
+              <tr key={`${pk.source}-${pk.slot}-x`}>
+                <td />
+                <td className="dim">白话转述</td>
+                <td colSpan={2}>{q(pk.quotes.expand)}</td>
+              </tr>,
             ])}
           </tbody>
         </table>
       </div>
+      <p className="sub">{EXPAND_NOTE}</p>
     </div>
   );
 }

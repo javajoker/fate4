@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { dailyOutlook, dailyNarrative, AXIS_DIRECTIONAL, SYSTEM_LABEL } from "@fate/core";
+import { dailyOutlook, dailyNarrative, pickSource, AXIS_DIRECTIONAL, EXPAND_NOTE, SYSTEM_LABEL } from "@fate/core";
 import { useChart } from "../../../lib/chartContext";
 
 const KIND_NOTE: Readonly<Record<string, string>> = {
@@ -123,30 +123,34 @@ export default function DailyPage() {
               爻辞一路的说法 —— 引文。与上面的纳甲断法各说各的，不互相印证。
             </p>
             <p>
-              {o.liuyao.yaoci.gua.ben.name}：{o.liuyao.yaoci.gua.ben.classic.text}
-              {o.liuyao.yaoci.gua.bian !== null && (
-                <>　→　{o.liuyao.yaoci.gua.bian.name}：{o.liuyao.yaoci.gua.bian.classic.text}</>
-              )}
+              {o.liuyao.yaoci.gua.ben.name}
+              {o.liuyao.yaoci.gua.bian === null ? "，六爻皆静" : <>　→　{o.liuyao.yaoci.gua.bian.name}</>}
             </p>
             <table>
-              <thead><tr><th>爻</th><th>位</th><th>爻辞</th><th>指事</th></tr></thead>
+              <thead><tr><th>取</th><th>出处</th><th>原文</th><th>指事</th></tr></thead>
               <tbody>
                 {o.liuyao.yaoci.picks.flatMap((pk) => [
-                  <tr key={`${pk.pos}-b`}>
-                    <td>{pk.pos}</td><td>{pk.role}</td>
-                    <td>{pk.ben.classic.text}</td>
-                    <td>{pk.ben.gist?.text ?? <span className="dim">—</span>}</td>
+                  <tr key={`${pk.source}-${pk.slot}`}>
+                    <td>{pk.role}</td>
+                    <td>{pickSource(o.liuyao.yaoci, pk)}</td>
+                    <td>{pk.quotes.classic.text}</td>
+                    <td>
+                      {pk.quotes.gist.text
+                        ?? <span className="dim">未通过措辞检查（{pk.quotes.gist.withheld.join("、")}）</span>}
+                    </td>
                   </tr>,
-                  ...(pk.bian === null ? [] : [
-                    <tr key={`${pk.pos}-v`}>
-                      <td>{pk.pos}</td><td className="dim">变出</td>
-                      <td>{pk.bian.classic.text}</td>
-                      <td>{pk.bian.gist?.text ?? <span className="dim">—</span>}</td>
-                    </tr>,
-                  ]),
+                  <tr key={`${pk.source}-${pk.slot}-x`}>
+                    <td />
+                    <td className="dim">白话转述</td>
+                    <td colSpan={2}>
+                      {pk.quotes.expand.text
+                        ?? <span className="dim">未通过措辞检查（{pk.quotes.expand.withheld.join("、")}）</span>}
+                    </td>
+                  </tr>,
                 ])}
               </tbody>
             </table>
+            <p className="dim">{EXPAND_NOTE}</p>
           </div>
 
           <div className="card">

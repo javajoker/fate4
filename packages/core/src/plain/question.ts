@@ -13,7 +13,9 @@
  */
 
 import type { QuestionReport } from "../liuyao/report.js";
-import { relayerYaoci, type Quote, type YaociPick, type YaociReading } from "../liuyao/yaoci.js";
+import {
+  relayerYaoci, type Quote, type YaociPick, type YaociReading, type YaociRole, type YaociSource,
+} from "../liuyao/yaoci.js";
 import type { NarrativeLine } from "../report/render.js";
 import type { PlainCard } from "./cards.js";
 import {
@@ -74,60 +76,74 @@ const POS_PLAIN: readonly string[] = Object.freeze([
   "最下面那一格", "第二格", "第三格", "第四格", "第五格", "最上面那一格",
 ]);
 
-/** 取爻角色 → 人话。**「应」是对方，不是将来** —— 见 liuyao/yaoci.ts。 */
-const ROLE_PLAIN: Readonly<Record<string, string>> = Object.freeze({
-  动爻: "卦里正在动的那一格",
-  世爻: "卦里代表你这边的那一格",
-  应爻: "卦里代表对方那边的那一格",
+/** 卦在人话里怎么叫。「本卦／变卦」是术语。 */
+const SOURCE_PLAIN: Readonly<Record<YaociSource, string>> = Object.freeze({
+  本卦: "原来那一卦", 变卦: "变过去的那一卦",
 });
+
+/** 一条所取之辞在这一例里的分量 → 卡片标题后缀。只取一条时不加。 */
+const ROLE_PLAIN: Readonly<Record<YaociRole, string>> = Object.freeze({
+  主: "（为主）", 次: "（其次）", 体: "（这件事本身）", 用: "（它往哪里去）",
+});
+
+/**
+ * 七例取法 → 人话。按动爻数（0–6）索引，与 `zhishiSlots` 一一对应。
+ * 说的是「传统在这里读哪一段」，不说读出来是好是坏。
+ */
+export const ZHISHI_RULE_PLAIN: readonly string[] = Object.freeze([
+  "这一卦六格都没动，传统在这里读整卦的那段话。",
+  "这一卦有一格在动，传统在这里读正在动的那一格的话。",
+  "这一卦有两格在动，传统在这里读这两格的话，以靠上的那一格为主。",
+  "这一卦有三格在动，动的与不动的各占一半，传统在这里把原来那一卦与变过去的那一卦的整卦之辞并读："
+    + "原来那一卦说的是这件事本身，变过去的那一卦说的是它往哪里去。",
+  "这一卦有四格在动，动的多、没动的少，传统在这里改读变过去的那一卦里没动的两格，以靠下的那一格为主。",
+  "这一卦有五格在动，只剩一格没动，传统在这里读变过去的那一卦里那唯一没动的一格。",
+  "这一卦六格全在动，传统在这里读变过去的那一卦的整卦之辞。",
+]);
 
 const quoted = (q: Quote | null): string | null => q?.text ?? null;
 
 /**
- * 一格的引文卡。守卫拦下的那几条不出现在这里 —— `quoted` 返回 null。
+ * 一条所取之辞的引文卡。守卫拦下的那几条不出现在这里 —— `quoted` 返回 null。
  *
  * 引文的「依据」是它的**出处**，不是一段推导，故写进正文里：卦名、通行本第几卦、
- * 第几爻。折进「看依据」的只留取法那一条 —— 每张卡都折同样两行，等于没折。
+ * 第几爻（或卦辞）。折进「看依据」的只留取法那一条 —— 每张卡都折同样两行，等于没折。
  */
 function yaociCardsOf(
   pick: YaociPick, ev: readonly NarrativeLine[], idPrefix: string,
-  cite: string, citeBian: string | null,
+  gua: { readonly name: string; readonly received: number }, single: boolean,
 ): PlainCard[] {
   const out: PlainCard[] = [];
-  const where = POS_PLAIN[pick.pos - 1] ?? `第 ${pick.pos} 格`;
-  const role = ROLE_PLAIN[pick.role] ?? "";
+  const isGua = pick.slot === 0;
+  const which = SOURCE_PLAIN[pick.source];
+  const where = isGua ? which : `${which}的${POS_PLAIN[pick.slot - 1] ?? `第 ${pick.slot} 格`}`;
+  const cite = `${gua.name}，通行本第 ${gua.received + 1} 卦`
+    + (isGua ? "卦辞" : `第 ${pick.slot} 爻`);
+  const tail = single ? "" : ROLE_PLAIN[pick.role];
+  const key = `yaoci.${pick.source === "本卦" ? "ben" : "bian"}.${pick.slot}`;
   const how = ev.slice(0, 1);
   const card = (id: string, title: string, body: string): PlainCard =>
-    ({ id: `${idPrefix}.${id}`, section: "今天", title, body, evidence: how, confidence: 1 });
+    ({ id: `${idPrefix}.${key}.${id}`, section: "今天", title: title + tail, body, evidence: how, confidence: 1 });
+
+  const classic = quoted(pick.quotes.classic);
+  const source = classic === null ? "" : `　这句话来自《周易》的原文：「${classic}」（${cite}）。`;
+  const unit = isGua ? "这一卦" : "这一格";
 
   const stage = quoted(pick.stage);
   if (stage !== null) {
-    out.push(card(`yaoci.${pick.pos}.stage`, "走到哪一步了",
-      `传统把一件事分成六个阶段，这次落在${where} —— 也就是${role}。这一格传统上是这样描述的：${stage}`));
+    out.push(card("stage", "走到哪一步了",
+      `传统把一件事分成六个阶段，这一条落在${where}。这一格传统上是这样描述的：${stage}`));
   }
 
-  const gist = quoted(pick.ben.gist);
-  const classic = quoted(pick.ben.classic);
+  const gist = quoted(pick.quotes.gist);
   if (gist !== null) {
-    out.push(card(`yaoci.${pick.pos}.gist`, "传统在这一格上的说法",
-      `${gist}` + (classic === null ? ""
-        : `　这句话来自《周易》的原文：「${classic}」（${cite}）。`)));
+    out.push(card("gist", isGua ? `传统对${which}的说法` : "传统在这一格上的说法", gist + source));
   }
 
-  const bianGist = quoted(pick.bian?.gist ?? null);
-  const bianClassic = quoted(pick.bian?.classic ?? null);
-  if (bianGist !== null) {
-    out.push(card(`yaoci.${pick.pos}.turn`, "这一格变过去以后",
-      `这一格是动的，传统上会连着看它变成什么。变过去那一格的说法是：${bianGist}`
-      + (bianClassic === null ? ""
-        : `　原文：「${bianClassic}」（${citeBian ?? cite}）。`)
-      + "　这说的是同一格的两种样子，不是两件事，也不是先后。"));
-  }
-
-  const expand = quoted(pick.ben.expand);
+  const expand = quoted(pick.quotes.expand);
   if (expand !== null) {
-    out.push(card(`yaoci.${pick.pos}.expand`, "把这一格展开说",
-      `以下是这套传统说法的白话转述，写的是这一格的处境，不是对你的判断。${expand}`));
+    out.push(card("expand", isGua ? "把这一卦展开说" : "把这一格展开说",
+      `以下是这套传统说法的白话转述，写的是${unit}的处境，不是对你的判断。${expand}`));
   }
   return out;
 }
@@ -136,7 +152,7 @@ function yaociCardsOf(
  * 指事一路的人话。**引文原样端出，一个字不改；过不了守卫的就不端。**
  *
  * 技术层的读法里没有爻位阶段与白话转述（那两项通篇第二人称，技术层不载），
- * 故此处 `relayerYaoci` 换到人话层重取一遍 —— 取的是同样几个位置。
+ * 故此处 `relayerYaoci` 换到人话层重取一遍 —— 取的是同样几格。
  */
 export function plainYaociCards(
   reading: YaociReading, ev: readonly NarrativeLine[], idPrefix = "q",
@@ -146,19 +162,17 @@ export function plainYaociCards(
 
   out.push({
     id: `${idPrefix}.yaoci.how`, section: "今天", title: "这些话是从哪来的",
-    body: "下面几条不是这套推演写的，是《周易》的爻辞与它的传统转述 —— 引文原样端出，一个字没改。"
-      + (y.method === "动爻"
-        ? "传统在这里取卦里正在动的那一格，连着看它变成什么。"
-        : "六格都没动，传统在这里改看代表你这边与对方那边的两格。")
+    body: "下面几条不是这套推演写的，是《周易》的卦辞、爻辞与它们的传统转述 —— 引文原样端出，一个字没改。"
+      + (ZHISHI_RULE_PLAIN[y.count] ?? "")
       + "它给的是「说的是什么事」，另外那几条给的是「这件事在卦里的分量」；两路各说各的，不互相印证。",
     evidence: ev, confidence: 1,
   });
 
+  const single = y.picks.length === 1;
   for (const pick of y.picks) {
-    const at = (g: { name: string; received: number }) =>
-      `${g.name}，通行本第 ${g.received + 1} 卦第 ${pick.pos} 爻`;
-    out.push(...yaociCardsOf(pick, ev, idPrefix,
-      at(y.gua.ben), y.gua.bian === null ? null : at(y.gua.bian)));
+    const g = pick.source === "本卦" ? y.gua.ben : y.gua.bian;
+    if (g === null) continue;
+    out.push(...yaociCardsOf(pick, ev, idPrefix, g, single));
   }
 
   if (y.withheldCount > 0) {

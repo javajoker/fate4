@@ -21,12 +21,16 @@ const EXAMPLE: BirthInput = {
   gender: "male", timeZone: "Asia/Shanghai", longitude: 121.47,
 };
 
-interface Result { code: number; out: string; err: string; files: Map<string, string> }
+interface Result {
+  code: number; out: string; err: string; files: Map<string, string>;
+  /** 命令声明「按人话层的闸过过」的引文段 —— 出口扫描对它们改用人话层规则。 */
+  spans: string[];
+}
 
 function cli(argv: string[], files: Map<string, string> = new Map()): Result {
-  const out: string[] = []; const err: string[] = [];
+  const out: string[] = []; const err: string[] = []; const spans: string[] = [];
   const io: Io = {
-    out: (s) => out.push(s),
+    out: (s, _k, ps) => { out.push(s); if (ps) spans.push(...ps); },
     err: (s) => err.push(s),
     readFile: (p) => {
       const v = files.get(p);
@@ -37,7 +41,7 @@ function cli(argv: string[], files: Map<string, string> = new Map()): Result {
     today: () => ({ year: 2026, month: 9, day: 1 }),
   };
   const code = run(argv, io);
-  return { code, out: out.join("\n"), err: err.join("\n"), files };
+  return { code, out: out.join("\n"), err: err.join("\n"), files, spans };
 }
 
 /** 先造一份命盘文件，供后续子命令引用。 */
@@ -314,8 +318,25 @@ describe("输出经措辞扫描", () => {
     for (const argv of cmds) {
       const r = cli(argv, files);
       expect(r.code, `${argv[0]}: ${r.err}`).toBe(0);
-      expect(formatViolations(scanText(r.out, argv[0]!)), argv[0]).toBe("措辞扫描通过。");
+      // 与真实出口同一个判定：白话转述按人话层规则，其余按技术层叙述档
+      expect(guardOutput(r.out, "narrative", r.spans).report, argv[0]).toBe("措辞扫描通过。");
+      // 只有带白话转述的命令才声明引文段（ask/daily 也可能一段不剩 —— 全被拦下时）
+      if (argv[0] !== "ask" && argv[0] !== "daily") expect(r.spans, argv[0]).toEqual([]);
     }
+  });
+
+  it("**白话转述换了闸，别处的「你」照拦** —— 遮的只是声明过的那几段", () => {
+    const r = cli(["ask", "--topic", "wealth.seek", "--city", "上海", "--at", "2026-09-02 14:30"]);
+    expect(r.spans.some((x) => x.includes("你")), "白话转述本就是第二人称").toBe(true);
+    // 不声明引文段，技术层规则就会拦下白话转述里的「你」 —— 证明出口确实在扫它
+    expect(guardOutput(r.out, "narrative").clean).toBe(false);
+    // 声明了引文段，正文里另冒出一个「你」仍要被拦
+    expect(guardOutput(`${r.out}\n你今年会顺利。`, "narrative", r.spans).clean).toBe(false);
+    // 引文段本身按人话层规则扫：祈使句照拦
+    expect(guardOutput("引文：务必去签约。", "narrative", ["务必去签约。"]).clean).toBe(false);
+    // JSON 里的字符串是转义过的，遮挡要认得出转义形式
+    const j = cli(["ask", "--topic", "wealth.seek", "--city", "上海", "--at", "2026-09-02 14:30", "--json"]);
+    expect(guardOutput(j.out, "data", j.spans).report).toBe("措辞扫描通过。");
   });
 
   it("人读输出里不得漏出英文枚举", () => {
@@ -336,6 +357,9 @@ describe("输出经措辞扫描", () => {
         // 字母（a–f）的概率约 21%，故参数一改、哈希一变，它就有五分之一的
         // 机会无故变红 —— 而红的原因与它要防的东西毫无关系。实测撞上过一次。
         if (/指纹|引擎版本/.test(line)) continue;
+        // 引文被拦时如实写出拦它的规则 id（zh.prediction.absolute 之类）——
+        // 那是标识符，且是有意让读者看得到的（docs/13 §7.5.4）。
+        if (/未通过措辞检查/.test(line)) continue;
         expect(line, `${argv[0]} 漏出英文：${line}`).not.toMatch(/[A-Za-z]{3,}/);
       }
     }

@@ -18,6 +18,8 @@ import type { Locale } from "../report/templates.js";
 import { renderTemplate, localeText, type NarrativeLine } from "../report/render.js";
 import { QUESTION_DISCLAIMER } from "../report/templates.js";
 import { scanText, type GuardViolation } from "../report/guard.js";
+import { scanPlain } from "../plain/guard.js";
+import type { GuardLayer } from "../report/screen.js";
 import type { Audience } from "../report/audience.js";
 import { toHant } from "../report/hant.js";
 import { ENGINE_VERSION } from "../report/assemble.js";
@@ -206,14 +208,29 @@ export function buildQuestionReport(
   // locale 直接交给语料，不走 T() —— 引文按原文发，不代为转写。
   const L4 = new Lines(locale);
   const yc = yaociReading(gua, ys, { locale, layer: "technical" });
-  if (yc.method === "动爻") {
-    L4.add("liuyao.yaoci.moving", {
-      positions: yc.picks.map((x) => x.pos).join("、"),
-    }, 1, "yaoci");
-  } else {
-    L4.add("liuyao.yaoci.shiying", { shi: gua.shi, ying: gua.ying }, 1, "yaoci");
+  {
+    const ben = yc.gua.ben.name;
+    const bian = yc.gua.bian?.name ?? "";
+    const list = (xs: readonly number[]) => xs.join("、");
+    const still = ([1, 2, 3, 4, 5, 6] as const).filter((x) => !yc.moving.includes(x));
+    const main = yc.picks[0]!.slot;
+    switch (yc.count) {
+      case 0: L4.add("liuyao.yaoci.rule0", { ben }, 1, "yaoci"); break;
+      case 1: L4.add("liuyao.yaoci.rule1", { ben, pos: yc.moving[0]! }, 1, "yaoci"); break;
+      case 2: L4.add("liuyao.yaoci.rule2", { ben, moving: list(yc.moving), main }, 1, "yaoci"); break;
+      case 3: L4.add("liuyao.yaoci.rule3", { ben, bian, moving: list(yc.moving) }, 1, "yaoci"); break;
+      case 4: L4.add("liuyao.yaoci.rule4",
+        { bian, moving: list(yc.moving), still: list(still), main }, 1, "yaoci"); break;
+      case 5: L4.add("liuyao.yaoci.rule5", { bian, still: list(still) }, 1, "yaoci"); break;
+      case 6: L4.add("liuyao.yaoci.rule6", { bian }, 1, "yaoci"); break;
+    }
   }
-  L4.add("liuyao.yaoci.yongshen", { state: yc.hitsYongshen ? "含" : "不含" }, 1, "yaoci");
+  L4.add("liuyao.yaoci.frame", {}, 1, "yaoci");
+  // 卦辞没有爻位，取的全是卦辞时（静、三爻动、六爻动）这一行无从说起。
+  const takesLines = yc.picks.some((x) => x.slot !== 0);
+  if (takesLines) {
+    L4.add("liuyao.yaoci.yongshen", { state: yc.hitsYongshen ? "含" : "不含" }, 1, "yaoci");
+  }
   if (yc.withheldCount > 0) {
     L4.add("liuyao.yaoci.withheld", { n: yc.withheldCount, quoted: yc.quoted }, 1, "yaoci");
   }
@@ -240,13 +257,16 @@ export function buildQuestionReport(
 
   // ── 导出前扫描，与四柱报告同一套 ──
   const chunks = collectQuestionText(report);
-  const violations = chunks.flatMap((c) => scanText(c.text, c.where));
+  const violations = chunks.flatMap((c) =>
+    c.gate === "plain" ? scanPlain(c.text, c.where) : scanText(c.text, c.where));
   return { ...report, guard: { scanned: chunks.length, violations } };
 }
 
 /** 走遍问事报告，把每一条会到达读者的字符串扫一遍。 */
-export function collectQuestionText(r: QuestionReport): { text: string; where: string }[] {
-  const out: { text: string; where: string }[] = [];
+export function collectQuestionText(
+  r: QuestionReport,
+): { text: string; where: string; gate?: GuardLayer }[] {
+  const out: { text: string; where: string; gate?: GuardLayer }[] = [];
   const push = (t: string, w: string) => { if (t.length > 0) out.push({ text: t, where: w }); };
   push(r.disclaimerTop, "disclaimerTop");
   push(r.disclaimerBottom, "disclaimerBottom");
@@ -262,6 +282,7 @@ export function collectQuestionText(r: QuestionReport): { text: string; where: s
   // 引文与叙述一并扫。`screen` 已在取用时逐条筛过，此处是**第二道**：
   // 没有它，「引文过了闸」就只是 yaoci.ts 自己说了算。
   for (const l of r.yaoci.narrative) push(l.text, `yaoci.${l.templateId}`);
-  for (const q of collectYaociText(r.yaoci.reading)) push(q.text, q.where);
+  // 白话转述是第二人称语域，按人话层的闸扫（见 yaoci.ts 模块头）。
+  for (const q of collectYaociText(r.yaoci.reading)) out.push(q);
   return out;
 }

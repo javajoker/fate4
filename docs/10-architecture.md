@@ -108,10 +108,12 @@ core/src/
 │
 ├── yijing/                       # 六十四卦、纳甲、爻辞（六爻与梅花共用）
 │   └── hexagrams.ts  trigrams.ts  najia.ts  yaoci.ts
+│       guaGist.ts                        # 卦辞指事（本项目撰述，语料卦辞格本无）
 ├── liuyao/                       # 六爻（见 13-liuyao）
 │   ├── cast.ts  moment.ts  dress.ts      # 起卦、装卦
 │   ├── yongshen.ts  strength.ts  judge.ts
 │   ├── yingqi.ts  topics.ts  claims.ts
+│   ├── yaoci.ts                          # 指事：七例取辞，引文过闸
 │   └── report.ts  markdown.ts  daily.ts
 ├── liuren/                       # 大六壬：天地盘、三传
 │   └── plate.ts  sanchuan.ts  tables.ts  claims.ts

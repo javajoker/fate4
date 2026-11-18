@@ -189,7 +189,7 @@ export default function AskPage() {
           <div className="m-sec">说的是什么事</div>
           <p className="m-lede">
             上面几条说的是「这件事在结果里的分量」。下面几条说的是「说的是什么事」——
-            它们来自《周易》的爻辞和它的传统转述，是引来的原话，一个字没改。
+            它们来自《周易》的卦辞、爻辞和它们的传统转述，是引来的原话，一个字没改。
             两路各说各的，不互相印证。
           </p>
           {plainQuestion(out.report).yaoci.map((c) => <Card key={c.id} card={c} />)}

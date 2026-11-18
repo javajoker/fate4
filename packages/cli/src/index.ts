@@ -18,7 +18,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { load as loadYaml } from "js-yaml";
 import {
   buildQuestionReport, buildReport, cast, castMomentOf, dailyOutlook, dayView,
-  disclaimerText, dress, evaluate, formatViolations, judge, luckTimeline,
+  dailyYaoci, disclaimerText, dress, evaluate, formatViolations, judge, luckTimeline,
+  plainGatedSpans, type GuardViolation,
   monthView, MONTH_BRANCH_ORDER, pickYongshen, renderDailyMarkdown, renderMarkdown,
   plainCards, plainQuestion, scanPlain, renderCrossMarkdown, renderQuestionMarkdown, crossReading,
   type PlainCard,
@@ -143,12 +144,15 @@ function loadOverrides(io: Io, path: string | undefined): PartialParams {
   }
 }
 
-function emit(io: Io, v: Record<string, unknown> | string, asJson: boolean, out?: string): void {
+function emit(
+  io: Io, v: Record<string, unknown> | string, asJson: boolean, out?: string,
+  plainSpans: readonly string[] = [],
+): void {
   const text = asJson || typeof v !== "string"
     ? JSON.stringify(v, null, 2)
     : v;
   const asData = asJson || typeof v !== "string";
-  if (out === undefined) io.out(text, asData ? "data" : "narrative");
+  if (out === undefined) io.out(text, asData ? "data" : "narrative", plainSpans);
   else io.writeFile(out, text.endsWith("\n") ? text : `${text}\n`);
 }
 
@@ -456,15 +460,16 @@ function cmdAsk(argv: readonly string[], io: Io): void {
     });
   }
 
+  const spans = plainGatedSpans(report.yaoci.reading);
   if (v["json"] === true) {
-    emit(io, report as unknown as Record<string, unknown>, true, v["out"] as string | undefined);
+    emit(io, report as unknown as Record<string, unknown>, true, v["out"] as string | undefined, spans);
     return;
   }
   if (v["plain"] === true) {
     emitPlain(io, renderPlainQuestion(plainQuestion(report)), v["out"] as string | undefined);
     return;
   }
-  emit(io, renderQuestionMarkdown(report), false, v["out"] as string | undefined);
+  emit(io, renderQuestionMarkdown(report), false, v["out"] as string | undefined, spans);
 }
 
 /**
@@ -489,7 +494,7 @@ function renderPlainQuestion(p: ReturnType<typeof plainQuestion>): string {
   block(p.cards);
   if (p.yaoci.length > 0) {
     o.push("## 说的是什么事", "",
-      "以下为《周易》爻辞及其传统转述的**引文**，原样端出，一个字未改。"
+      "以下为《周易》卦辞、爻辞及其传统转述的**引文**，原样端出，一个字未改。"
       + "与上一节各说各的，不互相印证。", "");
     block(p.yaoci);
   }
@@ -506,10 +511,12 @@ function cmdDaily(argv: readonly string[], io: Io): void {
   const d = typeof v["date"] === "string" ? parseDate(v["date"], "--date") : io.today();
   const o = dailyOutlook(chart, d, params);
   if (v["json"] === true) {
-    emit(io, o as unknown as Record<string, unknown>, true, v["out"] as string | undefined);
+    emit(io, o as unknown as Record<string, unknown>, true, v["out"] as string | undefined,
+      plainGatedSpans(o.liuyao.yaoci));
     return;
   }
-  emit(io, renderDailyMarkdown(o, locale), false, v["out"] as string | undefined);
+  emit(io, renderDailyMarkdown(o, locale), false, v["out"] as string | undefined,
+    plainGatedSpans(dailyYaoci(o, locale)));
 }
 
 function cmdCross(argv: readonly string[], io: Io): void {
@@ -831,20 +838,33 @@ export function run(argv: readonly string[], io: Io): number {
  */
 export function guardOutput(
   text: string, kind: "narrative" | "data" | "plain" = "narrative",
+  plainSpans: readonly string[] = [],
 ): { clean: boolean; report: string } {
+  // 按人话层的闸过过的引文段（白话转述）：先按人话层规则扫，再从正文里遮掉，
+  // 剩下的部分照旧按 `kind` 扫。JSON 里的字符串是转义过的，两种写法都遮。
+  const vs: GuardViolation[] = [];
+  let rest = text;
+  for (const span of new Set(plainSpans)) {
+    if (span.length === 0) continue;
+    const forms = [span, JSON.stringify(span).slice(1, -1)];
+    if (!forms.some((f) => rest.includes(f))) continue;
+    vs.push(...scanPlain(span, "cli.stdout.quote"));
+    for (const f of forms) rest = rest.split(f).join("〔引文〕");
+  }
   // 人话版走它自己的规则集：放开第二人称，另加六条更硬的。
   // 用技术层的规则扫人话，会把每一个「你」都拦下来。
-  const vs = kind === "plain"
-    ? scanPlain(text, "cli.stdout")
-    : scanText(text, "cli.stdout", kind === "data" ? { kind: "vocabulary" } : {});
+  vs.push(...(kind === "plain"
+    ? scanPlain(rest, "cli.stdout")
+    : scanText(rest, "cli.stdout", kind === "data" ? { kind: "vocabulary" } : {})));
   return { clean: vs.length === 0, report: formatViolations(vs) };
 }
 
 export async function main(argv: readonly string[]): Promise<number> {
   const buf: string[] = [];
+  const spans: string[] = [];
   let kind: "narrative" | "data" | "plain" = "narrative";
   const io: Io = {
-    out: (s, k) => { buf.push(s); if (k !== undefined) kind = k; },
+    out: (s, k, ps) => { buf.push(s); if (k !== undefined) kind = k; if (ps) spans.push(...ps); },
     err: (s) => process.stderr.write(`${s}\n`),
     readFile: (p) => readFileSync(p, "utf8"),
     writeFile: (p, s) => writeFileSync(p, s, "utf8"),
@@ -856,7 +876,7 @@ export async function main(argv: readonly string[]): Promise<number> {
   const code = run(argv, io);
   const text = buf.join("\n");
   if (text.length > 0) {
-    const g = guardOutput(text, kind);
+    const g = guardOutput(text, kind, spans);
     if (!g.clean) {
       process.stderr.write(`输出被措辞守卫拦下，未予打印：\n${g.report}\n`);
       return 3;
