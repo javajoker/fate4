@@ -4,3 +4,4 @@ export * from "./cards.js";
 export * from "./question.js";
 export * from "./year.js";
 export * from "./numbers.js";
+export * from "./zhishi.js";

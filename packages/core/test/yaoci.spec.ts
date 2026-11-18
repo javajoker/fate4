@@ -12,11 +12,12 @@ import { dress } from "../src/liuyao/dress.js";
 import { pickYongshen } from "../src/liuyao/yongshen.js";
 import { judge } from "../src/liuyao/judge.js";
 import {
-  collectYaociText, relayerYaoci, yaociReading, zhishiSlots, QUOTE_PREFIX,
+  collectYaociText, pickSource, relayerYaoci, yaociReading, zhishiSlots, QUOTE_PREFIX,
 } from "../src/liuyao/yaoci.js";
 import { buildQuestionReport } from "../src/liuyao/report.js";
 import { renderQuestionMarkdown } from "../src/liuyao/markdown.js";
 import { plainYaoci } from "../src/plain/question.js";
+import { zhishiProse } from "../src/plain/zhishi.js";
 import { scanText } from "../src/report/guard.js";
 import { scanPlain } from "../src/plain/guard.js";
 import { SIMPLIFIED_ONLY, toHant, unclassifiedOf } from "../src/report/hant.js";
@@ -562,3 +563,62 @@ describe("落到报告里", () => {
     }
   });
 });
+
+describe("**指事接成段落**（独立页面用）", () => {
+  const OPEN: Readonly<Record<string, RegExp>> = {
+    次: /^其次，/, 体: /^就这件事本身来说，/, 用: /^再看它往哪里去，/,
+  };
+
+  it("引文一字不改地出现在段落里；连接词按主／次／体／用各就各位", () => {
+    let seen = 0;
+    for (const g of allGua(17)) {
+      const r = reading(g, "zh-Hans", "plain");
+      const z = zhishiProse(r);
+      expect(z.rule.length).toBeGreaterThan(0);
+      const byRole = new Map(z.paragraphs.map((p) => [p.role, p]));
+      r.picks.forEach((pk, i) => {
+        const para = byRole.get(pk.role);
+        if (para === undefined) return;             // 整段都被拦下
+        seen++;
+        const body = para.text;
+        for (const q of [pk.quotes.gist, pk.quotes.expand]) {
+          // 句末标点可能被补上，故只查引文正文
+          if (q.text !== null) expect(body, `${pk.role}：${q.text}`).toContain(q.text.replace(/[。？！]$/, ""));
+        }
+        // 阶段只随第一格（且是爻辞）说一次
+        if (i === 0 && pk.slot !== GUA_SLOT && pk.stage?.text != null) {
+          expect(body.startsWith(pk.stage.text)).toBe(true);
+        } else if (pk.stage?.text != null) {
+          expect(body).not.toContain(pk.stage.text);
+        }
+        if (pk.role in OPEN) expect(body).toMatch(OPEN[pk.role]!);
+        if (pk.role === "主" && pk.slot === GUA_SLOT) expect(body).toMatch(/^整体来看，/);
+        expect(para.source).toBe(pickSource(r, pk));
+        expect(para.title === null).toBe(pk.slot === GUA_SLOT);
+        if (para.title !== null) expect(para.title).toMatch(/^(?:初|上)?[九六][二三四五]?$/);
+      });
+    }
+    expect(seen).toBeGreaterThan(500);
+  });
+
+  it("接好的段落过人话守卫 —— 连接词不该把引文接成断言", () => {
+    for (const g of allGua(17)) {
+      for (const p of zhishiProse(reading(g, "zh-Hans", "plain")).paragraphs) {
+        expect(scanPlain(p.text, "zhishi"), p.text).toEqual([]);
+      }
+    }
+  });
+
+  it("略去的段数如实计数；技术层的读法会先换到人话层", () => {
+    let withheld = 0;
+    for (const g of allGua(17)) {
+      const t = reading(g, "zh-Hans", "technical");
+      const z = zhishiProse(t);
+      expect(z).toEqual(zhishiProse(reading(g, "zh-Hans", "plain")));
+      withheld += z.withheld;
+    }
+    // 反向对照：白话转述有一成过不了人话守卫，一段都没略去说明计数没接上
+    expect(withheld).toBeGreaterThan(0);
+  });
+});
+

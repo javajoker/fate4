@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "paths": {
+      "@fate/data": ["../../packages/data/src/index.ts"],
+      "@fate/data/yaoci": ["../../packages/data/src/yaoci/index.ts"],
+      "@fate/data/vsop87-planets": ["../../packages/data/src/vsop87/planets.ts"]
+    }
+  },
+  "include": ["main.ts"]
+}

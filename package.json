@@ -12,11 +12,13 @@
     "gen:vsop87": "node scripts/generate-vsop87.mjs",
     "check:web": "node scripts/check-web-text.mjs",
     "pretest": "tsc -b",
-    "gen:book": "node scripts/build-book.mjs"
+    "gen:book": "node scripts/build-book.mjs",
+    "gen:zhishi": "tsc -p tools/zhishi && node scripts/build-zhishi.mjs"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.10.0",
+    "esbuild": "0.28.2",
     "js-yaml": "^5.4.1",
     "typescript": "^5.7.2",
     "vitest": "^3.0.0"
