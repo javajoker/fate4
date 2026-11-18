@@ -201,7 +201,12 @@
   .animate .hl .bar, .animate .hl .mk, .animate .hl .tag { animation: draw .38s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(var(--i) * 70ms); }
   @media (prefers-reduced-motion: reduce) { .animate .hl .bar, .animate .hl .mk, .animate .hl .tag { animation: none; } }
 
-  /* ── 说明 ── */
+  /* ── 说明：默认折叠 ── */
+  .guide-box > summary { cursor: pointer; list-style: none; }
+  .guide-box > summary::-webkit-details-marker { display: none; }
+  .guide-box > summary::before { content: "▸"; font-size: 15px; color: var(--ink-3); transition: transform .15s; }
+  .guide-box[open] > summary::before { transform: rotate(90deg); }
+  .guide-box[open] > summary { margin-bottom: 18px; }
   .guide { display: flex; flex-direction: column; gap: 22px; }
   .guide h3 { font-size: 15.5px; font-weight: 600; margin-bottom: 6px; }
   .guide p { color: var(--ink-2); max-width: 64ch; text-wrap: pretty; }
@@ -330,10 +335,10 @@
     <a class="again" href="#cast" data-t="again"></a>
   </section>
 
-  <section class="guide" id="guide">
-    <h2 class="sec" data-t="guideTitle"></h2>
+  <details class="guide-box" id="guide">
+    <summary class="sec"><span data-t="guideTitle"></span></summary>
     <div id="guideBody" class="guide"></div>
-  </section>
+  </details>
 
   <footer data-t="footer"></footer>
 </main>

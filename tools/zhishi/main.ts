@@ -81,10 +81,8 @@ const isEn = () => lang === "en";
 function defaultLang(): Lang {
   const saved = store.get();
   if (saved === "zh-Hans" || saved === "zh-Hant" || saved === "en" || saved === "bi") return saved;
-  const nav = (navigator.language || "").toLowerCase();
-  if (/^zh-(tw|hk|mo|hant)/.test(nav)) return "zh-Hant";
-  if (nav.startsWith("zh")) return "zh-Hans";
-  return "en";
+  // 默认繁体，不看浏览器语言；用户选过就照所选
+  return "zh-Hant";
 }
 
 const complete = (r: Row): boolean => r.every((f) => f !== null);
@@ -441,6 +439,12 @@ function main(): void {
         fill(ui().error, { msg: e instanceof Error ? e.message : String(e) })));
     }
   });
+
+  // 说明默认折叠；点「说明」或「先花一分钟看说明」时展开再跳过去
+  for (const a of document.querySelectorAll<HTMLAnchorElement>('a[href="#guide"]')) {
+    a.addEventListener("click", () => { $<HTMLDetailsElement>("guide").open = true; });
+  }
+  if (location.hash === "#guide") $<HTMLDetailsElement>("guide").open = true;
 
   setHow("time");
   applyTexts();
