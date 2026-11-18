@@ -30,7 +30,6 @@ export interface Ui {
   readonly howCoinHint: string;
   readonly placeLabel: string;
   readonly placeHint: string;
-  readonly cities: readonly string[];
 
   readonly step2: string;
   readonly handSelf: string;
@@ -97,8 +96,7 @@ const ZH_HANS: Ui = {
   howCoin: "掷铜钱",
   howCoinHint: "自己掷三枚硬币，一共六次。卦由你掷出来的结果决定。",
   placeLabel: "你在哪",
-  placeHint: "用来定当地的时刻。",
-  cities: ["上海", "北京", "广州", "深圳", "成都", "西安", "台北", "香港", "新加坡"],
+  placeHint: "按时区排列。时区定当地的钟点，城市的经度用来换算当地的太阳时。",
 
   step2: "掷六次，每次记下三枚的正反",
   handSelf: "我自己掷",
@@ -215,8 +213,7 @@ const EN: Ui = {
   howCoin: "Toss coins",
   howCoinHint: "Toss three coins, six times. The hexagram comes from what you throw.",
   placeLabel: "Where you are",
-  placeHint: "Sets the local time.",
-  cities: ["Shanghai", "Beijing", "Guangzhou", "Shenzhen", "Chengdu", "Xi'an", "Taipei", "Hong Kong", "Singapore"],
+  placeHint: "Grouped by time zone. The zone sets the local clock; the city's longitude sets local solar time.",
 
   step2: "Toss six times, marking each coin",
   handSelf: "I'll toss them",

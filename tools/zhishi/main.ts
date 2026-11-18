@@ -23,13 +23,7 @@ import { zhishiProse, type ZhishiParagraph } from "../../packages/core/src/plain
 import { loadParams } from "../../packages/core/src/params/load.js";
 import { toHant } from "../../packages/core/src/report/hant.js";
 import { UI_SOURCE, fill, mapUi, type Ui } from "./i18n.js";
-
-/** 与移动版同一张表（`packages/web/app/m/store.ts`）：时区、经度。名字在 i18n 里，次序一致。 */
-const CITIES: readonly (readonly [string, number])[] = [
-  ["Asia/Shanghai", 121.47], ["Asia/Shanghai", 116.41], ["Asia/Shanghai", 113.26],
-  ["Asia/Shanghai", 114.06], ["Asia/Shanghai", 104.07], ["Asia/Shanghai", 108.95],
-  ["Asia/Taipei", 121.56], ["Asia/Hong_Kong", 114.17], ["Asia/Singapore", 103.82],
-];
+import { CITIES, groupByOffset, guessCity, offsetLabel, type City } from "./cities.js";
 
 type Lang = "zh-Hans" | "zh-Hant" | "en" | "bi";
 type How = "time" | "coin";
@@ -122,15 +116,28 @@ function applyTexts(): void {
     const v = (u as unknown as Record<string, unknown>)[node.dataset["t"]!];
     if (typeof v === "string") node.textContent = v;
   }
-  // 地点：保留所选的那一项
-  const sel = $<HTMLSelectElement>("place");
-  const keep = sel.value;
-  sel.replaceChildren(...u.cities.map((name, i) => new Option(name, String(i))));
-  sel.value = keep === "" ? sel.value : keep;
+  renderPlaces();
   renderGuide();
   renderCoins();
   syncGo();
   if (last !== null) renderResult(false);
+}
+
+/** 城市名按当前语言。对照模式用繁体。 */
+const cityName = (c: City): string => (lang === "en" ? c.en : lang === "zh-Hans" ? c.hans : c.hant);
+
+/** 地点下拉：按时区分组（UTC 偏移由东往西），组内列主要城市。保留所选的那一项。 */
+function renderPlaces(): void {
+  const sel = $<HTMLSelectElement>("place");
+  const keep = sel.value;
+  const groups = groupByOffset().map(({ offset, cities }) => {
+    const g = document.createElement("optgroup");
+    g.label = offsetLabel(offset);
+    for (const { index, city } of cities) g.append(new Option(cityName(city), String(index)));
+    return g;
+  });
+  sel.replaceChildren(...groups);
+  if (keep !== "") sel.value = keep;
 }
 
 function renderGuide(): void {
@@ -239,7 +246,7 @@ function syncGo(): void {
 
 function castNow(): void {
   const city = Number($<HTMLSelectElement>("place").value);
-  const [timeZone, longitude] = CITIES[city]!;
+  const { tz: timeZone, lon: longitude } = CITIES[city]!;
   const now = wallNow(timeZone);
   const moment = castMomentOf({ ...now, timeZone, longitude });
   const input: CastInput = how === "time"
@@ -326,7 +333,8 @@ function renderResult(scroll: boolean): void {
   const proseEn = lang === "bi" ? zhishiProse(yaociReading(gua, null, { locale: "en", layer: "plain" })) : null;
 
   const moving = gua.yaos.filter((y) => y.moving).map((y) => y.pos);
-  const city = u.cities[last.city] ?? "";
+  const c = CITIES[last.city];
+  const city = c === undefined ? "" : cityName(c);
   $("meta").textContent = [
     last.how === "time" ? u.castByTime : u.castByCoin,
     isEn() ? `${last.when} (${city})` : `${last.when}（${city}）`,
@@ -403,11 +411,9 @@ function main(): void {
   });
 
   // 地点：按设备时区猜一个
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const guess = CITIES.findIndex(([z]) => z === tz);
   const place = $<HTMLSelectElement>("place");
-  place.replaceChildren(...ui().cities.map((name, i) => new Option(name, String(i))));
-  place.value = String(guess < 0 ? 0 : guess);
+  renderPlaces();
+  place.value = String(guessCity(Intl.DateTimeFormat().resolvedOptions().timeZone));
   place.addEventListener("change", invalidate);
 
   for (const b of document.querySelectorAll<HTMLButtonElement>("#how button")) {
