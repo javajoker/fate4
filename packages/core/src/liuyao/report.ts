@@ -17,6 +17,7 @@ import type { Params } from "../params/types.js";
 import type { Locale } from "../report/templates.js";
 import { renderTemplate, localeText, type NarrativeLine } from "../report/render.js";
 import { QUESTION_DISCLAIMER } from "../report/templates.js";
+import type { CastMethod } from "./cast.js";
 import { scanText, type GuardViolation } from "../report/guard.js";
 import { scanPlain } from "../plain/guard.js";
 import type { GuardLayer } from "../report/screen.js";
@@ -44,7 +45,14 @@ export interface QuestionReport {
     readonly questionFingerprint: string | null;
   };
   readonly disclaimerTop: string;
-  readonly casting: { readonly narrative: readonly NarrativeLine[] };
+  readonly casting: {
+    readonly narrative: readonly NarrativeLine[];
+    /**
+     * 实际用的起卦法。人话层的框定语与声明要按它分说：「同一时辰同一卦」
+     * 只对按时起卦成立，掷钱的卦由六次掷出的结果决定。
+     */
+    readonly method: CastMethod;
+  };
   readonly gua: {
     readonly narrative: readonly NarrativeLine[];
     /** 供表格渲染的逐爻数据。 */
@@ -202,7 +210,9 @@ export function buildQuestionReport(
       windows: yq.windows.map((w) => `${monthLabel(w)}（${w.monthsAhead} 个月后）`).join("、"),
     }, 1, "yingqi");
   }
-  L3.add("liuyao.disclaimer.question", {}, 1, "disclaimer");
+  // 「同一时辰同一卦」只对按时起卦成立；报数、掷钱各说各的
+  L3.add(gua.casting.method === "time" ? "liuyao.disclaimer.question"
+    : `liuyao.disclaimer.question.${gua.casting.method}`, {}, 1, "disclaimer");
 
   // ── 指事 ──
   // locale 直接交给语料，不走 T() —— 引文按原文发，不代为转写。
@@ -245,7 +255,7 @@ export function buildQuestionReport(
       questionFingerprint: options.questionFingerprint ?? null,
     },
     disclaimerTop: T(localeText(QUESTION_DISCLAIMER, locale, "QUESTION_DISCLAIMER")),
-    casting: { narrative: L0.items },
+    casting: { narrative: L0.items, method: gua.casting.method },
     gua: { narrative: [], yaos: gua.yaos, fushen: gua.fushen },
     topic: { narrative: L1.items },
     judgement: { narrative: L2.items },

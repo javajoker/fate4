@@ -13,6 +13,7 @@
  */
 
 import type { QuestionReport } from "../liuyao/report.js";
+import type { CastMethod } from "../liuyao/cast.js";
 import {
   relayerYaoci, type Quote, type YaociPick, type YaociReading, type YaociRole, type YaociSource,
 } from "../liuyao/yaoci.js";
@@ -189,11 +190,27 @@ export function plainYaociCards(
 export const plainYaoci = (r: QuestionReport): PlainCard[] =>
   plainYaociCards(r.yaoci.reading, r.yaoci.narrative, "q");
 
-/** 问事页顶部的框定语。比四柱那一版多说一件事：结果属于时刻，不属于人。 */
-export const PLAIN_QUESTION_FRAMING =
-  "下面是按传统方法对「你问的这个时刻」推演出来的结构，换成了平常话。"
-  + "同一个时段里，所有人问所有事得到的是同一个结果 —— 它属于那个时刻，不属于你，"
-  + "区分不同的事靠看结果里的哪一个位置。每一条都可以展开看它的来历。";
+/**
+ * 问事页顶部的框定语。比四柱那一版多说一件事：结果属于什么，不属于人。
+ *
+ * 「属于什么」随起卦法变：按时起卦属于那个时刻（同一时段所有人同一个结果）；
+ * 掷钱属于那六次；报数属于那个数与那个时辰。一句话通用地写成「属于时刻」，
+ * 掷钱的用户读到的就是一句假话。
+ */
+export const PLAIN_QUESTION_FRAMING_BY: Readonly<Record<CastMethod, string>> = Object.freeze({
+  time: "下面是按传统方法对「你问的这个时刻」推演出来的结构，换成了平常话。"
+    + "同一个时段里，所有人问所有事得到的是同一个结果 —— 它属于那个时刻，不属于你，"
+    + "区分不同的事靠看结果里的哪一个位置。每一条都可以展开看它的来历。",
+  number: "下面是按传统方法对「你报的数和这个时辰」推演出来的结构，换成了平常话。"
+    + "同一个数在同一个时段里得到的是同一个结果 —— 它属于那个数和那个时刻，不属于你，"
+    + "区分不同的事靠看结果里的哪一个位置。每一条都可以展开看它的来历。",
+  coin: "下面是按传统方法对「你掷出来的这六次」推演出来的结构，换成了平常话。"
+    + "结果由那六次决定，问的时刻只用来定这个月、这一天的背景 —— 它属于那六次，不属于你，"
+    + "区分不同的事靠看结果里的哪一个位置。每一条都可以展开看它的来历。",
+});
+
+/** 按时起卦那一版。保留这个名字，是因为它是默认起法、也是最常见的那一句。 */
+export const PLAIN_QUESTION_FRAMING = PLAIN_QUESTION_FRAMING_BY.time;
 
 const line = (id: string, title: string, body: string,
   ev: readonly NarrativeLine[], conf = 1): PlainCard => ({
@@ -283,7 +300,7 @@ export function plainQuestion(
     cards: Object.freeze(cards),
     audience,
     yaoci: Object.freeze(plainYaoci(r)),
-    framing: PLAIN_QUESTION_FRAMING,
+    framing: PLAIN_QUESTION_FRAMING_BY[r.casting.method],
     disclaimer: PLAIN_DISCLAIMER,
     disclaimerTechnical: r.disclaimerBottom,
   };

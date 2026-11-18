@@ -31,19 +31,19 @@ import type { CoinThrow } from "@fate/core";
  */
 
 /** 一枚铜钱：`null` 未记，1 阳，0 阴。 */
-type Face = 0 | 1 | null;
+export type Face = 0 | 1 | null;
 /** 一掷三枚。 */
-type Row = readonly [Face, Face, Face];
+export type Row = readonly [Face, Face, Face];
 
 const EMPTY: Row = [null, null, null];
 const POS_LABEL = ["初", "二", "三", "四", "五", "上"] as const;
 
-const complete = (r: Row): r is readonly [0 | 1, 0 | 1, 0 | 1] => r.every((f) => f !== null);
-const yangCount = (r: Row): CoinThrow =>
+export const complete = (r: Row): r is readonly [0 | 1, 0 | 1, 0 | 1] => r.every((f) => f !== null);
+export const yangCount = (r: Row): CoinThrow =>
   r.filter((f) => f === 1).length as CoinThrow;
 
 /** 阳面数 → 爻性与动静。与 `cast.ts` 的表同源，此处只作显示。 */
-function readYao(n: CoinThrow): { yang: boolean; moving: boolean; name: string } {
+export function readYao(n: CoinThrow): { yang: boolean; moving: boolean; name: string } {
   switch (n) {
     case 3: return { yang: true, moving: true, name: "老阳・重" };
     case 2: return { yang: false, moving: false, name: "少阴・拆" };
@@ -65,9 +65,14 @@ export interface CoinCastProps {
   readonly onChange: (throws: readonly CoinThrow[] | null) => void;
 }
 
-export function CoinCast({ onChange }: CoinCastProps) {
+/**
+ * 六掷的状态与操作 —— 桌面版（本文件）与移动版（`app/m/ask/Coins.tsx`）共用。
+ *
+ * 两版只是**说法**不同（桌面用术语，移动版用平常话），记法、次序、替掷的随机源
+ * 必须是同一份：各写一遍，迟早有一边的「替我掷」换成了 Math.random 而另一边没换。
+ */
+export function useCoinRows(onChange: CoinCastProps["onChange"]) {
   const [rows, setRows] = useState<readonly Row[]>([EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY]);
-  const [byHand, setByHand] = useState(true);
 
   const push = (next: readonly Row[]) => {
     setRows(next);
@@ -88,6 +93,15 @@ export function CoinCast({ onChange }: CoinCastProps) {
   const reset = () => push([EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY]);
 
   const done = rows.filter(complete).length;
+  return { rows, setCoin, tossNext, tossAll, reset, done };
+}
+
+/** 一枚铜钱点一下的下一个状态：空 → 阳 → 阴 → 空。 */
+export const nextFace = (f: Face): Face => (f === null ? 1 : f === 1 ? 0 : null);
+
+export function CoinCast({ onChange }: CoinCastProps) {
+  const { rows, setCoin, tossNext, tossAll, reset, done } = useCoinRows(onChange);
+  const [byHand, setByHand] = useState(true);
 
   return (
     <div className="coincast">
@@ -113,8 +127,8 @@ export function CoinCast({ onChange }: CoinCastProps) {
               <span className="coin-pos">{POS_LABEL[i]}</span>
               <span className="coins">
                 {[0, 1, 2].map((k) => {
-                  const f = r[k];
-                  const cycle: Face = f === null ? 1 : f === 1 ? 0 : null;
+                  const f = r[k] ?? null;
+                  const cycle = nextFace(f);
                   return (
                     <button
                       key={k} type="button"

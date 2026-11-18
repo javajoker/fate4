@@ -432,6 +432,38 @@ describe("问事的人话", () => {
       expect(q.framing).toContain("可以展开看");
     }
   });
+
+  it("**掷钱、报数不说「同一时段所有人同一个结果」** —— 那只对按时起卦成立", () => {
+    // 移动版加掷钱时逮到的：框定语与问事声明原先一律写「属于那个时刻」，
+    // 掷钱的用户读到的是一句假话。
+    const COIN = loadParams({ liuyao: { castMethod: "coin" } });
+    const NUM = loadParams({ liuyao: { castMethod: "number" } });
+    const m = castMomentOf({
+      year: 2026, month: 9, day: 2, hour: 14, minute: 30,
+      timeZone: "Asia/Shanghai", longitude: 121.47,
+    });
+    const build = (input: Parameters<typeof cast>[1], p: typeof COIN) => {
+      const g = dress(cast(m, input, p.liuyao), p.liuyao);
+      return buildQuestionReport(judge(g, pickYongshen(g, "wealth.seek"), p.liuyao), p);
+    };
+    const coin = build({ method: "coin", throws: [3, 1, 3, 2, 0, 1] }, COIN);
+    const num = build({ method: "number", value: 27 }, NUM);
+    expect(coin.casting.method).toBe("coin");
+    expect(num.casting.method).toBe("number");
+
+    for (const [r, word] of [[coin, "六次"], [num, "报的数"]] as const) {
+      const q = plainQuestion(r);
+      expect(q.framing).not.toContain("所有人问所有事得到的是同一个结果");
+      expect(q.framing).toContain(word);
+      expect(q.framing).toContain("可以展开看");
+      expect(scanPlain(q.framing, "plain.q.framing")).toEqual([]);
+      const tech = r.yingqi.narrative.map((l) => l.text).join("");
+      expect(tech).not.toContain("同一时辰内所有问事得到同一个卦");
+      expect(r.guard.violations).toEqual([]);
+    }
+    expect(coin.yingqi.narrative.map((l) => l.templateId)).toContain("liuyao.disclaimer.question.coin");
+    expect(num.yingqi.narrative.map((l) => l.templateId)).toContain("liuyao.disclaimer.question.number");
+  });
 });
 
 describe("**序列到「哪一类事」必须全覆盖**", () => {

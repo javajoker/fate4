@@ -912,6 +912,15 @@ const liuyaoTemplates: NarrativeTemplate[] = [
     zhHans: "以上为对卦象结构的描述，不构成对结果的预言，也不构成医疗、法律、财务或任何专业建议。同一时辰内所有问事得到同一个卦 —— 卦属于时刻，区分不同的事靠取不同的用神。",
     en: "The above describes the structure of the hexagram. It is not a prediction of outcomes, nor medical, legal, financial, or any other professional advice. All questions asked within the same two-hour period yield the same hexagram: the hexagram belongs to the moment, and different questions are distinguished by which line is taken as the subject.",
   }),
+  // 上一条的「同一时辰同一卦」只对按时起卦成立。报数、掷钱的卦另有来处，各说各的。
+  T("liuyao.disclaimer.question.number", "data", "disclaimer", [], {
+    zhHans: "以上为对卦象结构的描述，不构成对结果的预言，也不构成医疗、法律、财务或任何专业建议。报数所得的卦由所报之数与起卦的时辰共同决定，区分不同的事靠取不同的用神。",
+    en: "The above describes the structure of the hexagram. It is not a prediction of outcomes, nor medical, legal, financial, or any other professional advice. A number-cast hexagram is fixed by the number given together with the hour of casting; different questions are distinguished by which line is taken as the subject.",
+  }),
+  T("liuyao.disclaimer.question.coin", "data", "disclaimer", [], {
+    zhHans: "以上为对卦象结构的描述，不构成对结果的预言，也不构成医疗、法律、财务或任何专业建议。掷钱所得的卦由六次掷出的结果决定，起卦时刻只定月建与日辰；区分不同的事靠取不同的用神。",
+    en: "The above describes the structure of the hexagram. It is not a prediction of outcomes, nor medical, legal, financial, or any other professional advice. A coin-cast hexagram is fixed by the six throws; the moment of casting supplies only the month and day context. Different questions are distinguished by which line is taken as the subject.",
+  }),
 ];
 
 // ═══════════════════════════════════════════════════════════

@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   buildQuestionReport, cast, castMomentOf, dress, judge, loadParams,
   pickYongshen, plainQuestion, TOPICS, TOPIC_CATEGORIES,
-  type Liuqin, type TopicCategory,
+  type CastInput, type CoinThrow, type Liuqin, type TopicCategory,
 } from "@fate/core";
 import { Card } from "../Card";
+import { Coins } from "./Coins";
 import { Tarot } from "./Tarot";
 import { Disclaimer } from "../page";
 import { CITIES, loadAudience, loadMarks, saveMark, type Mark, type Verdict } from "../store";
@@ -17,12 +18,22 @@ import { CITIES, loadAudience, loadMarks, saveMark, type Mark, type Verdict } fr
  * 三件必须让用户知道的事，都写在页面上而不是折叠起来：
  *
  * 1. **不需要出生信息** —— 卦属于起卦的那个时刻，不属于问卜的人。
- * 2. **同一时段内所有人问所有事，得到同一个卦** —— 区分不同的事靠取不同的位置。
+ * 2. **按时刻起时，同一时段内所有人问所有事，得到同一个卦** —— 区分不同的事靠取不同的位置。
  * 3. **同一个问题当天只起一次** —— 允许重问等于允许一直摇到满意为止。
+ *
+ * 起卦两种：按时刻（默认，梅花的取数法）与掷铜钱（六爻本法）。第 2 条只对前者成立 ——
+ * 掷铜钱的结果由用户掷出来，时刻只定月建、日辰，故页首那段话随所选的起法换。
  */
 
 const JOURNAL = "fate.m.journal.v1";
-type Entry = { key: string; at: string; recordedAt: string };
+/**
+ * `input` 是后加的：一事不二占要能**原样复出**那一卦，掷铜钱的六次就得记下来。
+ * 旧记录没有这一项，它们当时只能按时刻起，故缺省即按时刻。
+ */
+type Entry = { key: string; at: string; recordedAt: string; input?: CastInput };
+
+type How = "time" | "coin";
+const HOW_LABEL: Readonly<Record<How, string>> = { time: "按现在的时刻", coin: "掷铜钱" };
 
 async function fingerprint(text: string): Promise<string> {
   const buf = new TextEncoder().encode(text.normalize("NFKC").trim());
@@ -43,8 +54,11 @@ export default function AskPage() {
   const [relation, setRelation] = useState<Liuqin>("父母");
   const [question, setQuestion] = useState("");
   const [place, setPlace] = useState(0);
+  const [how, setHow] = useState<How>("time");
+  // 六次掷齐才是一个合法输入，未齐时为 null
+  const [coins, setCoins] = useState<readonly CoinThrow[] | null>(null);
   const [out, setOut] = useState<{
-    report: ReturnType<typeof buildQuestionReport>; replayed: boolean;
+    report: ReturnType<typeof buildQuestionReport>; replayed: boolean; how: How;
   } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   // 复盘：问过的事，事后回来记结果。与「回看」共用同一本账。
@@ -73,17 +87,41 @@ export default function AskPage() {
       const prior = key === null ? undefined : journal.find((e) => e.key === key);
       const m = prior === undefined ? moment : castMomentOf(JSON.parse(prior.at) as typeof at);
 
-      const gua = dress(cast(m, { method: "time" }, params.liuyao), params.liuyao);
+      // 问过的事原样复出当时那一卦 —— 连同当时的起法，不看现在选的是哪一种
+      let input: CastInput;
+      if (prior !== undefined) {
+        input = prior.input ?? { method: "time" };
+      } else if (how === "time") {
+        input = { method: "time" };
+      } else {
+        if (coins === null || coins.length !== 6) {
+          throw new Error("六次还没掷齐 —— 每一次都要把三枚的正反记下来。");
+        }
+        input = {
+          method: "coin",
+          throws: coins as [CoinThrow, CoinThrow, CoinThrow, CoinThrow, CoinThrow, CoinThrow],
+        };
+      }
+      // 起法写进参数，报告「起卦法」一行与参数指纹才对得上实际用的那一种（桌面版同此）
+      const p = input.method === params.liuyao.castMethod
+        ? params
+        : { ...params, liuyao: { ...params.liuyao, castMethod: input.method } };
+
+      const gua = dress(cast(m, input, p.liuyao), p.liuyao);
       const ys = pickYongshen(gua, topic.id, topic.use.kind === "caller" ? relation : undefined);
-      const report = buildQuestionReport(judge(gua, ys, params.liuyao), params,
+      const report = buildQuestionReport(judge(gua, ys, p.liuyao), p,
         qh === null ? {} : { questionFingerprint: qh });
 
       if (prior === undefined && key !== null) {
         localStorage.setItem(JOURNAL, JSON.stringify([
-          ...journal, { key, at: JSON.stringify(at), recordedAt: new Date().toISOString() },
+          ...journal,
+          { key, at: JSON.stringify(at), recordedAt: new Date().toISOString(), input },
         ]));
       }
-      setOut({ report, replayed: prior !== undefined });
+      setOut({
+        report, replayed: prior !== undefined,
+        how: input.method === "coin" ? "coin" : "time",
+      });
       setAskedKey(key);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -111,9 +149,18 @@ export default function AskPage() {
       {method === "tarot" ? <Tarot /> : (
       <>
       <p className="m-lede">
-        这一页不需要你的出生信息 —— 它看的是你问的这个时刻。
-        同一个时段里，所有人问所有事得到的是同一个结果，
-        区分不同的事靠看结果里的哪一个位置。
+        {how === "time" ? (
+          <>
+            这一页不需要你的出生信息 —— 它看的是你问的这个时刻。
+            同一个时段里，所有人问所有事得到的是同一个结果，
+            区分不同的事靠看结果里的哪一个位置。
+          </>
+        ) : (
+          <>
+            这一页不需要你的出生信息。掷铜钱的话，结果由你掷出来的六次决定；
+            问的这个时刻只用来定这个月、这一天的背景。
+          </>
+        )}
       </p>
 
       <div className="m-form">
@@ -146,7 +193,20 @@ export default function AskPage() {
             {CITIES.map((c, i) => <option key={c[0]} value={i}>{c[0]}</option>)}
           </select>
         </div>
-        <button className="m-btn" onClick={() => { void ask(); }}>问</button>
+        <div className="m-field">
+          <label>怎么起</label>
+          <div className="m-seg" style={{ margin: 0 }}>
+            {(["time", "coin"] as const).map((h) => (
+              <button key={h} type="button" className={how === h ? "on" : undefined}
+                onClick={() => setHow(h)}>{HOW_LABEL[h]}</button>
+            ))}
+          </div>
+        </div>
+        {how === "coin" && <Coins onChange={setCoins} />}
+        <button className="m-btn" disabled={how === "coin" && coins === null}
+          onClick={() => { void ask(); }}>
+          {how === "coin" && coins === null ? "六次掷齐后再问" : "问"}
+        </button>
       </div>
 
       <p className="m-note">
@@ -165,7 +225,10 @@ export default function AskPage() {
         <>
           {out.replayed && (
             <div className="m-card">
-              <p className="dim">这个问题今天已经问过一次，这里显示的是当时的结果。</p>
+              <p className="dim">
+                这个问题今天已经问过一次（当时是{out.how === "coin" ? "掷铜钱" : "按时刻"}起的），
+                这里显示的是当时的结果。
+              </p>
             </div>
           )}
           <Followup
