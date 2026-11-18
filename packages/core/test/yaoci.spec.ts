@@ -569,14 +569,14 @@ describe("**指事接成段落**（独立页面用）", () => {
     次: /^其次，/, 体: /^就这件事本身来说，/, 用: /^再看它往哪里去，/,
   };
 
-  it("引文一字不改地出现在段落里；连接词按主／次／体／用各就各位", () => {
+  it("引文一字不改地出现在段落里；连接词按主／次／体／用各就各位；每一格爻辞都说阶段", () => {
     let seen = 0;
     for (const g of allGua(17)) {
       const r = reading(g, "zh-Hans", "plain");
       const z = zhishiProse(r);
       expect(z.rule.length).toBeGreaterThan(0);
       const byRole = new Map(z.paragraphs.map((p) => [p.role, p]));
-      r.picks.forEach((pk, i) => {
+      r.picks.forEach((pk) => {
         const para = byRole.get(pk.role);
         if (para === undefined) return;             // 整段都被拦下
         seen++;
@@ -585,12 +585,13 @@ describe("**指事接成段落**（独立页面用）", () => {
           // 句末标点可能被补上，故只查引文正文
           if (q.text !== null) expect(body, `${pk.role}：${q.text}`).toContain(q.text.replace(/[。？！]$/, ""));
         }
-        // 阶段只随第一格（且是爻辞）说一次
-        if (i === 0 && pk.slot !== GUA_SLOT && pk.stage?.text != null) {
-          expect(body.startsWith(pk.stage.text)).toBe(true);
-        } else if (pk.stage?.text != null) {
-          expect(body).not.toContain(pk.stage.text);
+        // 爻辞的每一格各说各的阶段，紧跟在段首连接词后面；卦辞没有阶段
+        if (pk.slot !== GUA_SLOT && pk.stage?.text != null) {
+          const lead = pk.role === "次" ? "其次，" : "";
+          expect(body.startsWith(lead + pk.stage.text), `${pk.role}：${body}`).toBe(true);
+          if (pk.quotes.gist.text !== null) expect(body).toContain("这一步的要点是：");
         }
+        if (pk.slot === GUA_SLOT) expect(body).not.toContain("这一步的要点是：");
         if (pk.role in OPEN) expect(body).toMatch(OPEN[pk.role]!);
         if (pk.role === "主" && pk.slot === GUA_SLOT) expect(body).toMatch(/^整体来看，/);
         expect(para.source).toBe(pickSource(r, pk));

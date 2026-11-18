@@ -9,13 +9,14 @@
  *
  * | 所取 | 接法 |
  * | 主（爻辞） | 阶段。这一步的要点是：指事。具体来说，白话转述 |
- * | 次（爻辞） | 其次，指事。细说起来，白话转述 |
+ * | 次（爻辞） | 其次，阶段。这一步的要点是：指事。细说起来，白话转述 |
  * | 主（卦辞） | 整体来看，指事。具体来说，白话转述 |
  * | 体（卦辞） | 就这件事本身来说，指事。具体来说，白话转述 |
  * | 用（卦辞） | 再看它往哪里去，指事。细说起来，白话转述 |
  *
- * 次的那一格**不再说阶段**：两格动时阶段说两遍，读者会以为事情同时走在两步上。
- * 阶段只随主的那一格说。
+ * 爻辞的每一格**各说各的阶段**：两格动（或四爻动取两个不变爻）时，主与次落在不同的爻位，
+ * 本来就是两步 —— 「其次」那一段说它自己走到哪一步，读者才知道这第二段话说的是哪一格的处境。
+ * 卦辞没有爻位，也就没有阶段。
  *
  * ## 不改引文
  *
@@ -51,16 +52,22 @@ export interface ZhishiProse {
 /** 补句末标点。已以句号、问号、叹号、引号收尾的不动。 */
 const sentence = (s: string): string => (/[。？！?!」”]$/.test(s) ? s : `${s}。`);
 
-const LEAD: Readonly<Record<YaociPick["role"], { readonly open: string; readonly expand: string }>> = {
-  // 「要点是：」而不是「此时，」：一句话指事有时是名词短语（「像母亲一样宽广的胸怀」），
-  // 接在「此时，」后面不成句；也有以「…时」起头的，「此时，条件成熟时」叠了两个时。
-  主: { open: "这一步的要点是：", expand: "具体来说，" },
-  次: { open: "其次，", expand: "细说起来，" },
-  体: { open: "就这件事本身来说，", expand: "具体来说，" },
-  用: { open: "再看它往哪里去，", expand: "细说起来，" },
+/** 段首的连接词。主（爻辞）由阶段起句，不加；卦辞的主没有阶段，用「整体来看」。 */
+const OPEN: Readonly<Record<YaociPick["role"], string>> = {
+  主: "", 次: "其次，", 体: "就这件事本身来说，", 用: "再看它往哪里去，",
 };
+/** 白话转述前的连接词。 */
+const EXPAND: Readonly<Record<YaociPick["role"], string>> = {
+  主: "具体来说，", 次: "细说起来，", 体: "具体来说，", 用: "细说起来，",
+};
+/**
+ * 阶段之后、指事之前。用「要点是：」而不是「此时，」：一句话指事有时是名词短语
+ * （「像母亲一样宽广的胸怀」），接在「此时，」后面不成句；也有以「…时」起头的，
+ * 「此时，条件成熟时」叠了两个时。
+ */
+const AFTER_STAGE = "这一步的要点是：";
 
-function paragraphOf(p: YaociPick, withStage: boolean): {
+function paragraphOf(p: YaociPick): {
   readonly text: string; readonly withheld: number;
 } {
   let withheld = 0;
@@ -70,21 +77,23 @@ function paragraphOf(p: YaociPick, withStage: boolean): {
     return q.text;
   };
   const isGua = p.slot === 0;
-  // 阶段只随主的那一格说；卦辞没有阶段
-  const stage = withStage && !isGua ? take(p.stage) : null;
+  // 卦辞没有爻位，也就没有阶段
+  const stage = isGua ? null : take(p.stage);
   const gist = take(p.quotes.gist);
   const expand = take(p.quotes.expand);
 
-  // 卦辞的「主」（静卦、六爻皆动）没有阶段可接，开头改用「整体来看」
-  const lead = p.role === "主" && isGua ? { open: "整体来看，", expand: "具体来说，" } : LEAD[p.role];
-  // 爻辞的「主」，「这一步」指的是前面那句阶段；阶段不在（被拦），它就无所指
-  const open = p.role === "主" && !isGua && stage === null ? "" : lead.open;
-
+  // 卦辞的「主」（静卦、六爻皆动）没有阶段可接，开头用「整体来看」
+  let open: string = p.role === "主" && isGua ? "整体来看，" : OPEN[p.role];
   const parts: string[] = [];
-  if (stage !== null) parts.push(sentence(stage));
-  if (gist !== null) parts.push(open + sentence(gist));
-  // 指事被拦时，开头的连接词让给转述
-  if (expand !== null) parts.push((gist === null ? open : lead.expand) + sentence(expand));
+  // 段首连接词只用一次：落在第一句实际出现的话前面（阶段、指事、转述，哪句被拦就往后让）
+  const lead = (): string => { const o = open; open = ""; return o; };
+
+  if (stage !== null) parts.push(lead() + sentence(stage));
+  // 「这一步」指的是前面那句阶段；阶段不在（卦辞，或被拦），它就无所指
+  if (gist !== null) parts.push((stage !== null ? AFTER_STAGE : lead()) + sentence(gist));
+  if (expand !== null) {
+    parts.push((stage !== null || gist !== null ? EXPAND[p.role] : lead()) + sentence(expand));
+  }
   return { text: parts.join(""), withheld };
 }
 
@@ -93,8 +102,8 @@ export function zhishiProse(reading: YaociReading): ZhishiProse {
   const y = reading.layer === "plain" ? reading : relayerYaoci(reading, "plain");
   let withheld = 0;
   const paragraphs: ZhishiParagraph[] = [];
-  y.picks.forEach((p, i) => {
-    const one = paragraphOf(p, i === 0);
+  y.picks.forEach((p) => {
+    const one = paragraphOf(p);
     withheld += one.withheld;
     if (one.text.length === 0) return;
     const head = p.slot === 0 ? null : (p.quotes.classic.text?.match(/^[^。]+/)?.[0] ?? null);
